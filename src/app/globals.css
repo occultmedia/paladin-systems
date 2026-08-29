@@ -1,26 +1,263 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  --color-canvas: #f6f7f9;
+  --color-surface: #fdfdfe;
+  --color-edge: #e5e8ed;
+  --color-line: #d4d9e0;
+  --color-fg: #15181d;
+  --color-muted: #5f6774;
+  --color-accent: #333a44;
+  --color-signal: #148256;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-archivo);
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-plex);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* ---------------------------------------------------------------------------
+   Theme engine. Light is the standard; dark activates only by choice
+   through the toggle (data-theme="dark").
+--------------------------------------------------------------------------- */
+
+:root {
+  color-scheme: light;
+
+  /* themed accents that utilities can't derive from tokens */
+  --halo-strong: rgb(21 32 54 / 0.06);
+  --halo-soft: rgb(21 32 54 / 0.04);
+  --grid-line: rgb(21 24 29 / 0.055);
+  --particle: rgb(21 24 29 / 0.22);
+  --pulse-color: #2b323c;
+  --pulse-glow: rgb(43 50 60 / 0.3);
+  --pulse-ring: rgb(21 24 29 / 0.22);
+  --bubble-bg: #eaeef4;
+
+  --glass-border: rgb(213 217 224 / 0.9);
+  --glass-a: rgb(255 255 255 / 0.86);
+  --glass-b: rgb(251 252 253 / 0.62);
+  --glass-topline: rgb(255 255 255 / 0.9);
+  --shadow-a: rgb(21 32 54 / 0.05);
+  --shadow-b: rgb(21 32 54 / 0.18);
+  --shadow-c: rgb(21 32 54 / 0.14);
+
+  --btn-a: #1c2027;
+  --btn-b: #0e1013;
+  --btn-a-hover: #262b34;
+  --btn-b-hover: #14171c;
+  --btn-text: #f5f6f7;
+  --btn-topline: rgb(255 255 255 / 0.14);
+  --btn-glow: rgb(21 24 29 / 0.35);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-canvas: #0a0a0b;
+  --color-surface: #131315;
+  --color-edge: #232327;
+  --color-line: #303036;
+  --color-fg: #f5f6f7;
+  --color-muted: #9a9ca3;
+  --color-accent: #d9dce1;
+  --color-signal: #37c081;
+
+  --halo-strong: rgb(255 255 255 / 0.07);
+  --halo-soft: rgb(255 255 255 / 0.045);
+  --grid-line: rgb(255 255 255 / 0.06);
+  --particle: rgb(255 255 255 / 0.2);
+  --pulse-color: #e9ebf0;
+  --pulse-glow: rgb(233 235 240 / 0.35);
+  --pulse-ring: rgb(255 255 255 / 0.25);
+  --bubble-bg: rgb(255 255 255 / 0.07);
+
+  --glass-border: rgb(255 255 255 / 0.09);
+  --glass-a: rgb(26 26 29 / 0.82);
+  --glass-b: rgb(17 17 19 / 0.62);
+  --glass-topline: rgb(255 255 255 / 0.08);
+  --shadow-a: rgb(0 0 0 / 0.4);
+  --shadow-b: rgb(0 0 0 / 0.55);
+  --shadow-c: rgb(0 0 0 / 0.5);
+
+  --btn-a: #ffffff;
+  --btn-b: #dde1e7;
+  --btn-a-hover: #ffffff;
+  --btn-b-hover: #eef0f4;
+  --btn-text: #0a0a0b;
+  --btn-topline: rgb(255 255 255 / 0.95);
+  --btn-glow: rgb(255 255 255 / 0.22);
+}
+
+/* Radius system: 16px containers/slabs, 10px interactive elements. */
+
+/* Frosted slab; adapts to theme through the glass variables. */
+@utility glass-slab {
+  border: 1px solid var(--glass-border);
+  background: linear-gradient(160deg, var(--glass-a), var(--glass-b));
+  backdrop-filter: blur(14px) saturate(130%);
+  -webkit-backdrop-filter: blur(14px) saturate(130%);
+  box-shadow:
+    inset 0 1px 0 var(--glass-topline),
+    0 1px 2px var(--shadow-a),
+    0 14px 34px -14px var(--shadow-b),
+    0 36px 72px -30px var(--shadow-c);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .glass-slab {
+    background: var(--color-surface);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+/* Primary button: machined face that inverts with the theme. */
+@utility btn-metal {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(to bottom, var(--btn-a), var(--btn-b));
+  color: var(--btn-text);
+  box-shadow:
+    inset 0 1px 0 var(--btn-topline),
+    0 12px 32px -12px var(--btn-glow);
+
+  &:hover {
+    background: linear-gradient(
+      to bottom,
+      var(--btn-a-hover),
+      var(--btn-b-hover)
+    );
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    &::after {
+      content: "";
+      position: absolute;
+      inset: 0 auto 0 -45%;
+      width: 35%;
+      background: linear-gradient(
+        105deg,
+        transparent,
+        rgb(255 255 255 / 0.55),
+        transparent
+      );
+      transform: translateX(0) skewX(-18deg);
+      transition: transform 0.65s ease;
+    }
+
+    &:hover::after {
+      transform: translateX(420%) skewX(-18deg);
+    }
+  }
+}
+
+/* Fixed white-faced button for the always-dark product cards. */
+@utility btn-hardware {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(to bottom, #ffffff, #dde1e7);
+  color: #0a0a0b;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.95),
+    0 12px 32px -12px rgb(255 255 255 / 0.22);
+
+  &:hover {
+    background: linear-gradient(to bottom, #ffffff, #eef0f4);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    &::after {
+      content: "";
+      position: absolute;
+      inset: 0 auto 0 -45%;
+      width: 35%;
+      background: linear-gradient(
+        105deg,
+        transparent,
+        rgb(255 255 255 / 0.85),
+        transparent
+      );
+      transform: translateX(0) skewX(-18deg);
+      transition: transform 0.65s ease;
+    }
+
+    &:hover::after {
+      transform: translateX(420%) skewX(-18deg);
+    }
+  }
+}
+
+/* Underline that draws in from the left on hover. */
+@utility link-underline {
+  background-image: linear-gradient(currentColor, currentColor);
+  background-size: 0% 1px;
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  transition:
+    background-size 0.3s ease,
+    color 0.2s ease;
+
+  &:hover {
+    background-size: 100% 1px;
+  }
+}
+
+/* Faded hairline rules between sections instead of hard edge-to-edge borders. */
+main > section + section,
+footer {
+  position: relative;
+}
+
+main > section + section::before,
+footer::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(1400px, 92%);
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    transparent,
+    var(--color-edge) 18%,
+    var(--color-edge) 82%,
+    transparent
+  );
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+@keyframes drift {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+html {
+  scroll-behavior: smooth;
+  background: var(--color-canvas);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
   }
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  color: var(--color-fg);
+}
+
+::selection {
+  background: var(--color-accent);
+  color: var(--color-canvas);
 }
