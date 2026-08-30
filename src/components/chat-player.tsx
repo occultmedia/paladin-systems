@@ -137,8 +137,10 @@ export function ChatPlayer({
           )}
         </div>
 
+        {/* Fixed-height, bottom-anchored window: the conversation grows
+            upward inside the frame, so the page never reflows. */}
         <div
-          className={`flex flex-col gap-2.5 px-4 py-4 ${bodyClassName}`}
+          className={`flex flex-col justify-end gap-2.5 overflow-hidden px-4 py-4 ${bodyClassName}`}
         >
           {steps.map((step, i) => {
             const key = `${cycle}-${i}`;

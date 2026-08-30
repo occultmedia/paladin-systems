@@ -3,7 +3,7 @@ import { PaladinMark } from "@/components/logo";
 
 export default function NotFound() {
   return (
-    <div className="flex min-h-[100dvh] flex-col items-center justify-center gap-6 px-5 text-center">
+    <div className="flex min-h-[100svh] flex-col items-center justify-center gap-6 px-5 text-center">
       <PaladinMark className="size-10 text-accent" />
       <div>
         <p className="font-mono text-[12px] uppercase tracking-[0.2em] text-muted">

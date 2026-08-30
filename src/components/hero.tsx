@@ -85,7 +85,7 @@ export function Hero() {
         className="pointer-events-none absolute left-[-10%] top-[15%] h-[480px] w-[640px] rounded-full bg-[radial-gradient(closest-side,var(--halo-soft),transparent)] blur-2xl"
       />
 
-      <div className="relative mx-auto grid min-h-[100dvh] w-full max-w-[1400px] grid-cols-1 items-center gap-y-10 px-5 pb-8 pt-32 lg:grid-cols-12 lg:gap-x-12 lg:gap-y-8 lg:px-8 lg:pb-8 lg:pt-20">
+      <div className="relative mx-auto grid min-h-[100svh] w-full max-w-[1400px] grid-cols-1 items-center gap-y-10 px-5 pb-8 pt-32 lg:grid-cols-12 lg:gap-x-12 lg:gap-y-8 lg:px-8 lg:pb-8 lg:pt-20">
         <div className="lg:col-span-7">
           <motion.p
             {...rise(0)}
@@ -152,7 +152,7 @@ export function Hero() {
             title="Your Tour Company"
             subtitle="online, replies in seconds"
             time="2:14 AM"
-            bodyClassName="min-h-[228px]"
+            bodyClassName="h-[368px] sm:h-[308px]"
             className="lg:-translate-x-3"
             srDescription="Example WhatsApp conversation: a customer asks about a jeep tour at 2:14 AM, the Agent confirms availability and price, sends a secure payment link, and the deposit is received."
           />
@@ -162,7 +162,7 @@ export function Hero() {
             title="Chat with us"
             subtitle="replies instantly, day and night"
             domain="your-realty.aw"
-            bodyClassName="min-h-[196px]"
+            bodyClassName="h-[332px] sm:h-[264px]"
             className="lg:translate-x-3"
             srDescription="Example website chat for a real estate office: a customer asks if a 2-bedroom apartment in Noord is available, the Agent checks the listings, offers a Thursday 3 PM viewing, and the viewing is confirmed."
           />

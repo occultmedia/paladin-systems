@@ -79,7 +79,7 @@ export function LiveDemo() {
               title="Chat with us"
               subtitle="replies instantly, day and night"
               domain="yourbusiness.aw"
-              bodyClassName="min-h-[478px]"
+              bodyClassName="h-[660px] sm:h-[520px]"
               srDescription="Example website chat: a customer asks the price of the sunset UTV tour, the assistant answers, checks the live calendar for Saturday, finds 3 UTVs open, creates a secure payment link, and the deposit is received."
             />
           </Reveal>
@@ -94,7 +94,7 @@ export function LiveDemo() {
               title="Your Charter Company"
               subtitle="online, replies in seconds"
               time="9:12 PM"
-              bodyClassName="min-h-[368px]"
+              bodyClassName="h-[460px] sm:h-[384px]"
               srDescription="Example WhatsApp chat: a customer asks for 2 spots on tomorrow's sunset sail, the assistant checks the manifest, finds tomorrow full but Sunday open, offers Sunday, sends a secure payment link, and the deposit is received."
             />
           </Reveal>
