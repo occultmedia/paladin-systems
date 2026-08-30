@@ -25,7 +25,7 @@ const METRICS = [
 
 const INDUSTRIES = [
   { icon: Building2, label: "Real Estate" },
-  { icon: Home, label: "Airbnbs" },
+  { icon: Home, label: "Vacation Rentals" },
   { icon: Car, label: "Car Rentals" },
   { icon: BedDouble, label: "Boutique Hotels" },
   { icon: Map, label: "Tour Operators" },

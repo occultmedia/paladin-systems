@@ -49,7 +49,7 @@ const PRODUCTS: Product[] = [
     ],
   },
   {
-    target: "For boutique hotels, villas + Airbnbs",
+    target: "For boutique hotels, villas + vacation rentals",
     name: "The Digital Concierge",
     pitch: "5-star guest support in 4 languages, while your staff sleeps.",
     hero: ConciergeBell,
