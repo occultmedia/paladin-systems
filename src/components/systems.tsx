@@ -22,18 +22,6 @@ import { CountUp } from "@/components/count-up";
 import { Reveal } from "@/components/reveal";
 import { CONTACT_EMAIL } from "@/lib/site";
 
-/* Product-card palette: charcoal modules lifted just above the page black,
-   with silver accents. Local to the hardware catalog. */
-const CARD = {
-  bg: "#101013",
-  edge: "#2a2a2f",
-  name: "#f5f6f7",
-  body: "#9a9ca3",
-  spec: "#c6c9cf",
-  faint: "#8a8d94",
-  bone: "#e9ebf0",
-};
-
 type Product = {
   target: string;
   name: string;
@@ -107,43 +95,33 @@ function ProductCard({ product }: { product: Product }) {
     <motion.article
       whileHover={reduce ? undefined : { y: -6 }}
       transition={{ type: "spring", stiffness: 260, damping: 22 }}
-      style={{ backgroundColor: CARD.bg, borderColor: CARD.edge }}
-      className="flex h-full flex-col overflow-hidden rounded-2xl border shadow-[0_18px_44px_-22px_rgba(0,0,0,0.6)] transition-[border-color,box-shadow] duration-300 hover:border-white/40 hover:shadow-[0_28px_64px_-24px_rgba(0,0,0,0.7),0_0_32px_-8px_rgba(233,235,240,0.28)]"
+      className="glass-slab flex h-full flex-col overflow-hidden rounded-2xl transition-[border-color] duration-300 hover:border-accent/50"
     >
       {/* product stage */}
-      <div
-        className="relative h-32 shrink-0 overflow-hidden border-b"
-        style={{ borderColor: CARD.edge }}
-      >
+      <div className="relative h-32 shrink-0 overflow-hidden border-b border-edge/80">
         <div
           aria-hidden
-          className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.045)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.045)_1px,transparent_1px)] bg-[size:26px_26px] [mask-image:radial-gradient(ellipse_at_50%_50%,black_0%,transparent_75%)]"
+          className="absolute inset-0 bg-[linear-gradient(to_right,var(--grid-line)_1px,transparent_1px),linear-gradient(to_bottom,var(--grid-line)_1px,transparent_1px)] bg-[size:26px_26px] [mask-image:radial-gradient(ellipse_at_50%_50%,black_0%,transparent_75%)]"
         />
         <div
           aria-hidden
-          className="absolute left-1/2 top-1/2 h-28 w-52 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(255,255,255,0.11),transparent)] blur-md"
+          className="absolute left-1/2 top-1/2 h-28 w-52 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(closest-side,var(--halo-strong),transparent)] blur-md"
         />
         <div className="relative flex h-full items-center justify-center">
-          <div className="flex size-14 items-center justify-center rounded-[10px] border border-[#333338] bg-[#17171a] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
-            <Hero className="size-6" style={{ color: CARD.bone }} strokeWidth={1.5} />
+          <div className="flex size-14 items-center justify-center rounded-[10px] border border-line bg-canvas/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+            <Hero className="size-6 text-accent" strokeWidth={1.5} />
           </div>
         </div>
       </div>
 
       <div className="flex flex-1 flex-col p-6">
-        <p
-          className="font-mono text-[10px] uppercase tracking-[0.16em]"
-          style={{ color: CARD.faint }}
-        >
+        <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted">
           {product.target}
         </p>
-        <h3
-          className="mt-3 font-display text-xl font-semibold"
-          style={{ color: CARD.name }}
-        >
+        <h3 className="mt-3 font-display text-xl font-semibold text-fg">
           {product.name}
         </h3>
-        <p className="mt-2 text-[14px] leading-relaxed" style={{ color: CARD.body }}>
+        <p className="mt-2 text-[14px] leading-relaxed text-muted">
           {product.pitch}
         </p>
 
@@ -151,14 +129,10 @@ function ProductCard({ product }: { product: Product }) {
           {product.specs.map((spec) => (
             <li key={spec.text} className="flex items-start gap-3">
               <spec.icon
-                className="mt-0.5 size-4 shrink-0"
-                style={{ color: CARD.bone }}
+                className="mt-0.5 size-4 shrink-0 text-accent"
                 strokeWidth={1.5}
               />
-              <span
-                className="font-mono text-[12px] leading-relaxed"
-                style={{ color: CARD.spec }}
-              >
+              <span className="font-mono text-[12px] leading-relaxed text-muted">
                 {spec.text}
               </span>
             </li>
@@ -166,12 +140,12 @@ function ProductCard({ product }: { product: Product }) {
         </ul>
 
         <div className="mt-auto pt-6">
-          <div className="border-t pt-5" style={{ borderColor: CARD.edge }}>
+          <div className="border-t border-edge/80 pt-5">
             <a
               href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(
                 `Order: ${product.name}`,
               )}`}
-              className="btn-hardware block w-full rounded-[10px] py-3 text-center font-mono text-[12.5px] font-medium uppercase tracking-[0.08em] transition-all hover:-translate-y-0.5 active:scale-[0.99]"
+              className="btn-metal block w-full rounded-[10px] py-3 text-center font-mono text-[12.5px] font-medium uppercase tracking-[0.08em] transition-all hover:-translate-y-0.5 active:scale-[0.99]"
             >
               Order This Agent
             </a>
