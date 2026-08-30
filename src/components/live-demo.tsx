@@ -1,4 +1,5 @@
 import { ChatPlayer, type ChatStep } from "@/components/chat-player";
+import { EmailCard } from "@/components/email-card";
 import { Reveal } from "@/components/reveal";
 
 const WIDGET_SCRIPT: ChatStep[] = [
@@ -54,6 +55,34 @@ const WHATSAPP_SCRIPT: ChatStep[] = [
   { kind: "status", text: "Deposit received. 2 spots confirmed for Sunday 5 PM." },
 ];
 
+const NOVA_SCRIPT: ChatStep[] = [
+  {
+    kind: "in",
+    text: "Hi! How much is an automatic SUV for 5 days next week?",
+  },
+  {
+    kind: "action",
+    pending: "Checking the fleet",
+    done: "3 SUVs free next week",
+  },
+  {
+    kind: "out",
+    text: "Hi, this is Nova! An automatic SUV is $68 per day, so $340 for 5 days with full insurance. Want me to hold one for you?",
+  },
+  { kind: "in", text: "Yes, Monday to Friday please" },
+  {
+    kind: "action",
+    pending: "Holding your SUV",
+    done: "SUV reserved: Monday to Friday",
+  },
+  {
+    kind: "out",
+    text: "Done! Pay the $80 deposit here and it's yours:",
+    link: "Secure payment link",
+  },
+  { kind: "status", text: "Deposit received. Your SUV is ready Monday at 9 AM." },
+];
+
 export function LiveDemo() {
   return (
     <section id="demo" className="scroll-mt-24">
@@ -62,9 +91,10 @@ export function LiveDemo() {
           <h2 className="font-display text-3xl font-semibold tracking-tight text-fg sm:text-4xl">
             Watch it close a booking.
           </h2>
-          <p className="mt-4 max-w-[56ch] text-[15px] leading-relaxed text-muted">
-            Two real conversations, start to finish. The small gray steps show
-            the Agent checking your calendar behind the scenes.
+          <p className="mt-4 max-w-[58ch] text-[15px] leading-relaxed text-muted">
+            Four real examples from Agents we build. The small gray steps show
+            the Agent working behind the scenes: checking calendars, fleets,
+            and payments.
           </p>
         </Reveal>
 
@@ -80,7 +110,7 @@ export function LiveDemo() {
               subtitle="replies instantly, day and night"
               domain="yourbusiness.aw"
               bodyClassName="h-[660px] sm:h-[520px]"
-              srDescription="Example website chat: a customer asks the price of the sunset UTV tour, the assistant answers, checks the live calendar for Saturday, finds 3 UTVs open, creates a secure payment link, and the deposit is received."
+              srDescription="Example website chat: a customer asks the price of the sunset UTV tour, the Agent answers, checks the live calendar for Saturday, finds 3 UTVs open, creates a secure payment link, and the deposit is received."
             />
           </Reveal>
 
@@ -95,8 +125,30 @@ export function LiveDemo() {
               subtitle="online, replies in seconds"
               time="9:12 PM"
               bodyClassName="h-[460px] sm:h-[384px]"
-              srDescription="Example WhatsApp chat: a customer asks for 2 spots on tomorrow's sunset sail, the assistant checks the manifest, finds tomorrow full but Sunday open, offers Sunday, sends a secure payment link, and the deposit is received."
+              srDescription="Example WhatsApp chat: a customer asks for 2 spots on tomorrow's sunset sail, the Agent checks the manifest, finds tomorrow full but Sunday open, offers Sunday, sends a secure payment link, and the deposit is received."
             />
+          </Reveal>
+
+          <Reveal delay={0.1}>
+            <p className="mb-3 font-mono text-[10.5px] uppercase tracking-[0.18em] text-muted">
+              Nova, a rental Agent
+            </p>
+            <ChatPlayer
+              chrome="whatsapp"
+              script={NOVA_SCRIPT}
+              title="Nova"
+              subtitle="rental Agent, online 24/7"
+              time="6:52 PM"
+              bodyClassName="h-[560px] sm:h-[452px]"
+              srDescription="Example WhatsApp chat with Nova, a car rental Agent: a customer asks the price of an automatic SUV for 5 days, Nova checks the fleet, quotes $340, reserves the SUV for Monday to Friday, sends a secure payment link, and the deposit is received."
+            />
+          </Reveal>
+
+          <Reveal delay={0.18}>
+            <p className="mb-3 font-mono text-[10.5px] uppercase tracking-[0.18em] text-muted">
+              Automatic review emails
+            </p>
+            <EmailCard />
           </Reveal>
         </div>
       </div>
