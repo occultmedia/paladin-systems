@@ -21,7 +21,7 @@ export function Positioning() {
       <div className="mx-auto max-w-[1400px] px-5 py-24 lg:px-8 lg:py-36">
         <Reveal>
           <h2 className="max-w-[22ch] font-display text-[clamp(30px,3.6vw,52px)] font-semibold leading-[1.08] tracking-tight text-fg">
-            A boutique studio with{" "}
+            A boutique agency with{" "}
             <span className="bg-gradient-to-r from-fg via-accent to-muted bg-clip-text text-transparent">
               one specialty.
             </span>
@@ -57,6 +57,14 @@ export function Positioning() {
               </div>
             ))}
           </div>
+        </Reveal>
+
+        <Reveal delay={0.2}>
+          <p className="mt-12 max-w-[58ch] text-[15px] leading-relaxed text-muted">
+            <span className="text-fg">Small by choice.</span> We take on a few
+            clients at a time and build every Agent like it&apos;s for our own
+            business, because we run our own businesses on these too.
+          </p>
         </Reveal>
       </div>
     </section>

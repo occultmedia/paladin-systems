@@ -91,7 +91,7 @@ export function Hero() {
             {...rise(0)}
             className="font-mono text-[11.5px] uppercase tracking-[0.26em] text-muted"
           >
-            Boutique AI integration for Aruban businesses
+            A boutique AI agency for Aruban businesses
           </motion.p>
 
           <motion.h1

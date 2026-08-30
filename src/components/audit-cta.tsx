@@ -1,4 +1,7 @@
+import { ArrowRight } from "lucide-react";
 import { Reveal } from "@/components/reveal";
+
+const STEPS = ["Free call", "We build your Agent", "You test it", "Live in 14 days"];
 
 export function AuditCta() {
   return (
@@ -18,8 +21,23 @@ export function AuditCta() {
                 Tell us how bookings happen today. We&apos;ll audit your
                 booking flow, show you where you&apos;re losing bookings and
                 what an Agent would take over, then quote one fixed price.
-                Like it? You&apos;re live in 14 days.
               </p>
+              <div className="mt-6 flex flex-wrap items-center gap-x-2.5 gap-y-2">
+                {STEPS.map((step, i) => (
+                  <span key={step} className="flex items-center gap-x-2.5">
+                    {i > 0 && (
+                      <ArrowRight
+                        aria-hidden
+                        className="size-3.5 text-muted"
+                        strokeWidth={1.5}
+                      />
+                    )}
+                    <span className="rounded-[10px] border border-edge/80 bg-canvas/50 px-3 py-1.5 text-[12.5px] font-medium text-fg">
+                      {step}
+                    </span>
+                  </span>
+                ))}
+              </div>
             </div>
             <div className="lg:col-span-4 lg:justify-self-end">
               {/* Replace with the client's real intake address before launch. */}
