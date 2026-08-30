@@ -1,5 +1,5 @@
 import { ChatPlayer, type ChatStep } from "@/components/chat-player";
-import { EmailCard } from "@/components/email-card";
+import { ReviewNotifications } from "@/components/review-notifications";
 import { Reveal } from "@/components/reveal";
 
 const WIDGET_SCRIPT: ChatStep[] = [
@@ -55,7 +55,7 @@ const WHATSAPP_SCRIPT: ChatStep[] = [
   { kind: "status", text: "Deposit received. 2 spots confirmed for Sunday 5 PM." },
 ];
 
-const NOVA_SCRIPT: ChatStep[] = [
+const RENTAL_SCRIPT: ChatStep[] = [
   {
     kind: "in",
     text: "Hi! How much is an automatic SUV for 5 days next week?",
@@ -67,7 +67,7 @@ const NOVA_SCRIPT: ChatStep[] = [
   },
   {
     kind: "out",
-    text: "Hi, this is Nova! An automatic SUV is $68 per day, so $340 for 5 days with full insurance. Want me to hold one for you?",
+    text: "An automatic SUV is $68 per day, so $340 for 5 days with full insurance. Want me to hold one for you?",
   },
   { kind: "in", text: "Yes, Monday to Friday please" },
   {
@@ -101,7 +101,7 @@ export function LiveDemo() {
         <div className="mt-12 grid grid-cols-1 gap-x-6 gap-y-10 lg:grid-cols-2 lg:items-start">
           <Reveal delay={0.1}>
             <p className="mb-3 font-mono text-[10.5px] uppercase tracking-[0.18em] text-muted">
-              On your website
+              Tours, on your website
             </p>
             <ChatPlayer
               chrome="widget"
@@ -116,7 +116,7 @@ export function LiveDemo() {
 
           <Reveal delay={0.18}>
             <p className="mb-3 font-mono text-[10.5px] uppercase tracking-[0.18em] text-muted">
-              On WhatsApp
+              Charters, on WhatsApp
             </p>
             <ChatPlayer
               chrome="whatsapp"
@@ -131,24 +131,24 @@ export function LiveDemo() {
 
           <Reveal delay={0.1}>
             <p className="mb-3 font-mono text-[10.5px] uppercase tracking-[0.18em] text-muted">
-              Nova, a rental Agent
+              Car rentals, on your website
             </p>
             <ChatPlayer
-              chrome="whatsapp"
-              script={NOVA_SCRIPT}
-              title="Nova"
-              subtitle="rental Agent, online 24/7"
-              time="6:52 PM"
-              bodyClassName="h-[560px] sm:h-[452px]"
-              srDescription="Example WhatsApp chat with Nova, a car rental Agent: a customer asks the price of an automatic SUV for 5 days, Nova checks the fleet, quotes $340, reserves the SUV for Monday to Friday, sends a secure payment link, and the deposit is received."
+              chrome="widget"
+              script={RENTAL_SCRIPT}
+              title="Chat with us"
+              subtitle="replies instantly, day and night"
+              domain="your-rentals.aw"
+              bodyClassName="h-[540px] sm:h-[440px]"
+              srDescription="Example website chat for a car rental: a customer asks the price of an automatic SUV for 5 days, the Agent checks the fleet, quotes $340, reserves the SUV for Monday to Friday, sends a secure payment link, and the deposit is received."
             />
           </Reveal>
 
           <Reveal delay={0.18}>
             <p className="mb-3 font-mono text-[10.5px] uppercase tracking-[0.18em] text-muted">
-              Automatic review emails
+              Reviews, via Gmail
             </p>
-            <EmailCard />
+            <ReviewNotifications />
           </Reveal>
         </div>
       </div>
