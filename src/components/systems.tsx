@@ -213,9 +213,9 @@ export function Systems() {
               </p>
             </div>
             <div className="border-t border-edge/80 px-7 py-8 sm:border-l sm:border-t-0">
-              <p className="font-mono text-[26px] text-fg"><CountUp prefix="$" value={200} suffix="/mo" /></p>
+              <p className="font-mono text-[26px] text-fg"><CountUp prefix="From $" value={200} suffix="/mo" /></p>
               <p className="mt-2 max-w-[26ch] text-[13.5px] leading-relaxed text-muted">
-                monthly maintenance, so it keeps running and improving
+                monthly maintenance and AI usage, sized to your traffic
               </p>
             </div>
             <div className="border-t border-edge/80 px-7 py-8 sm:border-l sm:border-t-0">
@@ -225,6 +225,12 @@ export function Systems() {
               </p>
             </div>
           </div>
+          <p className="mt-3 max-w-[74ch] text-[13.5px] leading-relaxed text-muted">
+            The monthly fee depends on the size of your website and how many
+            visitors your Agent talks to: busier businesses use more AI. We
+            agree the exact number with you up front, before anything goes
+            live.
+          </p>
         </Reveal>
 
         <Reveal delay={0.14} className="mt-6">

@@ -20,7 +20,7 @@ const PROMISES = [
   {
     icon: Unlock,
     title: "Clear pricing, no lock-in",
-    body: "One setup price, one flat monthly fee, no surprises. If you ever leave, everything we built stays yours.",
+    body: "One setup price, and a monthly fee sized to your traffic and agreed up front. No surprises, and if you ever leave, everything we built stays yours.",
   },
 ];
 
