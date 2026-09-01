@@ -6,6 +6,7 @@ const LINKS = [
   { label: "Products", href: "#systems" },
   { label: "Why Us", href: "#why-us" },
   { label: "Results", href: "#case-studies" },
+  { label: "FAQ", href: "#faq" },
 ];
 
 export function Footer() {
