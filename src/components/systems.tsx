@@ -95,7 +95,7 @@ function ProductCard({ product }: { product: Product }) {
     <motion.article
       whileHover={reduce ? undefined : { y: -6 }}
       transition={{ type: "spring", stiffness: 260, damping: 22 }}
-      className="glass-slab flex h-full flex-col overflow-hidden rounded-2xl transition-[border-color] duration-300 hover:border-accent/50"
+      className="glass-slab flex h-full flex-col overflow-hidden rounded-2xl transition-[border-color] duration-300 hover:border-signal/50"
     >
       {/* product stage */}
       <div className="relative h-32 shrink-0 overflow-hidden border-b border-edge/80">
@@ -161,6 +161,7 @@ export function Systems() {
     <section id="systems" className="scroll-mt-24">
       <div className="mx-auto max-w-[1400px] px-5 py-24 lg:px-8 lg:py-32">
         <Reveal>
+          <span aria-hidden className="section-bar" />
           <h2 className="font-display text-3xl font-semibold tracking-tight text-fg sm:text-4xl">
             Pick your Agent.
           </h2>
@@ -181,19 +182,19 @@ export function Systems() {
         <Reveal delay={0.12} className="mt-10">
           <div className="glass-slab grid grid-cols-1 rounded-2xl sm:grid-cols-3">
             <div className="px-7 py-8">
-              <p className="font-mono text-[26px] text-fg"><CountUp prefix="$" value={1500} /></p>
+              <p className="font-mono text-[26px] text-signal"><CountUp prefix="$" value={1500} /></p>
               <p className="mt-2 max-w-[26ch] text-[13.5px] leading-relaxed text-muted">
                 one-time base installation, any Agent
               </p>
             </div>
             <div className="border-t border-edge/80 px-7 py-8 sm:border-l sm:border-t-0">
-              <p className="font-mono text-[26px] text-fg"><CountUp prefix="From $" value={200} suffix="/mo" /></p>
+              <p className="font-mono text-[26px] text-signal"><CountUp prefix="From $" value={200} suffix="/mo" /></p>
               <p className="mt-2 max-w-[26ch] text-[13.5px] leading-relaxed text-muted">
                 monthly maintenance and AI usage, sized to your traffic
               </p>
             </div>
             <div className="border-t border-edge/80 px-7 py-8 sm:border-l sm:border-t-0">
-              <p className="font-mono text-[26px] text-fg">+ Custom</p>
+              <p className="font-mono text-[26px] text-signal">+ Custom</p>
               <p className="mt-2 max-w-[26ch] text-[13.5px] leading-relaxed text-muted">
                 special features quoted on top, one fixed price
               </p>
@@ -224,7 +225,7 @@ export function Systems() {
             </div>
             <a
               href="#audit"
-              className="shrink-0 font-medium text-accent underline-offset-4 hover:underline"
+              className="shrink-0 font-medium text-signal underline-offset-4 hover:underline"
             >
               Get a Free Quote
             </a>
@@ -243,7 +244,7 @@ export function Systems() {
             </p>
             <a
               href="#audit"
-              className="group mt-5 inline-flex items-center gap-2 text-[15px] font-medium text-accent transition-colors hover:text-fg"
+              className="group mt-5 inline-flex items-center gap-2 text-[15px] font-medium text-signal transition-colors hover:text-fg"
             >
               Tell us what you do
               <ArrowRight

@@ -11,6 +11,7 @@ export function CaseStudies() {
     <section id="case-studies" className="scroll-mt-24">
       <div className="mx-auto max-w-[1400px] px-5 py-24 lg:px-8 lg:py-32">
         <Reveal>
+          <span aria-hidden className="section-bar" />
           <h2 className="font-display text-3xl font-semibold tracking-tight text-fg sm:text-4xl">
             Results from the island.
           </h2>
@@ -47,13 +48,13 @@ export function CaseStudies() {
                   </p>
                   <div className="mt-auto flex gap-12 border-t border-edge/80 pt-6 [transform:translateZ(24px)]">
                     <div>
-                      <p className="font-mono text-[22px] text-accent"><CountUp prefix="+" value={31} suffix="%" /></p>
+                      <p className="font-mono text-[22px] text-signal"><CountUp prefix="+" value={31} suffix="%" /></p>
                       <p className="mt-1 max-w-[18ch] text-[12.5px] leading-snug text-muted">
                         more bookings, won while they slept
                       </p>
                     </div>
                     <div>
-                      <p className="font-mono text-[22px] text-accent"><CountUp value={38} suffix=" sec" /></p>
+                      <p className="font-mono text-[22px] text-signal"><CountUp value={38} suffix=" sec" /></p>
                       <p className="mt-1 max-w-[18ch] text-[12.5px] leading-snug text-muted">
                         to reply, instead of 4 hours
                       </p>
@@ -76,13 +77,13 @@ export function CaseStudies() {
                 </p>
                 <div className="mt-auto flex gap-12 border-t border-edge/80 pt-6 [transform:translateZ(24px)]">
                   <div>
-                    <p className="font-mono text-[22px] text-accent"><CountUp prefix="-" value={82} suffix="%" /></p>
+                    <p className="font-mono text-[22px] text-signal"><CountUp prefix="-" value={82} suffix="%" /></p>
                     <p className="mt-1 max-w-[18ch] text-[12.5px] leading-snug text-muted">
                       fewer no-shows, since deposits come first
                     </p>
                   </div>
                   <div>
-                    <p className="font-mono text-[22px] text-accent"><CountUp value={11} suffix=" min" /></p>
+                    <p className="font-mono text-[22px] text-signal"><CountUp value={11} suffix=" min" /></p>
                     <p className="mt-1 max-w-[18ch] text-[12.5px] leading-snug text-muted">
                       from first question to paid booking
                     </p>

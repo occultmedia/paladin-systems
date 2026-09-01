@@ -12,12 +12,22 @@ export function AuditCta() {
       />
       <div className="relative mx-auto max-w-[1400px] px-5 py-24 lg:px-8 lg:py-32">
         <Reveal>
-          <div className="glass-slab grid grid-cols-1 items-center gap-8 rounded-2xl p-8 sm:p-10 lg:grid-cols-12 lg:p-14">
-            <div className="lg:col-span-8">
-              <h2 className="font-display text-3xl font-semibold tracking-tight text-fg sm:text-4xl">
+          {/* Ink slab: deliberately black in both themes, lit by the brand lime. */}
+          <div className="relative grid grid-cols-1 items-center gap-8 overflow-hidden rounded-2xl border border-white/10 bg-ink p-8 text-ink-fg shadow-[0_24px_70px_-30px_rgb(11_13_8/0.6)] sm:p-10 lg:grid-cols-12 lg:p-14">
+            <div
+              aria-hidden
+              className="absolute inset-0 bg-[linear-gradient(to_right,rgb(255_255_255/0.045)_1px,transparent_1px),linear-gradient(to_bottom,rgb(255_255_255/0.045)_1px,transparent_1px)] bg-[size:34px_34px] [mask-image:radial-gradient(ellipse_at_80%_0%,black,transparent_72%)]"
+            />
+            <div
+              aria-hidden
+              className="absolute -right-28 -top-28 h-80 w-80 rounded-full bg-[radial-gradient(closest-side,rgb(179_253_106/0.22),transparent)] blur-2xl"
+            />
+            <div className="relative lg:col-span-8">
+              <span aria-hidden className="section-bar" />
+              <h2 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">
                 Get a free quote.
               </h2>
-              <p className="mt-4 max-w-[58ch] text-[15px] leading-relaxed text-muted">
+              <p className="mt-4 max-w-[58ch] text-[15px] leading-relaxed text-ink-muted">
                 Tell us how bookings happen today. We&apos;ll audit your
                 booking flow, show you where you&apos;re losing bookings and
                 what an Agent would take over, then quote one fixed price.
@@ -28,18 +38,18 @@ export function AuditCta() {
                     {i > 0 && (
                       <ArrowRight
                         aria-hidden
-                        className="size-3.5 text-muted"
+                        className="size-3.5 text-brand/70"
                         strokeWidth={1.5}
                       />
                     )}
-                    <span className="rounded-[10px] border border-edge/80 bg-canvas/50 px-3 py-1.5 text-[12.5px] font-medium text-fg">
+                    <span className="rounded-[10px] border border-white/15 bg-white/[0.06] px-3 py-1.5 text-[12.5px] font-medium text-ink-fg">
                       {step}
                     </span>
                   </span>
                 ))}
               </div>
             </div>
-            <div className="lg:col-span-4 lg:justify-self-end">
+            <div className="relative lg:col-span-4 lg:justify-self-end">
               {/* Replace with the client's real intake address before launch. */}
               <a
                 href="mailto:ops@sequencelabs.aw?subject=Free%20Quote"
@@ -47,7 +57,7 @@ export function AuditCta() {
               >
                 Get a Free Quote
               </a>
-              <p className="mt-3 font-mono text-[11px] text-muted">
+              <p className="mt-3 font-mono text-[11px] text-ink-muted">
                 ops@sequencelabs.aw
               </p>
             </div>

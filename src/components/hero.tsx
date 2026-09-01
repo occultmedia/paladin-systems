@@ -89,8 +89,12 @@ export function Hero() {
         <div className="lg:col-span-7">
           <motion.p
             {...rise(0)}
-            className="font-mono text-[11.5px] uppercase tracking-[0.26em] text-muted"
+            className="flex items-center gap-2.5 font-mono text-[11.5px] uppercase tracking-[0.26em] text-muted"
           >
+            <span
+              aria-hidden
+              className="size-1.5 shrink-0 rounded-full bg-signal shadow-[0_0_10px_2px_var(--btn-glow)] motion-safe:animate-pulse"
+            />
             A boutique AI agency for Aruban businesses
           </motion.p>
 
@@ -100,7 +104,7 @@ export function Hero() {
           >
             Never miss
             <br className="hidden md:block" />{" "}
-            <span className="bg-gradient-to-r from-fg via-accent to-muted bg-clip-text text-transparent">
+            <span className="underline decoration-brand decoration-[0.06em] underline-offset-[0.14em]">
               another booking.
             </span>
           </motion.h1>
@@ -133,7 +137,7 @@ export function Hero() {
           >
             {METRICS.map((metric) => (
               <div key={metric.label}>
-                <p className="font-mono text-[24px] text-fg">
+                <p className="font-mono text-[24px] text-signal">
                   <CountUp value={metric.value} suffix={metric.suffix} />
                 </p>
                 <p className="mt-1 text-[12.5px] text-muted">{metric.label}</p>
@@ -196,12 +200,12 @@ export function Hero() {
               ))}
               <a
                 href="#audit"
-                className="group flex items-center gap-3.5 rounded-2xl border border-accent/35 bg-surface/60 py-3.5 pl-4 pr-5 transition-all duration-300 hover:-translate-y-0.5 hover:border-accent/70"
+                className="group flex items-center gap-3.5 rounded-2xl border border-signal/40 bg-brand/10 py-3.5 pl-4 pr-5 transition-all duration-300 hover:-translate-y-0.5 hover:border-signal/70 hover:bg-brand/20"
               >
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-[10px] border border-accent/40 bg-canvas/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
-                  <Plus className="size-4 text-accent" strokeWidth={1.5} />
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-[10px] border border-signal/40 bg-canvas/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+                  <Plus className="size-4 text-signal" strokeWidth={1.5} />
                 </span>
-                <span className="text-[14.5px] font-medium text-accent">
+                <span className="text-[14.5px] font-medium text-signal">
                   Your Business
                 </span>
               </a>

@@ -23,7 +23,7 @@ const HOLD_AFTER = 5200;
 
 function TypingDots() {
   return (
-    <div className="flex w-fit items-center gap-1 self-end rounded-2xl rounded-br-[6px] border border-line bg-[var(--bubble-bg)] px-3.5 py-2.5">
+    <div className="flex w-fit items-center gap-1 self-end rounded-2xl rounded-br-[6px] border border-[var(--bubble-border)] bg-[var(--bubble-bg)] px-3.5 py-2.5">
       {[0, 1, 2].map((i) => (
         <motion.span
           key={i}
@@ -203,14 +203,14 @@ export function ChatPlayer({
                 className={
                   incoming
                     ? "w-fit max-w-[85%] self-start rounded-2xl rounded-bl-[6px] border border-edge bg-surface px-3.5 py-2.5"
-                    : "w-fit max-w-[85%] self-end rounded-2xl rounded-br-[6px] border border-line bg-[var(--bubble-bg)] px-3.5 py-2.5"
+                    : "w-fit max-w-[85%] self-end rounded-2xl rounded-br-[6px] border border-[var(--bubble-border)] bg-[var(--bubble-bg)] px-3.5 py-2.5"
                 }
               >
                 <p className="text-[14px] leading-snug text-fg">{step.text}</p>
                 {step.kind === "out" && step.link && (
                   <span className="mt-2 flex w-fit items-center gap-2 rounded-[10px] border border-line bg-surface px-3 py-1.5">
-                    <Lock className="size-3.5 text-accent" strokeWidth={1.5} />
-                    <span className="text-[12.5px] font-medium text-accent">
+                    <Lock className="size-3.5 text-signal" strokeWidth={1.5} />
+                    <span className="text-[12.5px] font-medium text-signal">
                       {step.link}
                     </span>
                   </span>

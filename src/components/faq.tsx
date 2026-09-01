@@ -46,6 +46,7 @@ export function Faq() {
     <section id="faq" className="scroll-mt-24">
       <div className="mx-auto max-w-[1400px] px-5 py-24 lg:px-8 lg:py-32">
         <Reveal>
+          <span aria-hidden className="section-bar" />
           <h2 className="font-display text-3xl font-semibold tracking-tight text-fg sm:text-4xl">
             Questions, answered.
           </h2>
@@ -58,11 +59,11 @@ export function Faq() {
           <div className="glass-slab divide-y divide-edge/80 rounded-2xl px-6 sm:px-8">
             {FAQS.map((faq) => (
               <details key={faq.question} className="group py-5">
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-6 text-[15.5px] font-medium text-fg transition-colors hover:text-accent [&::-webkit-details-marker]:hidden">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-6 text-[15.5px] font-medium text-fg transition-colors hover:text-signal [&::-webkit-details-marker]:hidden">
                   {faq.question}
                   <Plus
                     aria-hidden
-                    className="size-4 shrink-0 text-muted transition-transform duration-300 group-open:rotate-45"
+                    className="size-4 shrink-0 text-muted transition-transform duration-300 group-open:rotate-45 group-open:text-signal"
                     strokeWidth={1.5}
                   />
                 </summary>

@@ -88,6 +88,7 @@ export function LiveDemo() {
     <section id="demo" className="scroll-mt-24">
       <div className="mx-auto max-w-[1400px] px-5 py-24 lg:px-8 lg:py-32">
         <Reveal>
+          <span aria-hidden className="section-bar" />
           <h2 className="font-display text-3xl font-semibold tracking-tight text-fg sm:text-4xl">
             Watch it close a booking.
           </h2>

@@ -5,11 +5,16 @@
   --color-surface: #fdfdfe;
   --color-edge: #e5e8ed;
   --color-line: #d4d9e0;
-  --color-fg: #15181d;
+  --color-fg: #0d0f13;
   --color-muted: #5f6774;
-  --color-accent: #333a44;
+  --color-accent: #272d36;
   --color-signal: #3c7d14;
   --color-brand: #b3fd6a;
+
+  /* Ink panel: stays black in both themes on purpose. */
+  --color-ink: #0b0d08;
+  --color-ink-fg: #f6f8f1;
+  --color-ink-muted: #a9b1a0;
 }
 
 @theme inline {
@@ -31,10 +36,11 @@
   --halo-soft: rgb(21 32 54 / 0.04);
   --grid-line: rgb(21 24 29 / 0.055);
   --particle: rgb(21 24 29 / 0.22);
-  --pulse-color: #2b323c;
-  --pulse-glow: rgb(43 50 60 / 0.3);
-  --pulse-ring: rgb(21 24 29 / 0.22);
-  --bubble-bg: #eaeef4;
+  --pulse-color: #63b82a;
+  --pulse-glow: rgb(126 214 61 / 0.5);
+  --pulse-ring: rgb(99 184 42 / 0.4);
+  --bubble-bg: #e9fad4;
+  --bubble-border: #c9eda4;
 
   --glass-border: rgb(213 217 224 / 0.9);
   --glass-a: rgb(255 255 255 / 0.86);
@@ -68,10 +74,11 @@
   --halo-soft: rgb(255 255 255 / 0.045);
   --grid-line: rgb(255 255 255 / 0.06);
   --particle: rgb(255 255 255 / 0.2);
-  --pulse-color: #e9ebf0;
-  --pulse-glow: rgb(233 235 240 / 0.35);
-  --pulse-ring: rgb(255 255 255 / 0.25);
-  --bubble-bg: rgb(255 255 255 / 0.07);
+  --pulse-color: #b3fd6a;
+  --pulse-glow: rgb(179 253 106 / 0.35);
+  --pulse-ring: rgb(179 253 106 / 0.3);
+  --bubble-bg: rgb(179 253 106 / 0.12);
+  --bubble-border: rgb(179 253 106 / 0.22);
 
   --glass-border: rgb(255 255 255 / 0.09);
   --glass-a: rgb(26 26 29 / 0.82);
@@ -153,6 +160,20 @@
   }
 }
 
+/* Lime kicker bar that sits above section headings. */
+@utility section-bar {
+  display: block;
+  height: 4px;
+  width: 44px;
+  margin-bottom: 20px;
+  border-radius: 9999px;
+  background: linear-gradient(
+    to right,
+    var(--color-brand),
+    rgb(179 253 106 / 0.35)
+  );
+}
+
 /* Underline that draws in from the left on hover. */
 @utility link-underline {
   background-image: linear-gradient(currentColor, currentColor);
@@ -193,7 +214,7 @@ footer::before {
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-accent);
+  outline: 2px solid var(--color-signal);
   outline-offset: 2px;
 }
 

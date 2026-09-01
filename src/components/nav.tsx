@@ -20,7 +20,7 @@ export function Nav() {
     <header className="fixed inset-x-0 top-0 z-50 px-3 pt-3 sm:px-5">
       <div className="glass-slab relative mx-auto flex h-14 max-w-[1240px] items-center justify-between rounded-2xl px-4 lg:px-5">
         <a href="#top" className="group flex items-center gap-2.5">
-          <SequenceMark className="size-[19px] text-accent transition-transform duration-300 group-hover:-rotate-6 group-hover:scale-105" />
+          <SequenceMark className="size-[19px] text-accent transition-all duration-300 group-hover:-rotate-6 group-hover:scale-105 group-hover:text-signal" />
           <span className="font-display text-sm font-semibold tracking-[0.22em] text-fg">
             SEQUENCE LABS
           </span>

@@ -20,9 +20,10 @@ export function Positioning() {
     <section>
       <div className="mx-auto max-w-[1400px] px-5 py-24 lg:px-8 lg:py-36">
         <Reveal>
+          <span aria-hidden className="section-bar" />
           <h2 className="max-w-[22ch] font-display text-[clamp(30px,3.6vw,52px)] font-semibold leading-[1.08] tracking-tight text-fg">
             A boutique agency with{" "}
-            <span className="bg-gradient-to-r from-fg via-accent to-muted bg-clip-text text-transparent">
+            <span className="underline decoration-brand decoration-[0.06em] underline-offset-[0.14em]">
               one specialty.
             </span>
           </h2>

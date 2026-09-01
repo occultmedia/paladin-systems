@@ -37,6 +37,7 @@ export function HowItWorks() {
     <section id="how-it-works" className="scroll-mt-24">
       <div className="mx-auto max-w-[1400px] px-5 py-24 lg:px-8 lg:py-32">
         <Reveal>
+          <span aria-hidden className="section-bar" />
           <h2 className="font-display text-3xl font-semibold tracking-tight text-fg sm:text-4xl">
             How it works.
           </h2>
@@ -78,7 +79,7 @@ export function HowItWorks() {
                 <h3 className="mt-4 font-display text-[17px] font-semibold text-fg">
                   Sequence checks your schedule
                 </h3>
-                <div className="mt-4 max-w-[26ch] self-end rounded-2xl rounded-br-[6px] border border-accent/25 bg-accent/10 px-4 py-2.5 text-[13.5px] leading-snug text-fg [transform:translateZ(16px)]">
+                <div className="mt-4 max-w-[26ch] self-end rounded-2xl rounded-br-[6px] border border-[var(--bubble-border)] bg-[var(--bubble-bg)] px-4 py-2.5 text-[13.5px] leading-snug text-fg [transform:translateZ(16px)]">
                   Yes, we have 2 left!
                 </div>
                 <p className="mt-auto pt-5 font-mono text-[10.5px] tracking-[0.14em] text-muted">
@@ -99,7 +100,7 @@ export function HowItWorks() {
                 </h3>
                 <div className="mt-4 self-start rounded-[10px] border border-edge bg-canvas px-4 py-2.5 [transform:translateZ(16px)]">
                   <p className="flex items-center gap-2 text-[13.5px] font-medium text-fg">
-                    <Lock className="size-3.5 text-accent" strokeWidth={1.5} />
+                    <Lock className="size-3.5 text-signal" strokeWidth={1.5} />
                     Secure payment link
                   </p>
                   <p className="mt-1.5 flex items-center gap-1.5 text-[12.5px] font-medium text-signal">
