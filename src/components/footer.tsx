@@ -1,4 +1,4 @@
-import { PaladinMark } from "@/components/logo";
+import { SequenceMark } from "@/components/logo";
 
 const LINKS = [
   { label: "How It Works", href: "#how-it-works" },
@@ -15,9 +15,9 @@ export function Footer() {
       <div className="mx-auto flex max-w-[1400px] flex-col gap-8 px-5 py-14 md:flex-row md:items-center md:justify-between lg:px-8">
         <div>
           <div className="flex items-center gap-2.5">
-            <PaladinMark className="size-5 text-accent" />
+            <SequenceMark className="size-5 text-accent" />
             <span className="font-display text-[13px] font-semibold tracking-[0.22em] text-fg">
-              PALADIN SYSTEMS
+              SEQUENCE LABS
             </span>
           </div>
           <p className="mt-3 max-w-[38ch] text-[13px] leading-relaxed text-muted">
@@ -38,7 +38,7 @@ export function Footer() {
             ))}
           </nav>
           <p className="font-mono text-[11px] text-muted">
-            &copy; 2026 Paladin Systems
+            &copy; 2026 Sequence Labs
           </p>
         </div>
       </div>

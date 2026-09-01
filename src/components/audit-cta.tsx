@@ -42,13 +42,13 @@ export function AuditCta() {
             <div className="lg:col-span-4 lg:justify-self-end">
               {/* Replace with the client's real intake address before launch. */}
               <a
-                href="mailto:ops@paladinsystems.aw?subject=Free%20Quote"
+                href="mailto:ops@sequencelabs.aw?subject=Free%20Quote"
                 className="btn-metal inline-block rounded-[10px] px-7 py-4 font-mono text-[13px] font-medium uppercase tracking-[0.08em] transition-all hover:-translate-y-0.5 active:scale-[0.98]"
               >
                 Get a Free Quote
               </a>
               <p className="mt-3 font-mono text-[11px] text-muted">
-                ops@paladinsystems.aw
+                ops@sequencelabs.aw
               </p>
             </div>
           </div>

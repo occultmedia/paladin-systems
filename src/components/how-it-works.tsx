@@ -76,7 +76,7 @@ export function HowItWorks() {
                   <CalendarCheck className="size-5 text-accent" strokeWidth={1.5} />
                 </div>
                 <h3 className="mt-4 font-display text-[17px] font-semibold text-fg">
-                  Paladin checks your schedule
+                  Sequence checks your schedule
                 </h3>
                 <div className="mt-4 max-w-[26ch] self-end rounded-2xl rounded-br-[6px] border border-accent/25 bg-accent/10 px-4 py-2.5 text-[13.5px] leading-snug text-fg [transform:translateZ(16px)]">
                   Yes, we have 2 left!

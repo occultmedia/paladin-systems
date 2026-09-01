@@ -1,14 +1,15 @@
 @import "tailwindcss";
 
 @theme {
-  --color-canvas: #f6f7f9;
+  --color-canvas: #ffffff;
   --color-surface: #fdfdfe;
   --color-edge: #e5e8ed;
   --color-line: #d4d9e0;
   --color-fg: #15181d;
   --color-muted: #5f6774;
   --color-accent: #333a44;
-  --color-signal: #148256;
+  --color-signal: #3c7d14;
+  --color-brand: #b3fd6a;
 }
 
 @theme inline {
@@ -43,13 +44,13 @@
   --shadow-b: rgb(21 32 54 / 0.18);
   --shadow-c: rgb(21 32 54 / 0.14);
 
-  --btn-a: #1c2027;
-  --btn-b: #0e1013;
-  --btn-a-hover: #262b34;
-  --btn-b-hover: #14171c;
-  --btn-text: #f5f6f7;
-  --btn-topline: rgb(255 255 255 / 0.14);
-  --btn-glow: rgb(21 24 29 / 0.35);
+  --btn-a: #bdff7d;
+  --btn-b: #a7f455;
+  --btn-a-hover: #c6ff8f;
+  --btn-b-hover: #b3fd6a;
+  --btn-text: #0c0f06;
+  --btn-topline: rgb(255 255 255 / 0.5);
+  --btn-glow: rgb(126 214 61 / 0.45);
 }
 
 :root[data-theme="dark"] {
@@ -61,7 +62,7 @@
   --color-fg: #f5f6f7;
   --color-muted: #9a9ca3;
   --color-accent: #d9dce1;
-  --color-signal: #37c081;
+  --color-signal: #b3fd6a;
 
   --halo-strong: rgb(255 255 255 / 0.07);
   --halo-soft: rgb(255 255 255 / 0.045);
@@ -80,13 +81,13 @@
   --shadow-b: rgb(0 0 0 / 0.55);
   --shadow-c: rgb(0 0 0 / 0.5);
 
-  --btn-a: #ffffff;
-  --btn-b: #dde1e7;
-  --btn-a-hover: #ffffff;
-  --btn-b-hover: #eef0f4;
-  --btn-text: #0a0a0b;
-  --btn-topline: rgb(255 255 255 / 0.95);
-  --btn-glow: rgb(255 255 255 / 0.22);
+  --btn-a: #bdff7d;
+  --btn-b: #a3f150;
+  --btn-a-hover: #c6ff8f;
+  --btn-b-hover: #b3fd6a;
+  --btn-text: #0c0f06;
+  --btn-topline: rgb(255 255 255 / 0.55);
+  --btn-glow: rgb(179 253 106 / 0.3);
 }
 
 /* Radius system: 16px containers/slabs, 10px interactive elements. */
@@ -222,6 +223,6 @@ body {
 }
 
 ::selection {
-  background: var(--color-accent);
-  color: var(--color-canvas);
+  background: #b3fd6a;
+  color: #101403;
 }

@@ -1,6 +1,6 @@
-# Paladin Systems
+# Sequence Labs
 
-Marketing site for Paladin Systems: AI assistants for Aruban businesses that
+Marketing site for Sequence Labs: AI assistants for Aruban businesses that
 answer customers on WhatsApp, check availability, and collect deposits with
 secure payment links, 24/7.
 

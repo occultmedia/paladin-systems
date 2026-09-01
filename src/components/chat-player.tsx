@@ -3,7 +3,7 @@
 import { motion, useReducedMotion } from "framer-motion";
 import { CheckCircle2, LoaderCircle, Lock } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { PaladinMark } from "@/components/logo";
+import { SequenceMark } from "@/components/logo";
 
 export type ChatStep =
   | { kind: "in"; text: string }
@@ -117,7 +117,7 @@ export function ChatPlayer({
               className="size-5"
             />
           ) : (
-            <PaladinMark className="size-5 text-accent" />
+            <SequenceMark className="size-5 text-accent" />
           )}
           <div className="min-w-0 flex-1">
             <p className="truncate text-[13.5px] font-semibold text-fg">
