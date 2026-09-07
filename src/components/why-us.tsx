@@ -44,10 +44,10 @@ export function WhyUs() {
             Serious tools under the hood.
           </h2>
           <p className="mt-4 max-w-[60ch] text-[15px] leading-relaxed text-muted">
-            For your customers it&apos;s just WhatsApp, Google Calendar, and
-            secure card payments. Behind the scenes, we custom-build every
-            Agent with n8n, Voiceflow, Claude, Gemini, and Framer, connected to
-            accounts you own.
+            For your customers it&apos;s just a fast website, WhatsApp, Google
+            Calendar, and secure card payments. Behind the scenes, we
+            custom-build every website and Agent with n8n, Voiceflow, Claude,
+            Gemini, and Framer, connected to accounts you own.
           </p>
         </Reveal>
 

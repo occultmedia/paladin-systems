@@ -5,37 +5,42 @@ import { Reveal } from "@/components/reveal";
    FAQPage structured data in page.tsx. Keep both in sync by editing here. */
 export const FAQS = [
   {
+    question: "What does Sequence Labs actually build?",
+    answer:
+      "Websites, first and foremost: custom-designed, fast, and built to bring in business. On top of that, you can add an AI Agent whenever you're ready: an upgrade that answers customers on your website and WhatsApp, takes bookings, and collects deposits automatically.",
+  },
+  {
     question: "What exactly is an AI Agent?",
     answer:
       "A digital receptionist we custom-build for your business. It lives in your WhatsApp and website chat, knows your prices, schedule, and company rules, and it doesn't just answer questions: it checks real availability, holds spots, and collects deposits with secure payment links.",
   },
   {
-    question: "Does it work with WhatsApp?",
-    answer:
-      "Yes, WhatsApp is where most Aruban customers already message you, so it's usually the first place we install your Agent. It also works as a chat widget on your website, and it can send automatic emails, like review requests after a tour.",
-  },
-  {
     question: "How much does it cost?",
     answer:
-      "Installation is a one-time $1,500 for any Agent. Monthly maintenance starts at $200 and depends on the size of your website and how many customers your Agent talks to. Special features are quoted separately at one fixed price, and we agree every number with you before anything goes live.",
+      "The website is quoted per project at one fixed price after a free call, sized to the pages and features you need. Adding an Agent is a one-time $1,500 installation, with monthly maintenance from $200 depending on the size of your website and how many customers it talks to. We agree every number with you before anything goes live.",
   },
   {
     question: "How long does it take to go live?",
     answer:
-      "About 14 days from our first call. We audit how your bookings work today, build the Agent, you test it, and then it goes live on your channels.",
+      "Most websites are live about 14 days after our first call: we design, you review, we launch. Adding an Agent takes about another week on top, including your own testing time.",
   },
   {
-    question: "Do I need a new website?",
+    question: "I already have a website. Can you still help?",
     answer:
-      "No. Your Agent installs on the website you already have and on your WhatsApp number. If you don't have a website yet, we can build one too.",
+      "Yes. We can redesign it, rebuild it from scratch, or leave it exactly as it is and just install an Agent on the site and WhatsApp number you already have.",
   },
   {
-    question: "What languages does it speak?",
+    question: "Does the Agent work with WhatsApp?",
     answer:
-      "English, Spanish, Dutch, and Papiamento, so it answers your guests the way Aruba actually talks.",
+      "Yes, WhatsApp is where most Aruban customers already message you, so it's usually the first place we install your Agent. It also works as a chat widget on your website, and it can send automatic emails, like review requests after a tour.",
   },
   {
-    question: "What happens when it doesn't know the answer?",
+    question: "What languages do you build in?",
+    answer:
+      "Your website and your Agent both speak English, Spanish, Dutch, and Papiamento, so you answer guests the way Aruba actually talks.",
+  },
+  {
+    question: "What happens when the Agent doesn't know the answer?",
     answer:
       "It hands the conversation to you or your staff, with the full chat history attached. The Agent knows its limits: a person can always step in.",
   },

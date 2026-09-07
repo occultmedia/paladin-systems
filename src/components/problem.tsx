@@ -1,7 +1,12 @@
-import { HandCoins, Hourglass, MessageCircleX } from "lucide-react";
+import { Hourglass, MessageCircleX, SearchX } from "lucide-react";
 import { Reveal } from "@/components/reveal";
 
 const PAINS = [
+  {
+    icon: SearchX,
+    title: "Invisible online",
+    body: "Your only home online is an Instagram page. Tourists who Google you find nothing, and the booking goes to a competitor with a real website.",
+  },
   {
     icon: MessageCircleX,
     title: "Missed messages",
@@ -11,11 +16,6 @@ const PAINS = [
     icon: Hourglass,
     title: "Wasted time",
     body: "You spend hours every day answering the same questions about prices and times on WhatsApp.",
-  },
-  {
-    icon: HandCoins,
-    title: "Payment friction",
-    body: "Chasing people down for manual bank transfers or cash deposits leads to empty seats and no-shows.",
   },
 ];
 

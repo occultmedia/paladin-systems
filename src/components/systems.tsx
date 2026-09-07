@@ -9,10 +9,13 @@ import {
   ConciergeBell,
   CreditCard,
   FileSignature,
+  Globe,
   IdCard,
   Languages,
   MessageCircle,
+  Search,
   SearchCheck,
+  Smartphone,
   Wifi,
   Wrench,
   Zap,
@@ -162,15 +165,70 @@ export function Systems() {
       <div className="mx-auto max-w-[1400px] px-5 py-24 lg:px-8 lg:py-32">
         <Reveal>
           <h2 className="font-display text-3xl font-semibold tracking-tight text-fg sm:text-4xl">
-            Pick your Agent.
+            Start with the website. Add the Agent.
           </h2>
-          <p className="mt-4 max-w-[52ch] text-[15px] leading-relaxed text-muted">
-            Three ready-made Agents, each custom-tuned to your business. Same
-            simple pricing for all of them.
+          <p className="mt-4 max-w-[56ch] text-[15px] leading-relaxed text-muted">
+            The website is the foundation: custom-designed, built, and
+            launched by us. The Agents below are optional upgrades you can add
+            whenever you&apos;re ready.
           </p>
         </Reveal>
 
-        <div className="mt-12 grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <Reveal delay={0.08} className="mt-12">
+          <div className="glass-slab overflow-hidden rounded-2xl">
+            <div className="grid grid-cols-1 lg:grid-cols-12">
+              <div className="p-7 sm:p-9 lg:col-span-7">
+                <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted">
+                  For every business on the island
+                </p>
+                <h3 className="mt-3 font-display text-2xl font-semibold text-fg">
+                  The Custom Website
+                </h3>
+                <p className="mt-2 max-w-[52ch] text-[14.5px] leading-relaxed text-muted">
+                  Designed around your brand and built to bring in business:
+                  fast on island internet, beautiful on every phone, and easy
+                  for tourists to find on Google.
+                </p>
+                <ul className="mt-6 space-y-3">
+                  {[
+                    { icon: Globe, text: "Custom design on your own domain, no templates." },
+                    { icon: Smartphone, text: "Mobile-first and fast, even on hotel Wi-Fi." },
+                    { icon: Search, text: "Built to rank on Google for what you sell." },
+                    { icon: Languages, text: "English, Spanish, Dutch, and Papiamento." },
+                  ].map((spec) => (
+                    <li key={spec.text} className="flex items-start gap-3">
+                      <spec.icon className="mt-0.5 size-4 shrink-0 text-accent" strokeWidth={1.5} />
+                      <span className="font-mono text-[12px] leading-relaxed text-muted">
+                        {spec.text}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="flex flex-col justify-center border-t border-edge/80 p-7 sm:p-9 lg:col-span-5 lg:border-l lg:border-t-0">
+                <p className="font-mono text-[26px] text-fg">Quoted per project</p>
+                <p className="mt-2 max-w-[30ch] text-[13.5px] leading-relaxed text-muted">
+                  One fixed price after a free call, sized to the pages and
+                  features you actually need.
+                </p>
+                <a
+                  href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent("Order: Custom Website")}`}
+                  className="btn-metal mt-6 block w-full rounded-[10px] py-3 text-center font-mono text-[12.5px] font-medium uppercase tracking-[0.08em] transition-all hover:-translate-y-0.5 active:scale-[0.99]"
+                >
+                  Start My Website
+                </a>
+              </div>
+            </div>
+          </div>
+        </Reveal>
+
+        <Reveal delay={0.1} className="mt-14">
+          <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted">
+            The Agent add-ons
+          </p>
+        </Reveal>
+
+        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
           {PRODUCTS.map((product, i) => (
             <Reveal key={product.name} delay={0.08 * i} className="h-full">
               <ProductCard product={product} />
@@ -200,10 +258,11 @@ export function Systems() {
             </div>
           </div>
           <p className="mt-3 max-w-[74ch] text-[13.5px] leading-relaxed text-muted">
-            The monthly fee depends on the size of your website and how many
-            visitors your Agent talks to: busier businesses use more AI. We
-            agree the exact number with you up front, before anything goes
-            live.
+            Agent pricing only: the website itself is quoted separately per
+            project. The monthly fee depends on the size of your website and
+            how many visitors your Agent talks to: busier businesses use more
+            AI. We agree the exact number with you up front, before anything
+            goes live.
           </p>
         </Reveal>
 
@@ -237,9 +296,9 @@ export function Systems() {
               aria-hidden
               className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-edge to-transparent"
             />
-            <p className="max-w-[32ch] font-display text-[clamp(22px,2.6vw,34px)] font-semibold leading-[1.22] tracking-tight text-fg">
-              If customers message you to book, ask, or order, we can
-              custom-build an Agent for it.
+            <p className="max-w-[34ch] font-display text-[clamp(22px,2.6vw,34px)] font-semibold leading-[1.22] tracking-tight text-fg">
+              If your business needs a website, we build it. If customers
+              message you to book, ask, or order, we build the Agent too.
             </p>
             <a
               href="#audit"

@@ -1,8 +1,8 @@
 # Sequence Labs
 
-Marketing site for Sequence Labs: AI assistants for Aruban businesses that
-answer customers on WhatsApp, check availability, and collect deposits with
-secure payment links, 24/7.
+Marketing site for Sequence Labs: a boutique web studio for Aruban
+businesses. Custom websites first, with optional AI Agents that answer
+customers on WhatsApp, take bookings, and collect deposits 24/7.
 
 Built with Next.js (App Router), TypeScript, Tailwind CSS v4, and Framer
 Motion. Fully static output; all fonts, photos, and logos are self-hosted.

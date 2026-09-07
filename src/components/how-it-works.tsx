@@ -4,11 +4,11 @@ import { motion, useReducedMotion } from "framer-motion";
 import {
   ArrowDown,
   ArrowRight,
-  CalendarCheck,
   CheckCircle2,
-  CreditCard,
   Lock,
   MessageCircle,
+  Palette,
+  Rocket,
 } from "lucide-react";
 import { Reveal } from "@/components/reveal";
 import { TiltCard } from "@/components/tilt-card";
@@ -41,11 +41,10 @@ export function HowItWorks() {
             How it works.
           </h2>
           <p className="mt-4 max-w-[58ch] text-[15px] leading-relaxed text-muted">
-            <span className="text-fg">
-              Not a chatbot that answers FAQ questions.
-            </span>{" "}
-            It&apos;s a receptionist who never sleeps: it knows your prices and
-            rules, checks your real calendar, and closes the booking itself.
+            <span className="text-fg">Website first. Agent second.</span> We
+            design and launch a site built around how your business actually
+            works. Then, if you want it, we add an AI Agent that answers
+            customers and closes bookings on its own.
           </p>
         </Reveal>
 
@@ -54,48 +53,48 @@ export function HowItWorks() {
             <TiltCard className="glass-slab rounded-2xl" maxTilt={5}>
               <div className="flex h-full flex-col p-7 [transform-style:preserve-3d]">
                 <div className="[transform:translateZ(26px)]">
+                  <Palette className="size-5 text-accent" strokeWidth={1.5} />
+                </div>
+                <h3 className="mt-4 font-display text-[17px] font-semibold text-fg">
+                  We design your website
+                </h3>
+                <div className="mt-4 self-start rounded-full border border-edge bg-canvas px-4 py-2 font-mono text-[12.5px] tracking-[0.06em] text-fg [transform:translateZ(16px)]">
+                  your-business.aw
+                </div>
+                <p className="mt-auto pt-5 font-mono text-[10.5px] tracking-[0.14em] text-muted">
+                  YOUR BRAND / YOUR STORY
+                </p>
+              </div>
+            </TiltCard>
+
+            <Connector />
+
+            <TiltCard className="glass-slab rounded-2xl" maxTilt={5}>
+              <div className="flex h-full flex-col p-7 [transform-style:preserve-3d]">
+                <div className="[transform:translateZ(26px)]">
+                  <Rocket className="size-5 text-accent" strokeWidth={1.5} />
+                </div>
+                <h3 className="mt-4 font-display text-[17px] font-semibold text-fg">
+                  We build it and launch it
+                </h3>
+                <div className="mt-4 self-end rounded-2xl rounded-br-[6px] border border-accent/25 bg-accent/10 px-4 py-2.5 text-[13.5px] leading-snug text-fg [transform:translateZ(16px)]">
+                  Live in 14 days
+                </div>
+                <p className="mt-auto pt-5 font-mono text-[10.5px] tracking-[0.14em] text-muted">
+                  FAST / MOBILE-FIRST / FOUND ON GOOGLE
+                </p>
+              </div>
+            </TiltCard>
+
+            <Connector />
+
+            <TiltCard className="glass-slab rounded-2xl" maxTilt={5}>
+              <div className="flex h-full flex-col p-7 [transform-style:preserve-3d]">
+                <div className="[transform:translateZ(26px)]">
                   <MessageCircle className="size-5 text-accent" strokeWidth={1.5} />
                 </div>
                 <h3 className="mt-4 font-display text-[17px] font-semibold text-fg">
-                  Tourist asks a question
-                </h3>
-                <div className="mt-4 max-w-[26ch] self-start rounded-2xl rounded-bl-[6px] border border-edge bg-canvas px-4 py-2.5 text-[13.5px] leading-snug text-fg [transform:translateZ(16px)]">
-                  Can I book a Jeep for tomorrow?
-                </div>
-                <p className="mt-auto pt-5 font-mono text-[10.5px] tracking-[0.14em] text-muted">
-                  WHATSAPP / YOUR WEBSITE
-                </p>
-              </div>
-            </TiltCard>
-
-            <Connector />
-
-            <TiltCard className="glass-slab rounded-2xl" maxTilt={5}>
-              <div className="flex h-full flex-col p-7 [transform-style:preserve-3d]">
-                <div className="[transform:translateZ(26px)]">
-                  <CalendarCheck className="size-5 text-accent" strokeWidth={1.5} />
-                </div>
-                <h3 className="mt-4 font-display text-[17px] font-semibold text-fg">
-                  Sequence checks your schedule
-                </h3>
-                <div className="mt-4 max-w-[26ch] self-end rounded-2xl rounded-br-[6px] border border-accent/25 bg-accent/10 px-4 py-2.5 text-[13.5px] leading-snug text-fg [transform:translateZ(16px)]">
-                  Yes, we have 2 left!
-                </div>
-                <p className="mt-auto pt-5 font-mono text-[10.5px] tracking-[0.14em] text-muted">
-                  LIVE AVAILABILITY / GOOGLE CALENDAR
-                </p>
-              </div>
-            </TiltCard>
-
-            <Connector />
-
-            <TiltCard className="glass-slab rounded-2xl" maxTilt={5}>
-              <div className="flex h-full flex-col p-7 [transform-style:preserve-3d]">
-                <div className="[transform:translateZ(26px)]">
-                  <CreditCard className="size-5 text-accent" strokeWidth={1.5} />
-                </div>
-                <h3 className="mt-4 font-display text-[17px] font-semibold text-fg">
-                  You get paid
+                  The plus: your AI Agent
                 </h3>
                 <div className="mt-4 self-start rounded-[10px] border border-edge bg-canvas px-4 py-2.5 [transform:translateZ(16px)]">
                   <p className="flex items-center gap-2 text-[13.5px] font-medium text-fg">
@@ -108,7 +107,7 @@ export function HowItWorks() {
                   </p>
                 </div>
                 <p className="mt-auto pt-5 font-mono text-[10.5px] tracking-[0.14em] text-muted">
-                  CREDIT CARD DEPOSITS / LOCAL BANKS
+                  OPTIONAL / WHATSAPP + YOUR WEBSITE
                 </p>
               </div>
             </TiltCard>

@@ -92,9 +92,9 @@ export function LiveDemo() {
             Watch it close a booking.
           </h2>
           <p className="mt-4 max-w-[58ch] text-[15px] leading-relaxed text-muted">
-            Four real examples from Agents we build. The small gray steps show
-            the Agent working behind the scenes: checking calendars, fleets,
-            and payments.
+            This is the Agent upgrade in action: four real examples on
+            websites we build. The small gray steps show the Agent working
+            behind the scenes, checking calendars, fleets, and payments.
           </p>
         </Reveal>
 

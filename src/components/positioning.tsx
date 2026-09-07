@@ -2,12 +2,12 @@ import { Reveal } from "@/components/reveal";
 
 const SPECIALTIES = [
   {
-    name: "Bookings",
-    body: "Every inquiry answered and closed the moment it arrives, 24 hours a day.",
+    name: "Websites",
+    body: "Designed, built, and launched by us: fast, beautiful, and easy to find on Google.",
   },
   {
-    name: "Booking flow",
-    body: "From first message to paid confirmation, end to end, hands-free.",
+    name: "Bookings",
+    body: "Add an Agent and every inquiry is answered and closed the moment it arrives, 24 hours a day.",
   },
   {
     name: "Customer acquisition",
@@ -21,21 +21,23 @@ export function Positioning() {
       <div className="mx-auto max-w-[1400px] px-5 py-24 lg:px-8 lg:py-36">
         <Reveal>
           <h2 className="max-w-[22ch] font-display text-[clamp(30px,3.6vw,52px)] font-semibold leading-[1.08] tracking-tight text-fg">
-            A boutique agency with{" "}
+            A boutique studio that builds it{" "}
             <span className="bg-gradient-to-r from-fg via-accent to-muted bg-clip-text text-transparent">
-              one specialty.
+              end to end.
             </span>
           </h2>
         </Reveal>
 
         <Reveal delay={0.1}>
           <p className="mt-7 max-w-[58ch] text-[16px] leading-relaxed text-muted lg:text-[17px]">
-            We put serious AI inside Aruban businesses.{" "}
+            We build the website your business deserves, and the AI that puts
+            it to work.{" "}
             <span className="text-fg">
-              We don&apos;t sell chatbots that answer FAQ questions:
+              We don&apos;t sell templates, and we don&apos;t sell chatbots
+              that answer FAQ questions:
             </span>{" "}
-            our Agents catch every booking, run your booking flow end to end,
-            and turn happy customers into the next ones.
+            every site is designed around how you operate, and every Agent we
+            add catches bookings and turns happy customers into the next ones.
           </p>
         </Reveal>
 

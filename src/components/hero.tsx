@@ -18,9 +18,9 @@ const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
 /* Placeholder track-record figures: confirm real numbers before launch. */
 const METRICS = [
+  { value: 12, suffix: "+", label: "websites launched" },
   { value: 3500, suffix: "+", label: "bookings processed" },
-  { value: 10000, suffix: "+", label: "customer conversations" },
-  { value: 38, suffix: " sec", label: "average first reply" },
+  { value: 14, suffix: " days", label: "concept to live" },
 ];
 
 const INDUSTRIES = [
@@ -91,17 +91,17 @@ export function Hero() {
             {...rise(0)}
             className="font-mono text-[11.5px] uppercase tracking-[0.26em] text-muted"
           >
-            A boutique AI agency for Aruban businesses
+            A boutique web studio for Aruban businesses
           </motion.p>
 
           <motion.h1
             {...rise(0.08)}
             className="mt-7 font-display text-[clamp(38px,5.5vw,75px)] font-bold uppercase leading-[1.02] tracking-[-0.02em] text-fg"
           >
-            Never miss
+            Websites that
             <br className="hidden md:block" />{" "}
             <span className="bg-gradient-to-r from-fg via-accent to-muted bg-clip-text text-transparent">
-              another booking.
+              win customers.
             </span>
           </motion.h1>
 
@@ -109,10 +109,10 @@ export function Hero() {
             {...rise(0.16)}
             className="mt-7 max-w-[56ch] text-base leading-relaxed text-muted lg:text-[18px]"
           >
-            We install automated booking systems on your website and WhatsApp.
-            While you run your business (or sleep), our system answers customer
-            questions, checks your availability, and sends secure payment links
-            to collect deposits 24/7.
+            We design and build fast, modern websites for Aruban businesses.
+            And when you&apos;re ready for more, we add an AI Agent that
+            answers your customers, checks your availability, and collects
+            deposits with secure payment links, 24/7.
           </motion.p>
 
           <motion.div

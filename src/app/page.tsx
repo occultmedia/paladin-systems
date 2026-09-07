@@ -36,6 +36,15 @@ const businessJsonLd = {
       "@type": "Offer",
       itemOffered: {
         "@type": "Service",
+        name: "The Custom Website",
+        description:
+          "A custom-designed website for Aruban businesses: fast, mobile-first, built to rank on Google, in English, Spanish, Dutch, and Papiamento. Quoted per project.",
+      },
+    },
+    {
+      "@type": "Offer",
+      itemOffered: {
+        "@type": "Service",
         name: "The 24/7 Booking Engine",
         description:
           "An AI Agent for tour operators, charters, and car rentals: answers customers on WhatsApp and web, checks the live calendar, and collects deposits with secure payment links.",
