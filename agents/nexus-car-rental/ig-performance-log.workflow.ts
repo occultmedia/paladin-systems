@@ -1,7 +1,9 @@
 // Nexus IG Performance Log — Learning Loop
-// Deployed: https://paladinxsystems.app.n8n.cloud/workflow/mgmOJrMe8guJMwbO
-// Public results form (while active): https://paladinxsystems.app.n8n.cloud/form/nexus-ig-results
-// Workflow settings (set via API, not expressible in SDK source): timezone America/Aruba.
+// Source of truth — deploy via n8n MCP validate_workflow + create_workflow_from_code.
+// Portable: the data table is referenced BY NAME (nexus_ig_posts).
+// At deploy: set workflow timezone to America/Aruba and patch FORM_URL in
+// "Build Reminder Email" with the workspace URL (…/form/nexus-ig-results).
+// Public results form (while active): https://YOUR-WORKSPACE.app.n8n.cloud/form/nexus-ig-results
 
 import { workflow, node, trigger, sticky, newCredential, expr } from '@n8n/workflow-sdk';
 
@@ -82,7 +84,7 @@ const updateRow = node({
     parameters: {
       resource: 'row',
       operation: 'update',
-      dataTableId: { __rl: true, mode: 'id', value: 'bLjxeBsdJPqCudHf', cachedResultName: 'nexus_ig_posts' },
+      dataTableId: { __rl: true, mode: 'name', value: 'nexus_ig_posts' },
       matchType: 'allConditions',
       filters: { conditions: [{ keyName: 'post_id', condition: 'eq', keyValue: expr('{{ $json.post_id }}') }] },
       columns: {
@@ -135,7 +137,7 @@ const fetchDrafts = node({
     parameters: {
       resource: 'row',
       operation: 'get',
-      dataTableId: { __rl: true, mode: 'id', value: 'bLjxeBsdJPqCudHf', cachedResultName: 'nexus_ig_posts' },
+      dataTableId: { __rl: true, mode: 'name', value: 'nexus_ig_posts' },
       matchType: 'allConditions',
       filters: { conditions: [{ keyName: 'status', condition: 'eq', keyValue: 'drafted' }] },
       returnAll: true
@@ -154,7 +156,7 @@ const buildReminder = node({
       mode: 'runOnceForAllItems',
       language: 'javaScript',
       jsCode: `
-const FORM_URL = 'https://paladinxsystems.app.n8n.cloud/form/nexus-ig-results';
+const FORM_URL = 'https://REPLACE-WITH-YOUR-N8N-URL/form/nexus-ig-results';
 const items = $input.all();
 const rows = [];
 for (let i = 0; i < items.length; i++) {
@@ -181,7 +183,11 @@ html += '</table>';
 if (rows.length > shown.length) {
   html += '<div style="color:#5f6368;font-size:12px;margin-bottom:10px">…and ' + (rows.length - shown.length) + ' more.</div>';
 }
-html += '<a href="' + FORM_URL + '" style="display:inline-block;background:#1a73e8;color:#ffffff;text-decoration:none;font-size:14px;font-weight:bold;padding:10px 18px;border-radius:6px">Log results (takes 2 min)</a>';
+if (FORM_URL.indexOf('REPLACE') === -1) {
+  html += '<a href="' + FORM_URL + '" style="display:inline-block;background:#1a73e8;color:#ffffff;text-decoration:none;font-size:14px;font-weight:bold;padding:10px 18px;border-radius:6px">Log results (takes 2 min)</a>';
+} else {
+  html += '<div style="font-size:13px;font-weight:bold">Open the "Nexus IG Performance Log" workflow in n8n to get the results form link.</div>';
+}
 html += '<div style="color:#5f6368;font-size:12px;margin-top:10px">Open Instagram &rarr; post &rarr; View insights, then copy likes, comments, saves, shares and reach into the form. Mark skipped posts as Skipped so the agent stops suggesting that angle.</div>';
 html += '<div style="color:#5f6368;font-size:11px;margin-top:16px">Sent automatically every Sunday when posts are missing results.</div>';
 html += '</div>';
@@ -217,7 +223,7 @@ const sendReminder = node({
 const loopNote = sticky(`## Nexus IG Performance Log — the learning loop
 This is how the content agent gets smarter.
 
-**Form** (share/bookmark): https://paladinxsystems.app.n8n.cloud/form/nexus-ig-results
+**Form** (share/bookmark): https://YOUR-WORKSPACE.app.n8n.cloud/form/nexus-ig-results
 Team logs likes / comments / saves / shares / reach per post ID → the matching row in the *nexus_ig_posts* data table is updated with a weighted score (saves and shares count most).
 
 **Sunday 17:00**: if any posts still have status "drafted", a check-in email lists them with a button to the form. No unlogged posts = no email.

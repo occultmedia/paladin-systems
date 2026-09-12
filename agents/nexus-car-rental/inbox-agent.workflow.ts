@@ -1,10 +1,12 @@
-// Nexus Inbox Agent — Reply Drafts for Approval
-// Deployed: https://paladinxsystems.app.n8n.cloud/workflow/CaZ9lmPGWEDUhyFz
-// Workflow settings (set via API, not expressible in SDK source): timezone America/Aruba.
-// Approval is structural: there is no send node — replies are created as Gmail
-// drafts inside the original thread and a human sends (or discards) them.
+// Nexus Inbox Agent — Reply Drafts for Approval (v2: reads memory, logs drafts for learning)
+// Source of truth — deploy via n8n MCP validate_workflow + create_workflow_from_code.
+// Portable: data tables are referenced BY NAME (nexus_agent_memory, nexus_draft_reviews).
+// At deploy: set workflow timezone to America/Aruba.
+// Approval is structural: there is no send node — replies are created as Gmail drafts
+// inside the original thread and a human sends (or discards) them. Every draft is
+// logged so the nightly Correction Learner can diff it against what was actually sent.
 
-import { workflow, node, trigger, sticky, newCredential, languageModel, outputParser, ifElse, expr } from '@n8n/workflow-sdk';
+import { workflow, node, trigger, sticky, newCredential, languageModel, outputParser, ifElse, merge, expr } from '@n8n/workflow-sdk';
 
 const inboxTrigger = trigger({
   type: 'n8n-nodes-base.gmailTrigger',
@@ -74,12 +76,94 @@ return { json: {
   output: [{ gmailMessageId: '18f2a1b2c3d4e5f6', threadId: '18f2a1b2c3d4e5f6', fromAddress: 'sarah@example.com', fromName: 'Sarah Jones', subject: 'Car rental 12-19 December', replySubject: 'Re: Car rental 12-19 December', receivedAt: '2026-09-12T14:03:00.000Z', bodyText: 'Hi, do you have an automatic SUV available from Dec 12 to 19? We land at 2pm. Thanks, Sarah' }]
 });
 
+const fetchMemory = node({
+  type: 'n8n-nodes-base.dataTable',
+  version: 1.1,
+  config: {
+    name: 'Fetch Agent Memory',
+    position: [0, -260],
+    executeOnce: true,
+    alwaysOutputData: true,
+    parameters: {
+      resource: 'row',
+      operation: 'get',
+      dataTableId: { __rl: true, mode: 'name', value: 'nexus_agent_memory' },
+      returnAll: true
+    }
+  },
+  output: [{ id: 1, agent: 'inbox', kind: 'fact', content: 'Minimum driver age is 23.', source: 'told', weight: 2, active: true, created_date: '2026-09-15', updated_date: '2026-09-15' }]
+});
+
+const composeMemory = node({
+  type: 'n8n-nodes-base.code',
+  version: 2,
+  config: {
+    name: 'Compose Memory Block',
+    position: [220, -260],
+    parameters: {
+      mode: 'runOnceForAllItems',
+      language: 'javaScript',
+      jsCode: `
+const NL = String.fromCharCode(10);
+const items = $input.all();
+const rows = [];
+for (let i = 0; i < items.length; i++) {
+  const r = items[i].json;
+  if (!r || !r.content) continue;
+  if (r.active === false) continue;
+  if (r.agent !== 'inbox' && r.agent !== 'shared') continue;
+  rows.push(r);
+}
+rows.sort(function (a, b) {
+  const w = (b.weight || 0) - (a.weight || 0);
+  if (w !== 0) return w;
+  return String(b.updated_date || b.created_date || '').localeCompare(String(a.updated_date || a.created_date || ''));
+});
+const capped = rows.slice(0, 60);
+function group(kind, title) {
+  const lines = [];
+  for (let i = 0; i < capped.length; i++) {
+    const r = capped[i];
+    if (r.kind !== kind) continue;
+    let line = '- ' + String(r.content).slice(0, 300);
+    if (r.source === 'correction') line += ' (learned from a corrected draft)';
+    if (r.source === 'told') line += ' (told by the team)';
+    lines.push(line);
+  }
+  return lines.length ? title + NL + lines.join(NL) : '';
+}
+const parts = [];
+const facts = group('fact', 'BUSINESS FACTS:');
+const style = group('style_rule', 'STYLE RULES:');
+const prefs = group('preference', 'PREFERENCES:');
+const lessons = group('lesson', 'LESSONS FROM PAST CORRECTIONS:');
+if (facts) parts.push(facts);
+if (style) parts.push(style);
+if (prefs) parts.push(prefs);
+if (lessons) parts.push(lessons);
+const memoryBlock = parts.length ? parts.join(NL + NL) : '(Nothing learned yet — first days on the job. Rely on the system message and be extra careful with [CHECK: ...] placeholders.)';
+return [{ json: { memoryBlock: memoryBlock, memoryCount: rows.length } }];
+`
+    }
+  },
+  output: [{ memoryBlock: 'BUSINESS FACTS: - Minimum driver age is 23. (told by the team)', memoryCount: 1 }]
+});
+
+const mergeCtx = merge({
+  version: 3.2,
+  config: {
+    name: 'Merge Email + Memory',
+    position: [440, -80],
+    parameters: { mode: 'combine', combineBy: 'combineAll', options: {} }
+  }
+});
+
 const claudeInbox = languageModel({
   type: '@n8n/n8n-nodes-langchain.lmChatAnthropic',
   version: 1.5,
   config: {
     name: 'Claude Sonnet 5 (Inbox)',
-    position: [360, 220],
+    position: [560, 200],
     parameters: {
       model: { __rl: true, mode: 'id', value: 'claude-sonnet-5', cachedResultName: 'Claude Sonnet 5' },
       options: { maxTokensToSample: 4096 }
@@ -93,7 +177,7 @@ const replyParser = outputParser({
   version: 1.3,
   config: {
     name: 'Reply Draft Schema',
-    position: [600, 220],
+    position: [800, 200],
     parameters: {
       schemaType: 'fromJson',
       jsonSchemaExample: '{ "category": "booking_inquiry", "should_draft": true, "confidence": 0.93, "reasoning": "Customer asks about SUV availability for December dates.", "subject": "Re: Car rental 12-19 December", "body_html": "<p>Hi Sarah,</p><p>Thank you for reaching out!</p>" }'
@@ -106,15 +190,17 @@ const triageAndDraft = node({
   version: 3.1,
   config: {
     name: 'Triage & Draft Reply — Claude',
-    position: [480, 0],
+    position: [680, -80],
     parameters: {
       promptType: 'define',
-      text: expr('A new email arrived in the Nexus Car Rental Aruba inbox. Classify it and, if appropriate, draft the reply.\n\nFrom: {{ $json.fromName }} <{{ $json.fromAddress }}>\nSubject: {{ $json.subject }}\nReceived: {{ $json.receivedAt }}\n\nEmail body:\n{{ $json.bodyText }}'),
+      text: expr('A new email arrived in the Nexus Car Rental Aruba inbox. Classify it and, if appropriate, draft the reply.\n\nFrom: {{ $json.fromName }} <{{ $json.fromAddress }}>\nSubject: {{ $json.subject }}\nReceived: {{ $json.receivedAt }}\n\nEmail body:\n{{ $json.bodyText }}\n\n=== YOUR LEARNED KNOWLEDGE (facts the team taught you + lessons from your past corrected drafts — apply ALL of these; they override your general habits) ===\n{{ $json.memoryBlock }}'),
       hasOutputParser: true,
       options: {
         systemMessage: `You are the inbox assistant for Nexus Car Rental Aruba, a car rental company on Aruba (airport: Queen Beatrix International, AUA — email: info@nexuscarsaruba.com). You read ONE incoming email and produce (1) a classification and (2) when appropriate, a reply draft. A human reviews every draft inside Gmail before anything is sent — you never send email yourself.
 
-# Business facts you may state (EDIT ME — keep current; treat as the ONLY source of truth)
+Your drafts are compared against what the team actually sends, and the differences become lessons in your LEARNED KNOWLEDGE. Apply every learned fact, style rule, preference, and lesson from the user message — they are more current than anything below.
+
+# Business facts you may state (EDIT ME — keep current; treat as the ONLY source of truth besides LEARNED KNOWLEDGE)
 - Company: Nexus Car Rental Aruba. Contact: info@nexuscarsaruba.com.
 - Pickup on Aruba; airport pickup available at AUA [CHECK: confirm exact meeting-point wording].
 - Bookings are made through the booking page on our website.
@@ -123,7 +209,7 @@ const triageAndDraft = node({
 - [CHECK: deposit amount and accepted payment methods]
 - [CHECK: insurance coverage options]
 - [CHECK: hotel/cruise-terminal delivery availability]
-Anything not in this list must NOT be stated as fact.
+Anything not in this list or in LEARNED KNOWLEDGE must NOT be stated as fact.
 
 # Classify (category)
 - booking_inquiry: wants to rent, asks availability or how to book
@@ -142,7 +228,7 @@ false → automated_or_marketing, spam_or_irrelevant, and anything a human must 
 # Drafting rules
 - Reply in the language of the sender (English, Spanish, Dutch or Papiamento).
 - Warm, professional, concise — a helpful island business, not a corporation. Greet by first name when known.
-- Answer everything you CAN from Business facts. For anything you cannot know (prices, availability, refunds, exceptions) do NOT guess: keep the sentence and insert [CHECK: exact thing the team must fill in] where the fact belongs.
+- Answer everything you CAN from Business facts and LEARNED KNOWLEDGE. For anything you cannot know (prices, availability, refunds, exceptions) do NOT guess: keep the sentence and insert [CHECK: exact thing the team must fill in] where the fact belongs.
 - Always move things forward: confirm their dates back to them, point to the booking page, or ask for the one missing detail (dates, flight number, vehicle type, booking number).
 - Quotes: restate their dates and wishes, then structure the reply so the team only fills in [CHECK: quote for these dates].
 - Complaints: lead with empathy and an apology for the experience (never admit legal fault, never promise compensation), and say the team is personally looking into it.
@@ -163,7 +249,7 @@ const shouldDraft = ifElse({
   version: 2.3,
   config: {
     name: 'Needs a Reply Draft?',
-    position: [740, 0],
+    position: [940, -80],
     parameters: {
       conditions: {
         options: { caseSensitive: true, leftValue: '', typeValidation: 'loose' },
@@ -179,16 +265,16 @@ const createDraft = node({
   version: 2.2,
   config: {
     name: 'Create Draft in Thread',
-    position: [980, -100],
+    position: [1180, -180],
     parameters: {
       resource: 'draft',
       operation: 'create',
-      subject: expr("{{ $('Extract Email Essentials').item.json.replySubject }}"),
+      subject: expr("{{ $('Merge Email + Memory').item.json.replySubject }}"),
       emailType: 'html',
       message: expr('{{ $json.output.body_html }}'),
       options: {
-        threadId: expr("{{ $('Extract Email Essentials').item.json.threadId }}"),
-        sendTo: expr("{{ $('Extract Email Essentials').item.json.fromAddress }}")
+        threadId: expr("{{ $('Merge Email + Memory').item.json.threadId }}"),
+        sendTo: expr("{{ $('Merge Email + Memory').item.json.fromAddress }}")
       }
     },
     credentials: { gmailOAuth2: newCredential('Gmail (Nexus Car Rental)') }
@@ -196,29 +282,79 @@ const createDraft = node({
   output: [{ id: 'r-draft-1', message: { id: 'm1', threadId: '18f2a1b2c3d4e5f6', labelIds: ['DRAFT'] } }]
 });
 
+const recordDraft = node({
+  type: 'n8n-nodes-base.dataTable',
+  version: 1.1,
+  config: {
+    name: 'Record Draft for Learning',
+    position: [1400, -180],
+    parameters: {
+      resource: 'row',
+      operation: 'insert',
+      dataTableId: { __rl: true, mode: 'name', value: 'nexus_draft_reviews' },
+      columns: {
+        mappingMode: 'defineBelow',
+        value: {
+          thread_id: expr("{{ $('Merge Email + Memory').item.json.threadId }}"),
+          draft_id: expr('{{ $json.id }}'),
+          customer_email: expr("{{ $('Merge Email + Memory').item.json.fromAddress }}"),
+          subject: expr("{{ $('Merge Email + Memory').item.json.subject }}"),
+          draft_text: expr("{{ $('Triage & Draft Reply — Claude').item.json.output.body_html }}"),
+          sent_text: '',
+          status: 'awaiting_send',
+          drafted_at: expr('{{ $now.toISO() }}'),
+          compared_at: '',
+          similarity: 0,
+          lessons_added: 0
+        },
+        schema: [
+          { id: 'thread_id', displayName: 'thread_id', required: false, defaultMatch: false, display: true, type: 'string', canBeUsedToMatch: true },
+          { id: 'draft_id', displayName: 'draft_id', required: false, defaultMatch: false, display: true, type: 'string', canBeUsedToMatch: true },
+          { id: 'customer_email', displayName: 'customer_email', required: false, defaultMatch: false, display: true, type: 'string', canBeUsedToMatch: true },
+          { id: 'subject', displayName: 'subject', required: false, defaultMatch: false, display: true, type: 'string', canBeUsedToMatch: true },
+          { id: 'draft_text', displayName: 'draft_text', required: false, defaultMatch: false, display: true, type: 'string', canBeUsedToMatch: true },
+          { id: 'sent_text', displayName: 'sent_text', required: false, defaultMatch: false, display: true, type: 'string', canBeUsedToMatch: true },
+          { id: 'status', displayName: 'status', required: false, defaultMatch: false, display: true, type: 'string', canBeUsedToMatch: true },
+          { id: 'drafted_at', displayName: 'drafted_at', required: false, defaultMatch: false, display: true, type: 'string', canBeUsedToMatch: true },
+          { id: 'compared_at', displayName: 'compared_at', required: false, defaultMatch: false, display: true, type: 'string', canBeUsedToMatch: true },
+          { id: 'similarity', displayName: 'similarity', required: false, defaultMatch: false, display: true, type: 'number', canBeUsedToMatch: true },
+          { id: 'lessons_added', displayName: 'lessons_added', required: false, defaultMatch: false, display: true, type: 'number', canBeUsedToMatch: true }
+        ]
+      }
+    }
+  },
+  output: [{ id: 42, createdAt: '2026-09-15T14:10:05.000Z', updatedAt: '2026-09-15T14:10:05.000Z' }]
+});
+
 const skipEmail = node({
   type: 'n8n-nodes-base.noOp',
   version: 1,
-  config: { name: 'Skip — No Reply Needed', position: [980, 100], parameters: {} },
+  config: { name: 'Skip — No Reply Needed', position: [1180, 60], parameters: {} },
   output: [{ output: { category: 'automated_or_marketing', should_draft: false } }]
 });
 
-const inboxNote = sticky(`## Nexus Inbox Agent — how it works
-Checks the inbox **every minute** for new unread email (own mail, promos and social are filtered out). Claude classifies each message and, for real customer email, writes a reply draft **inside the same Gmail thread**.
+const inboxNote = sticky(`## Nexus Inbox Agent — drafts replies, learns from your edits
+Checks the inbox **every minute** for new unread email (own mail, promos and social filtered out). Before drafting, it loads everything it has LEARNED (taught facts + lessons from past corrected drafts) from the *nexus_agent_memory* table. Claude classifies the email and, for real customer mail, writes a reply draft **inside the same Gmail thread**.
 
-**Nothing is ever sent automatically.** Open the thread in Gmail → the draft is waiting → edit if needed → hit Send. Facts the agent cannot know appear as [CHECK: ...] for you to fill in.
+**Nothing is ever sent automatically.** Open the thread → the draft is waiting → edit → Send. Every draft is logged to *nexus_draft_reviews*; the nightly Correction Learner workflow diffs your sent version against the draft and turns your edits into permanent lessons.
 
 Setup:
-1. Connect **Gmail** (info@nexuscarsaruba.com) on the trigger and on "Create Draft in Thread".
+1. Connect **Gmail** (info@nexuscarsaruba.com) on the trigger and "Create Draft in Thread".
 2. Add the **Anthropic** API key on "Claude Sonnet 5 (Inbox)".
-3. Update the "Business facts" block in the agent's system message — replace every [CHECK: ...] you can (pickup point, ages, deposit, fleet). The more facts, the fewer blanks in drafts.
-4. Activate.`, [inboxTrigger, extractEmail], { color: 4 });
+3. Edit the "Business facts" block in the agent's system message — or just use the Teach form; taught facts are applied automatically.
+4. Set workflow timezone to America/Aruba, then activate.`, [inboxTrigger, extractEmail], { color: 4 });
 
 export default workflow('nexus-inbox-agent', 'Nexus Inbox Agent — Reply Drafts for Approval')
   .add(inboxTrigger)
   .to(extractEmail)
+  .to(mergeCtx.input(0))
+  .add(inboxTrigger)
+  .to(fetchMemory)
+  .to(composeMemory)
+  .to(mergeCtx.input(1))
+  .add(mergeCtx)
   .to(triageAndDraft)
   .to(shouldDraft
-    .onTrue(createDraft)
+    .onTrue(createDraft.to(recordDraft))
     .onFalse(skipEmail))
   .add(inboxNote);

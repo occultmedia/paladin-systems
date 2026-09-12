@@ -1,7 +1,8 @@
-// Nexus IG Content Engine — Research, Draft, Learn
-// Deployed: https://paladinxsystems.app.n8n.cloud/workflow/FtVx5tMkFxwUVMtU
-// Workflow settings (set via API, not expressible in SDK source): timezone America/Aruba.
-// Data table nexus_ig_posts = bLjxeBsdJPqCudHf.
+// Nexus IG Content Engine — Research, Draft, Learn (v2: reads team-taught memory)
+// Source of truth — deploy via n8n MCP validate_workflow + create_workflow_from_code.
+// Portable: data tables are referenced BY NAME (nexus_ig_posts, nexus_agent_memory).
+// At deploy: set workflow timezone to America/Aruba and patch FORM_URL in
+// "Build Approval Email" with the workspace URL (…/form/nexus-ig-results).
 
 import { workflow, node, trigger, sticky, newCredential, languageModel, outputParser, expr } from '@n8n/workflow-sdk';
 
@@ -110,11 +111,29 @@ const fetchHistory = node({
     parameters: {
       resource: 'row',
       operation: 'get',
-      dataTableId: { __rl: true, mode: 'id', value: 'bLjxeBsdJPqCudHf', cachedResultName: 'nexus_ig_posts' },
+      dataTableId: { __rl: true, mode: 'name', value: 'nexus_ig_posts' },
       returnAll: true
     }
   },
   output: [{ post_id: '20260908-airport-pickup', created_date: '2026-09-08', theme: 'Airport pickup made easy', format: 'reel', hook: 'Landing in Aruba?', status: 'posted', likes: 120, comments: 14, saves: 33, shares: 9, reach: 5400, score: 301, notes: '' }]
+});
+
+const fetchTaught = node({
+  type: 'n8n-nodes-base.dataTable',
+  version: 1.1,
+  config: {
+    name: 'Fetch Taught Memory',
+    position: [1320, 0],
+    executeOnce: true,
+    alwaysOutputData: true,
+    parameters: {
+      resource: 'row',
+      operation: 'get',
+      dataTableId: { __rl: true, mode: 'name', value: 'nexus_agent_memory' },
+      returnAll: true
+    }
+  },
+  output: [{ id: 3, agent: 'marketing', kind: 'fact', content: 'We now have 3 Jeep Wranglers in the fleet.', source: 'told', weight: 2, active: true, created_date: '2026-09-15' }]
 });
 
 const buildBrief = node({
@@ -122,7 +141,7 @@ const buildBrief = node({
   version: 2,
   config: {
     name: 'Build Research Brief',
-    position: [1320, 0],
+    position: [1540, 0],
     parameters: {
       mode: 'runOnceForAllItems',
       language: 'javaScript',
@@ -183,6 +202,21 @@ function postLine(r) {
   return line;
 }
 
+const taught = [];
+const tItems = $('Fetch Taught Memory').all();
+for (let i = 0; i < tItems.length; i++) {
+  const r = tItems[i].json;
+  if (!r || !r.content) continue;
+  if (r.active === false) continue;
+  if (r.agent !== 'marketing' && r.agent !== 'shared') continue;
+  taught.push(r);
+}
+taught.sort(function (a, b) { return (b.weight || 0) - (a.weight || 0); });
+const taughtLines = [];
+for (let i = 0; i < taught.length && i < 40; i++) {
+  taughtLines.push('- [' + (taught[i].kind || 'fact') + '] ' + String(taught[i].content).slice(0, 300));
+}
+
 const research = [];
 research.push('== LIVE GOOGLE SEARCHES (high-intent phrases travelers type today) ==');
 research.push(searchPhrases.length ? searchPhrases.join(NL) : '(unavailable this run — rely on evergreen high-intent angles)');
@@ -206,6 +240,9 @@ if (!rows.length) {
   history.push('== LAST 9 POSTS (do NOT repeat these themes or hooks) ==');
   history.push(recent.map(postLine).join(NL));
 }
+history.push('');
+history.push('== WHAT THE TEAM HAS TAUGHT ME (standing facts and preferences — obey these) ==');
+history.push(taughtLines.length ? taughtLines.join(NL) : '(nothing taught yet)');
 
 return [{ json: {
   runDate: now.toFormat('yyyy-LL-dd'),
@@ -225,7 +262,7 @@ const claudeCreative = languageModel({
   version: 1.5,
   config: {
     name: 'Claude Sonnet 5 (Creative)',
-    position: [1440, 240],
+    position: [1660, 240],
     parameters: {
       model: { __rl: true, mode: 'id', value: 'claude-sonnet-5', cachedResultName: 'Claude Sonnet 5' },
       options: { maxTokensToSample: 8000 }
@@ -239,7 +276,7 @@ const packParser = outputParser({
   version: 1.3,
   config: {
     name: 'Content Pack Schema',
-    position: [1680, 240],
+    position: [1900, 240],
     parameters: {
       schemaType: 'fromJson',
       jsonSchemaExample: '{ "strategy_note": "Search interest is spiking around airport pickup, so two posts answer arrival questions.", "experiment": "Post 3 tests a POV reel because we have never tried first-person hooks.", "posts": [ { "slug": "airport-pickup", "format": "reel", "theme": "Airport pickup made easy", "target_audience": "High-intent planners flying into AUA in the next 90 days", "hook": "Landing in Aruba? Your car should land with you.", "caption": "Bon bini! Here is how pickup works...", "hashtags": "#aruba #arubacarrental #arubatravel #onehappyisland", "visual_direction": "Clip 1: arrivals hall pan. Clip 2: keys handed over. Clip 3: driving off with ocean view.", "cta": "Book your car before you fly — link in bio.", "best_time": "6:30 PM AST — trip planners scroll after dinner" } ] }'
@@ -252,10 +289,10 @@ const creativeDirector = node({
   version: 3.1,
   config: {
     name: 'Creative Director — Claude',
-    position: [1560, 0],
+    position: [1780, 0],
     parameters: {
       promptType: 'define',
-      text: expr('Create the next Instagram content pack for Nexus Car Rental Aruba.\n\nRun date: {{ $json.runLabel }}\n\n=== FRESH MARKET RESEARCH (collected minutes ago) ===\n{{ $json.researchBrief }}\n\n=== OUR PERFORMANCE HISTORY ===\n{{ $json.historyBrief }}'),
+      text: expr('Create the next Instagram content pack for Nexus Car Rental Aruba.\n\nRun date: {{ $json.runLabel }}\n\n=== FRESH MARKET RESEARCH (collected minutes ago) ===\n{{ $json.researchBrief }}\n\n=== OUR PERFORMANCE HISTORY & TEAM GUIDANCE ===\n{{ $json.historyBrief }}'),
       hasOutputParser: true,
       options: {
         systemMessage: `You are the marketing brain for Nexus Car Rental Aruba — an independent car rental company on Aruba (airport: Queen Beatrix International, AUA). You act as a senior social media strategist and direct-response copywriter who deeply understands Instagram.
@@ -288,14 +325,15 @@ E. DIRECT OFFER / BOOKING PUSH: clear call to book (max 1 per pack).
 The user message contains TODAY's Google autocomplete phrases (what high-intent travelers literally type) plus current Reddit threads. Anchor at least 2 of the 3 posts in something concrete from that research — a question, worry, trend, or topic. Use the angle; never copy text.
 
 # How to improve every run (your feedback loop)
-The performance history shows real results of past posts (score = weighted engagement).
+The performance history shows real results of past posts (score = weighted engagement), and the "WHAT THE TEAM HAS TAUGHT ME" section contains standing facts and preferences the team gave you.
+- Team-taught facts and preferences are LAW: use real taught facts (new vehicles, services, policies) as content material, and never violate a taught preference.
 - Double down on themes, formats, and hook styles that appear under TOP PERFORMERS.
 - Avoid the patterns of the weakest posts.
 - Never repeat a theme or hook from the LAST 9 POSTS list.
 - Post 3 is always an EXPERIMENT: a format, angle, or hook style we have not tried yet. State the hypothesis in "experiment".
 
 # Hard rules
-- NEVER invent prices, discounts, availability, fleet details, or policies. Where a business fact is needed, write [CHECK: what to confirm] and keep the post usable without it.
+- NEVER invent prices, discounts, availability, fleet details, or policies. Taught facts are the exception — they are real. Where any other business fact is needed, write [CHECK: what to confirm] and keep the post usable without it.
 - English captions; you may open with "Bon bini" (Papiamento welcome) when it fits.
 - No competitor bashing, no engagement bait ("tag 5 friends"), no fake urgency, nothing that could embarrass the brand.
 - Every post must plausibly move someone closer to renting a car in Aruba.
@@ -314,7 +352,7 @@ const prepareRows = node({
   version: 2,
   config: {
     name: 'Prepare Draft Rows',
-    position: [1800, 0],
+    position: [2020, 0],
     parameters: {
       mode: 'runOnceForAllItems',
       language: 'javaScript',
@@ -358,11 +396,11 @@ const insertRows = node({
   version: 1.1,
   config: {
     name: 'Log Drafts to Content Table',
-    position: [2020, -120],
+    position: [2240, -120],
     parameters: {
       resource: 'row',
       operation: 'insert',
-      dataTableId: { __rl: true, mode: 'id', value: 'bLjxeBsdJPqCudHf', cachedResultName: 'nexus_ig_posts' },
+      dataTableId: { __rl: true, mode: 'name', value: 'nexus_ig_posts' },
       columns: {
         mappingMode: 'defineBelow',
         value: {
@@ -418,12 +456,12 @@ const buildEmail = node({
   version: 2,
   config: {
     name: 'Build Approval Email',
-    position: [2020, 120],
+    position: [2240, 120],
     parameters: {
       mode: 'runOnceForAllItems',
       language: 'javaScript',
       jsCode: `
-const FORM_URL = 'https://paladinxsystems.app.n8n.cloud/form/nexus-ig-results';
+const FORM_URL = 'https://REPLACE-WITH-YOUR-N8N-URL/form/nexus-ig-results';
 const rows = $input.all().map(function (i) { return i.json; });
 const pack = $('Creative Director — Claude').first().json.output || {};
 const brief = $('Build Research Brief').first().json;
@@ -484,7 +522,7 @@ const sendPack = node({
   version: 2.2,
   config: {
     name: 'Email Pack for Approval',
-    position: [2240, 120],
+    position: [2460, 120],
     parameters: {
       resource: 'message',
       operation: 'send',
@@ -500,14 +538,12 @@ const sendPack = node({
 });
 
 const setupNote = sticky(`## Nexus IG Content Engine — setup
-1. **Anthropic** — add your Anthropic API key to the credential on the "Claude Sonnet 5 (Creative)" node.
+1. **Anthropic** — add your API key on "Claude Sonnet 5 (Creative)".
 2. **Gmail** — connect the Google account in "Email Pack for Approval".
-3. Optional: paste your results-form URL into FORM_URL at the top of "Build Approval Email" (the form lives in the "Nexus IG Performance Log" workflow).
-4. Activate. Runs **Mon / Wed / Fri 07:00** (set workflow timezone to America/Aruba in Settings if not already).
+3. Paste your workspace form URL into FORM_URL at the top of "Build Approval Email" (https://YOUR-WORKSPACE.app.n8n.cloud/form/nexus-ig-results).
+4. Set workflow timezone to America/Aruba in Settings, then activate. Runs **Mon / Wed / Fri 07:00**.
 
-**Learning loop:** every pack is logged to the *nexus_ig_posts* data table as "drafted". When the team logs real results via the form, the next run reads top performers + flops and adapts. Post 3 is always an experiment.
-
-Research sources are keyless (Google autocomplete + Reddit); if one is down the run continues with the rest.`, [runSchedule, seedQueries], { color: 4 });
+**Learning loops:** reads past post scores from *nexus_ig_posts* AND team-taught facts from *nexus_agent_memory* (Teach form). Post 3 is always an experiment. Research sources are keyless (Google autocomplete + Reddit); if one is down the run continues.`, [runSchedule, seedQueries], { color: 4 });
 
 export default workflow('nexus-ig-content-engine', 'Nexus IG Content Engine — Research, Draft, Learn')
   .add(runSchedule)
@@ -516,6 +552,7 @@ export default workflow('nexus-ig-content-engine', 'Nexus IG Content Engine — 
   .to(fetchRedditAruba)
   .to(fetchRedditSearch)
   .to(fetchHistory)
+  .to(fetchTaught)
   .to(buildBrief)
   .to(creativeDirector)
   .to(prepareRows)
