@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // n8n workflow sources for client agents — not part of the site build.
+    "agents/**",
   ]),
 ]);
 
