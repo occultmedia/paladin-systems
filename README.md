@@ -1,8 +1,9 @@
 # Sequence Labs
 
-Marketing site for Sequence Labs: AI assistants for Aruban businesses that
-answer customers on WhatsApp, check availability, and collect deposits with
-secure payment links, 24/7.
+Marketing site for Sequence Labs: an Aruban web agency on monthly
+subscriptions. We build, maintain, and grow business websites — Base at
+Afl. 250/month, Pro (all-in-one with SEO + GEO and monthly analytics
+reports) at Afl. 500/month, and custom Enterprise plans.
 
 Built with Next.js (App Router), TypeScript, Tailwind CSS v4, and Framer
 Motion. Fully static output; all fonts, photos, and logos are self-hosted.

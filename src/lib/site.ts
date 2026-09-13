@@ -2,7 +2,7 @@
 export const SITE_URL = "https://paladin-systems.vercel.app";
 export const SITE_NAME = "Sequence Labs";
 export const SITE_TITLE =
-  "AI Agents & Booking Automation for Aruban Businesses | Sequence Labs";
+  "Web Design, Maintenance & Marketing on a Monthly Plan | Sequence Labs";
 export const SITE_DESCRIPTION =
-  "Boutique AI agency in Aruba. We build AI Agents that answer WhatsApp, take bookings, collect deposits with secure payment links, and win 5-star reviews, 24/7.";
+  "Aruban web agency on a flat monthly plan. We build your website, keep it maintained, and grow it with SEO, GEO, and a plain-language report every month — from Afl. 250/month.";
 export const CONTACT_EMAIL = "ops@sequencelabs.aw";

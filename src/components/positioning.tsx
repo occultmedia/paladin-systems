@@ -2,16 +2,16 @@ import { Reveal } from "@/components/reveal";
 
 const SPECIALTIES = [
   {
-    name: "Bookings",
-    body: "Every inquiry answered and closed the moment it arrives, 24 hours a day.",
+    name: "Build",
+    body: "Designed and built for your business: fast, mobile-first, in your brand.",
   },
   {
-    name: "Booking flow",
-    body: "From first message to paid confirmation, end to end, hands-free.",
+    name: "Maintain",
+    body: "Updates, fixes, and small changes handled when you ask, with uptime watched.",
   },
   {
-    name: "Customer acquisition",
-    body: "Follow-ups, reviews, and repeat guests, working for you on autopilot.",
+    name: "Grow",
+    body: "SEO, GEO, fresh content, and a plain-language report every month.",
   },
 ];
 
@@ -31,12 +31,12 @@ export function Positioning() {
 
         <Reveal delay={0.1}>
           <p className="mt-7 max-w-[58ch] text-[16px] leading-relaxed text-muted lg:text-[17px]">
-            We put serious AI inside Aruban businesses.{" "}
+            We keep Aruban businesses alive online.{" "}
             <span className="text-fg">
-              We don&apos;t sell chatbots that answer FAQ questions:
+              We don&apos;t build a website and disappear:
             </span>{" "}
-            our Agents catch every booking, run your booking flow end to end,
-            and turn happy customers into the next ones.
+            we design it, run it, and grow it, month after month, with
+            someone always watching your corner of the internet.
           </p>
         </Reveal>
 

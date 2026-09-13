@@ -1,21 +1,21 @@
-import { HandCoins, Hourglass, MessageCircleX } from "lucide-react";
+import { CalendarClock, EyeOff, Hourglass } from "lucide-react";
 import { Reveal } from "@/components/reveal";
 
 const PAINS = [
   {
-    icon: MessageCircleX,
-    title: "Missed messages",
-    body: "Tourists message you at 2 AM. If you don't reply instantly, they book with someone else.",
+    icon: CalendarClock,
+    title: "A website going stale",
+    body: "Your prices changed months ago, but the site still shows the old ones. Updating it never reaches the top of your list.",
   },
   {
     icon: Hourglass,
-    title: "Wasted time",
-    body: "You spend hours every day answering the same questions about prices and times on WhatsApp.",
+    title: "No time, no web guy",
+    body: "Every small change means chasing a freelancer, waiting a week, and getting a surprise invoice at the end.",
   },
   {
-    icon: HandCoins,
-    title: "Payment friction",
-    body: "Chasing people down for manual bank transfers or cash deposits leads to empty seats and no-shows.",
+    icon: EyeOff,
+    title: "Flying blind",
+    body: "Visitors come and go, but nobody can tell you what's working, what isn't, or where customers give up.",
   },
 ];
 

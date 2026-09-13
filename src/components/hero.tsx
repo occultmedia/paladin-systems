@@ -18,9 +18,9 @@ const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
 /* Placeholder track-record figures: confirm real numbers before launch. */
 const METRICS = [
-  { value: 3500, suffix: "+", label: "bookings processed" },
-  { value: 10000, suffix: "+", label: "customer conversations" },
-  { value: 38, suffix: " sec", label: "average first reply" },
+  { value: 120, suffix: "+", label: "site changes shipped" },
+  { value: 24, suffix: "/7", label: "uptime monitoring" },
+  { value: 48, suffix: " hr", label: "typical change turnaround" },
 ];
 
 const INDUSTRIES = [
@@ -33,38 +33,38 @@ const INDUSTRIES = [
   { icon: UtensilsCrossed, label: "Restaurants" },
 ];
 
-const TOUR_SCRIPT: ChatStep[] = [
+const CHANGE_SCRIPT: ChatStep[] = [
   {
     kind: "in",
-    text: "Hi! Do you have a jeep tour tomorrow morning? We're 4 people",
-  },
-  {
-    kind: "out",
-    text: "We do! The 9 AM tour has 4 spots left. $89 per person. Want me to hold them?",
-  },
-  {
-    kind: "out",
-    text: "Here's your secure link to pay the $50 deposit:",
-    link: "Secure payment link",
-  },
-  { kind: "status", text: "Deposit received. See you at 9 AM!" },
-];
-
-const REALTY_SCRIPT: ChatStep[] = [
-  {
-    kind: "in",
-    text: "Is the 2-bedroom apartment in Noord still available?",
+    text: "Hi! Can you put our new Sunday brunch menu on the site?",
   },
   {
     kind: "action",
-    pending: "Checking current listings",
-    done: "2BR Noord: available",
+    pending: "Updating the menu page",
+    done: "Menu page updated",
   },
   {
     kind: "out",
-    text: "It is! Want to see it? Thursday at 3 PM is open for a viewing.",
+    text: "Done, it's live! Want me to feature the brunch on your homepage this week too?",
   },
-  { kind: "status", text: "Viewing confirmed for Thursday 3 PM." },
+  { kind: "status", text: "Change shipped in 25 minutes." },
+];
+
+const REPORT_SCRIPT: ChatStep[] = [
+  {
+    kind: "in",
+    text: "How did the website do this month?",
+  },
+  {
+    kind: "action",
+    pending: "Pulling your Google Analytics",
+    done: "Report ready: visitors +23%",
+  },
+  {
+    kind: "out",
+    text: "Great month: 23% more visitors, and your sunset tour page is now your top landing page. Full report is in your inbox.",
+  },
+  { kind: "status", text: "Monthly report sent." },
 ];
 
 export function Hero() {
@@ -95,17 +95,17 @@ export function Hero() {
               aria-hidden
               className="size-1.5 shrink-0 rounded-full bg-signal shadow-[0_0_10px_2px_var(--btn-glow)] motion-safe:animate-pulse"
             />
-            A boutique AI agency for Aruban businesses
+            A boutique web agency for Aruban businesses
           </motion.p>
 
           <motion.h1
             {...rise(0.08)}
             className="mt-7 font-display text-[clamp(38px,5.5vw,75px)] font-bold uppercase leading-[1.02] tracking-[-0.02em] text-fg"
           >
-            Never miss
+            Never worry about
             <br className="hidden md:block" />{" "}
             <span className="underline decoration-brand decoration-[0.06em] underline-offset-[0.14em]">
-              another booking.
+              your website again.
             </span>
           </motion.h1>
 
@@ -113,10 +113,9 @@ export function Hero() {
             {...rise(0.16)}
             className="mt-7 max-w-[56ch] text-base leading-relaxed text-muted lg:text-[18px]"
           >
-            We install automated booking systems on your website and WhatsApp.
-            While you run your business (or sleep), our system answers customer
-            questions, checks your availability, and sends secure payment links
-            to collect deposits 24/7.
+            We build your website, then stay on it month after month:
+            maintenance, changes, SEO, and reports, all for one flat monthly
+            price. You run your business; we run your website.
           </motion.p>
 
           <motion.div
@@ -152,23 +151,23 @@ export function Hero() {
         >
           <ChatPlayer
             chrome="whatsapp"
-            script={TOUR_SCRIPT}
-            title="Your Tour Company"
-            subtitle="online, replies in seconds"
-            time="2:14 AM"
+            script={CHANGE_SCRIPT}
+            title="Sequence Labs"
+            subtitle="your web team, one message away"
+            time="8:41 AM"
             bodyClassName="h-[368px] sm:h-[308px]"
             className="lg:-translate-x-3"
-            srDescription="Example WhatsApp conversation: a customer asks about a jeep tour at 2:14 AM, the Agent confirms availability and price, sends a secure payment link, and the deposit is received."
+            srDescription="Example WhatsApp conversation: a client asks Sequence Labs to put their new Sunday brunch menu on the site, the team updates the menu page, and the change is live 25 minutes later."
           />
           <ChatPlayer
             chrome="widget"
-            script={REALTY_SCRIPT}
+            script={REPORT_SCRIPT}
             title="Chat with us"
-            subtitle="replies instantly, day and night"
-            domain="your-realty.aw"
+            subtitle="your web team, one message away"
+            domain="sequencelabs.aw"
             bodyClassName="h-[332px] sm:h-[264px]"
             className="lg:translate-x-3"
-            srDescription="Example website chat for a real estate office: a customer asks if a 2-bedroom apartment in Noord is available, the Agent checks the listings, offers a Thursday 3 PM viewing, and the viewing is confirmed."
+            srDescription="Example chat: a client asks how the website did this month, Sequence Labs pulls Google Analytics, reports visitors up 23%, and sends the full monthly report to their inbox."
           />
         </motion.div>
 

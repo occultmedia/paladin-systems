@@ -23,7 +23,7 @@ const businessJsonLd = {
   email: CONTACT_EMAIL,
   image: `${SITE_URL}/og.png`,
   logo: `${SITE_URL}/icon.svg`,
-  priceRange: "from $1,500",
+  priceRange: "from Afl. 250/month",
   knowsLanguage: ["en", "es", "nl", "pap"],
   areaServed: { "@type": "Country", name: "Aruba" },
   address: {
@@ -34,29 +34,33 @@ const businessJsonLd = {
   makesOffer: [
     {
       "@type": "Offer",
+      price: "250",
+      priceCurrency: "AWG",
       itemOffered: {
         "@type": "Service",
-        name: "The 24/7 Booking Engine",
+        name: "Base",
         description:
-          "An AI Agent for tour operators, charters, and car rentals: answers customers on WhatsApp and web, checks the live calendar, and collects deposits with secure payment links.",
+          "Afl. 250 per month: we design and build your website, then keep it maintained with basic upkeep and small site changes on request.",
+      },
+    },
+    {
+      "@type": "Offer",
+      price: "500",
+      priceCurrency: "AWG",
+      itemOffered: {
+        "@type": "Service",
+        name: "Pro",
+        description:
+          "Afl. 500 per month, all in one: everything in Base plus SEO and GEO, monthly content changes, and a Google Analytics report sent every month.",
       },
     },
     {
       "@type": "Offer",
       itemOffered: {
         "@type": "Service",
-        name: "The Digital Concierge",
+        name: "Enterprise",
         description:
-          "An AI Agent for boutique hotels, villas, and vacation rentals: 24/7 guest support in English, Spanish, Dutch, and Papiamento, with maintenance requests routed to staff.",
-      },
-    },
-    {
-      "@type": "Offer",
-      itemOffered: {
-        "@type": "Service",
-        name: "The Operations Dispatcher",
-        description:
-          "An AI Agent for high-volume excursions: collects driver's licenses and digital waivers before arrival and keeps the morning guest manifest updated.",
+          "A custom monthly plan for bigger operations: multiple sites or brands, AI agents, booking systems, custom integrations, and priority support. Price on conversation.",
       },
     },
   ],

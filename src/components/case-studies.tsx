@@ -43,20 +43,20 @@ export function CaseStudies() {
                     UTV SAFARI OPERATOR / NOORD
                   </p>
                   <p className="mt-4 max-w-[48ch] text-[15px] leading-relaxed text-fg">
-                    Nine vehicles, one dispatcher, and a 2 AM inquiry queue that
-                    used to wait for sunrise.
+                    Their old web presence was a Facebook page and a phone
+                    number. We built the site, and now we run it.
                   </p>
                   <div className="mt-auto flex gap-12 border-t border-edge/80 pt-6 [transform:translateZ(24px)]">
                     <div>
-                      <p className="font-mono text-[22px] text-signal"><CountUp prefix="+" value={31} suffix="%" /></p>
+                      <p className="font-mono text-[22px] text-signal"><CountUp prefix="+" value={62} suffix="%" /></p>
                       <p className="mt-1 max-w-[18ch] text-[12.5px] leading-snug text-muted">
-                        more bookings, won while they slept
+                        more visitors, six months after launch
                       </p>
                     </div>
                     <div>
-                      <p className="font-mono text-[22px] text-signal"><CountUp value={38} suffix=" sec" /></p>
+                      <p className="font-mono text-[22px] text-signal"><CountUp prefix="#" value={1} /></p>
                       <p className="mt-1 max-w-[18ch] text-[12.5px] leading-snug text-muted">
-                        to reply, instead of 4 hours
+                        Google result for their main tour
                       </p>
                     </div>
                   </div>
@@ -72,20 +72,20 @@ export function CaseStudies() {
                   PRIVATE CHARTER FLEET / PALM BEACH
                 </p>
                 <p className="mt-4 max-w-[40ch] text-[15px] leading-relaxed text-fg">
-                  Sunset departures sell out by noon. Deposits now land in-chat
-                  before the crew reaches the dock.
+                  Rate changes used to take their old agency two weeks. Now
+                  they message us at breakfast and it&apos;s live by lunch.
                 </p>
                 <div className="mt-auto flex gap-12 border-t border-edge/80 pt-6 [transform:translateZ(24px)]">
                   <div>
-                    <p className="font-mono text-[22px] text-signal"><CountUp prefix="-" value={82} suffix="%" /></p>
+                    <p className="font-mono text-[22px] text-signal"><CountUp prefix="-" value={40} suffix="%" /></p>
                     <p className="mt-1 max-w-[18ch] text-[12.5px] leading-snug text-muted">
-                      fewer no-shows, since deposits come first
+                      bounce rate after the speed + content pass
                     </p>
                   </div>
                   <div>
-                    <p className="font-mono text-[22px] text-signal"><CountUp value={11} suffix=" min" /></p>
+                    <p className="font-mono text-[22px] text-signal"><CountUp value={3} suffix=" hr" /></p>
                     <p className="mt-1 max-w-[18ch] text-[12.5px] leading-snug text-muted">
-                      from first question to paid booking
+                      average from change request to live
                     </p>
                   </div>
                 </div>

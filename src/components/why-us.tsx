@@ -4,23 +4,23 @@ import { Reveal } from "@/components/reveal";
 const PROMISES = [
   {
     icon: BookOpenCheck,
-    title: "It learns your rules",
-    body: "We train your Agent on your prices, policies, and tone of voice, so it answers exactly the way you would.",
+    title: "One team for everything",
+    body: "Design, development, changes, SEO, and reports: one team, one monthly price, nobody pointing fingers at 'the other vendor'.",
   },
   {
     icon: KeyRound,
     title: "You own everything",
-    body: "The accounts, the customer chats, the money: all yours. We build the Agent and hand you the keys.",
+    body: "The domain, the website, the content, the analytics: all in accounts under your name. We build it and hand you the keys.",
   },
   {
     icon: UserCheck,
-    title: "A person can always step in",
-    body: "The Agent knows its limits. Tricky questions go to you or your staff, with the whole conversation attached.",
+    title: "A person, not a ticket queue",
+    body: "Message us on WhatsApp and a human replies, usually the same person who built your site.",
   },
   {
     icon: Unlock,
     title: "Clear pricing, no lock-in",
-    body: "One setup price, and a monthly fee sized to your traffic and agreed up front. No surprises, and if you ever leave, everything we built stays yours.",
+    body: "A flat monthly price agreed up front. No surprises, and if you ever leave, the website and everything on it stays yours.",
   },
 ];
 
@@ -45,10 +45,10 @@ export function WhyUs() {
             Serious tools under the hood.
           </h2>
           <p className="mt-4 max-w-[60ch] text-[15px] leading-relaxed text-muted">
-            For your customers it&apos;s just WhatsApp, Google Calendar, and
-            secure card payments. Behind the scenes, we custom-build every
-            Agent with n8n, Voiceflow, Claude, Gemini, and Framer, connected to
-            accounts you own.
+            For your customers it&apos;s just a fast, good-looking website.
+            Behind the scenes, we build and run every site with Framer,
+            Google Analytics, n8n, Claude, and Gemini, wired to accounts you
+            own.
           </p>
         </Reveal>
 

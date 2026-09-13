@@ -1,86 +1,62 @@
 import { ChatPlayer, type ChatStep } from "@/components/chat-player";
-import { ReviewNotifications } from "@/components/review-notifications";
+import { MonthlyReport } from "@/components/monthly-report";
 import { Reveal } from "@/components/reveal";
 
-const WIDGET_SCRIPT: ChatStep[] = [
-  { kind: "in", text: "Hi! How much is the sunset UTV tour?" },
-  {
-    kind: "out",
-    text: "It's $129 per driver and $59 per passenger. Goggles and water included.",
-  },
-  { kind: "in", text: "Do you have space for 6 people this Saturday?" },
-  {
-    kind: "action",
-    pending: "Checking Saturday's live calendar",
-    done: "Saturday 4 PM: 3 UTVs open",
-  },
-  {
-    kind: "out",
-    text: "Yes! Saturday 4 PM has 3 UTVs open, which fits 6 people. Want me to reserve them?",
-  },
-  { kind: "in", text: "Yes please. Can we pay half now?" },
-  {
-    kind: "action",
-    pending: "Creating a secure payment link",
-    done: "Payment link ready",
-  },
-  {
-    kind: "out",
-    text: "Done, the UTVs are on hold. Pay the $290 deposit here to confirm:",
-    link: "Secure payment link",
-  },
-  { kind: "status", text: "Deposit received. See you Saturday at 4 PM!" },
-];
-
-const WHATSAPP_SCRIPT: ChatStep[] = [
+const RATES_SCRIPT: ChatStep[] = [
   {
     kind: "in",
-    text: "Good evening! Do you have 2 spots on tomorrow's sunset sail?",
+    text: "Morning! High season starts Monday. Can you switch the site to the new rates?",
   },
   {
     kind: "action",
-    pending: "Checking tomorrow's manifest",
-    done: "Tomorrow: full. Sunday: 8 spots open",
+    pending: "Updating rates across the site",
+    done: "Rates updated on 6 pages",
   },
   {
     kind: "out",
-    text: "Tomorrow is fully booked, sorry! But Sunday's 5 PM sail has 8 spots open. Same route, same open bar. Should I hold 2?",
+    text: "Done and live. I also updated the FAQ answer about seasonal pricing so everything matches.",
   },
-  { kind: "in", text: "Sunday works!" },
-  {
-    kind: "out",
-    text: "Perfect. Confirm with a $40 deposit here:",
-    link: "Secure payment link",
-  },
-  { kind: "status", text: "Deposit received. 2 spots confirmed for Sunday 5 PM." },
+  { kind: "in", text: "Perfect, thanks!" },
+  { kind: "status", text: "Shipped the same morning." },
 ];
 
-const RENTAL_SCRIPT: ChatStep[] = [
+const URGENT_SCRIPT: ChatStep[] = [
   {
     kind: "in",
-    text: "Hi! How much is an automatic SUV for 5 days next week?",
+    text: "Our booking button stopped working and we're getting calls!",
   },
   {
     kind: "action",
-    pending: "Checking the fleet",
-    done: "3 SUVs free next week",
+    pending: "Checking your site",
+    done: "Found it: a link broke in an update",
   },
   {
     kind: "out",
-    text: "An automatic SUV is $68 per day, so $340 for 5 days with full insurance. Want me to hold one for you?",
+    text: "Fixed, bookings are flowing again. We've added a check so this can't happen silently next time.",
   },
-  { kind: "in", text: "Yes, Monday to Friday please" },
+  { kind: "status", text: "Watched 24/7, fixed in minutes." },
+];
+
+const SEO_SCRIPT: ChatStep[] = [
+  {
+    kind: "in",
+    text: "When tourists search 'jeep tour aruba', we're nowhere. Can you fix that?",
+  },
   {
     kind: "action",
-    pending: "Holding your SUV",
-    done: "SUV reserved: Monday to Friday",
+    pending: "Running an SEO + GEO audit",
+    done: "Audit done: 9 fixes queued",
   },
   {
     kind: "out",
-    text: "Done! Pay the $80 deposit here and it's yours:",
-    link: "Secure payment link",
+    text: "We're rewriting your tour pages so Google ranks them, and so AI assistants recommend you when travelers ask.",
   },
-  { kind: "status", text: "Deposit received. Your SUV is ready Monday at 9 AM." },
+  {
+    kind: "action",
+    pending: "Publishing optimized pages",
+    done: "Live: 9 pages optimized",
+  },
+  { kind: "status", text: "Climbing the rankings, tracked monthly." },
 ];
 
 export function LiveDemo() {
@@ -90,66 +66,66 @@ export function LiveDemo() {
         <Reveal>
           <span aria-hidden className="section-bar" />
           <h2 className="font-display text-3xl font-semibold tracking-tight text-fg sm:text-4xl">
-            Watch it close a booking.
+            Message us. Consider it done.
           </h2>
           <p className="mt-4 max-w-[58ch] text-[15px] leading-relaxed text-muted">
-            Four real examples from Agents we build. The small gray steps show
-            the Agent working behind the scenes: checking calendars, fleets,
-            and payments.
+            What a month with Sequence Labs looks like. The small gray steps
+            show us working behind the scenes: updating pages, watching
+            uptime, and tuning your SEO.
           </p>
         </Reveal>
 
         <div className="mt-12 grid grid-cols-1 gap-x-6 gap-y-10 lg:grid-cols-2 lg:items-start">
           <Reveal delay={0.1}>
             <p className="mb-3 font-mono text-[10.5px] uppercase tracking-[0.18em] text-muted">
-              Tours, on your website
+              A rate change, on WhatsApp
             </p>
             <ChatPlayer
-              chrome="widget"
-              script={WIDGET_SCRIPT}
-              title="Chat with us"
-              subtitle="replies instantly, day and night"
-              domain="yourbusiness.aw"
-              bodyClassName="h-[660px] sm:h-[520px]"
-              srDescription="Example website chat: a customer asks the price of the sunset UTV tour, the Agent answers, checks the live calendar for Saturday, finds 3 UTVs open, creates a secure payment link, and the deposit is received."
+              chrome="whatsapp"
+              script={RATES_SCRIPT}
+              title="Sequence Labs"
+              subtitle="your web team, one message away"
+              time="9:12 AM"
+              bodyClassName="h-[500px] sm:h-[420px]"
+              srDescription="Example WhatsApp chat: a client asks Sequence Labs to switch the site to high-season rates, the team updates 6 pages plus the pricing FAQ, and the change ships the same morning."
             />
           </Reveal>
 
           <Reveal delay={0.18}>
             <p className="mb-3 font-mono text-[10.5px] uppercase tracking-[0.18em] text-muted">
-              Charters, on WhatsApp
+              An urgent fix, after hours
             </p>
             <ChatPlayer
-              chrome="whatsapp"
-              script={WHATSAPP_SCRIPT}
-              title="Your Charter Company"
-              subtitle="online, replies in seconds"
-              time="9:12 PM"
-              bodyClassName="h-[460px] sm:h-[384px]"
-              srDescription="Example WhatsApp chat: a customer asks for 2 spots on tomorrow's sunset sail, the Agent checks the manifest, finds tomorrow full but Sunday open, offers Sunday, sends a secure payment link, and the deposit is received."
+              chrome="widget"
+              script={URGENT_SCRIPT}
+              title="Chat with us"
+              subtitle="your web team, one message away"
+              domain="sequencelabs.aw"
+              bodyClassName="h-[420px] sm:h-[360px]"
+              srDescription="Example chat: a client reports their booking button broke, Sequence Labs finds the broken link, fixes it within minutes, and adds monitoring so it cannot break silently again."
             />
           </Reveal>
 
           <Reveal delay={0.1}>
             <p className="mb-3 font-mono text-[10.5px] uppercase tracking-[0.18em] text-muted">
-              Car rentals, on your website
+              Getting found on Google, and by AI
             </p>
             <ChatPlayer
               chrome="widget"
-              script={RENTAL_SCRIPT}
+              script={SEO_SCRIPT}
               title="Chat with us"
-              subtitle="replies instantly, day and night"
-              domain="your-rentals.aw"
+              subtitle="your web team, one message away"
+              domain="sequencelabs.aw"
               bodyClassName="h-[540px] sm:h-[440px]"
-              srDescription="Example website chat for a car rental: a customer asks the price of an automatic SUV for 5 days, the Agent checks the fleet, quotes $340, reserves the SUV for Monday to Friday, sends a secure payment link, and the deposit is received."
+              srDescription="Example chat: a client asks why they don't show up when tourists search for jeep tours in Aruba, Sequence Labs runs an SEO and GEO audit, rewrites and publishes 9 optimized pages, and tracks the rankings monthly."
             />
           </Reveal>
 
           <Reveal delay={0.18}>
             <p className="mb-3 font-mono text-[10.5px] uppercase tracking-[0.18em] text-muted">
-              Reviews, via Gmail
+              Your report, every month
             </p>
-            <ReviewNotifications />
+            <MonthlyReport />
           </Reveal>
         </div>
       </div>

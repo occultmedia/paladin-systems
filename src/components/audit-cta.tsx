@@ -1,7 +1,7 @@
 import { ArrowRight } from "lucide-react";
 import { Reveal } from "@/components/reveal";
 
-const STEPS = ["Free call", "We build your Agent", "You test it", "Live in 14 days"];
+const STEPS = ["Free call", "We build your site", "You approve it", "We run it monthly"];
 
 export function AuditCta() {
   return (
@@ -28,9 +28,9 @@ export function AuditCta() {
                 Get a free quote.
               </h2>
               <p className="mt-4 max-w-[58ch] text-[15px] leading-relaxed text-ink-muted">
-                Tell us how bookings happen today. We&apos;ll audit your
-                booking flow, show you where you&apos;re losing bookings and
-                what an Agent would take over, then quote one fixed price.
+                Tell us what your website needs to do. We&apos;ll review what
+                you have today, show you what we&apos;d build and improve,
+                and quote the plan that fits: one flat monthly price.
               </p>
               <div className="mt-6 flex flex-wrap items-center gap-x-2.5 gap-y-2">
                 {STEPS.map((step, i) => (

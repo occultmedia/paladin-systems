@@ -5,39 +5,39 @@ import { Reveal } from "@/components/reveal";
    FAQPage structured data in page.tsx. Keep both in sync by editing here. */
 export const FAQS = [
   {
-    question: "What exactly is an AI Agent?",
+    question: "What do I get for Afl. 250 a month?",
     answer:
-      "A digital receptionist we custom-build for your business. It lives in your WhatsApp and website chat, knows your prices, schedule, and company rules, and it doesn't just answer questions: it checks real availability, holds spots, and collects deposits with secure payment links.",
+      "The Base plan: we design and build your website, then keep it maintained month after month, with small changes here and there on request. The build is part of the plan, so there's no big upfront project invoice.",
   },
   {
-    question: "Does it work with WhatsApp?",
+    question: "What's different about Pro?",
     answer:
-      "Yes, WhatsApp is where most Aruban customers already message you, so it's usually the first place we install your Agent. It also works as a chat widget on your website, and it can send automatic emails, like review requests after a tour.",
+      "Pro (Afl. 500 a month) is the all-in-one: everything in Base, plus SEO and GEO so people actually find you, monthly content changes to keep the site fresh, and a Google Analytics report in your inbox every month that explains what's working in plain language.",
   },
   {
-    question: "How much does it cost?",
+    question: "What is GEO?",
     answer:
-      "Installation is a one-time $1,500 for any Agent. Monthly maintenance starts at $200 and depends on the size of your website and how many customers your Agent talks to. Special features are quoted separately at one fixed price, and we agree every number with you before anything goes live.",
+      "Generative Engine Optimization. More and more travelers ask AI assistants like ChatGPT, Claude, or Gemini what to do in Aruba. GEO is how we make sure those assistants know your business and recommend it, on top of classic Google SEO.",
   },
   {
-    question: "How long does it take to go live?",
+    question: "I already have a website. Do I still need the build?",
     answer:
-      "About 14 days from our first call. We audit how your bookings work today, build the Agent, you test it, and then it goes live on your channels.",
+      "No problem: we can take over the site you already have, clean it up, and run it under the same monthly plans. If it's genuinely holding you back, we'll tell you plainly and rebuild it as part of your plan.",
   },
   {
-    question: "Do I need a new website?",
+    question: "How do I request changes?",
     answer:
-      "No. Your Agent installs on the website you already have and on your WhatsApp number. If you don't have a website yet, we can build one too.",
+      "Send us a WhatsApp or an email, the way you'd text a colleague. We confirm what we understood, make the change, and send you the link when it's live.",
   },
   {
-    question: "What languages does it speak?",
+    question: "Do I own my website?",
     answer:
-      "English, Spanish, Dutch, and Papiamento, so it answers your guests the way Aruba actually talks.",
+      "Yes. The domain, the website, the content, and the analytics live in accounts under your name. If you ever leave, all of it stays with you.",
   },
   {
-    question: "What happens when it doesn't know the answer?",
+    question: "What does Enterprise cost?",
     answer:
-      "It hands the conversation to you or your staff, with the full chat history attached. The Agent knows its limits: a person can always step in.",
+      "There's no fixed price because there's no fixed scope: multiple sites or brands, AI agents, booking systems, custom integrations. We talk, we scope it together, and you get one clear monthly number before anything starts.",
   },
 ];
 

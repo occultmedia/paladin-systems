@@ -1,8 +1,8 @@
-import { CheckCircle2, Star } from "lucide-react";
+import { CheckCircle2, TrendingUp } from "lucide-react";
 
-/* Phone-style notification mockups: the review request going out through
-   Gmail, and the 5-star Google review coming back in. */
-export function ReviewNotifications() {
+/* Phone-style notification mockups: the monthly report landing in the
+   client's inbox, and the ranking win it reports. */
+export function MonthlyReport() {
   return (
     <div className="flex flex-col gap-3">
       <div className="glass-slab rounded-2xl p-4">
@@ -21,11 +21,11 @@ export function ReviewNotifications() {
           </span>
         </div>
         <p className="mt-2.5 text-[13.5px] font-semibold text-fg">
-          Your Charter Company
+          Sequence Labs: your August website report
         </p>
         <p className="mt-1 max-w-[52ch] text-[13px] leading-snug text-muted">
-          How was your sunset sail? If you had a good time, would you leave us
-          a quick Google review? It takes 30 seconds…
+          Visitors up 23%, your sunset cruise page is the new top landing
+          page, and 9 SEO fixes went live. Full breakdown inside&hellip;
         </p>
       </div>
 
@@ -39,33 +39,30 @@ export function ReviewNotifications() {
             height={16}
             className="size-4"
           />
-          <span className="text-[12px] font-medium text-muted">Google</span>
+          <span className="text-[12px] font-medium text-muted">
+            Google Search
+          </span>
           <span className="ml-auto font-mono text-[10.5px] tracking-[0.08em] text-muted">
-            10:31 AM
+            THIS MONTH
           </span>
         </div>
         <p className="mt-2.5 flex flex-wrap items-center gap-2 text-[13.5px] font-semibold text-fg">
-          New 5-star review
-          <span className="flex gap-0.5">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <Star
-                key={i}
-                className="size-3 fill-accent text-accent"
-                strokeWidth={1.5}
-              />
-            ))}
+          &ldquo;sunset cruise aruba&rdquo;
+          <span className="flex items-center gap-1 text-signal">
+            <TrendingUp className="size-3.5" strokeWidth={2} />
+            #1 result
           </span>
         </p>
         <p className="mt-1 max-w-[52ch] text-[13px] leading-snug text-muted">
-          &ldquo;Amazing sunset sail! The crew was fantastic and booking was so
-          easy.&rdquo; Marisol V.
+          Your tours page now ranks first, and AI assistants recommend it
+          when travelers ask what to do in Aruba.
         </p>
       </div>
 
       <div className="flex w-fit items-center gap-1.5 rounded-[10px] border border-signal/30 bg-signal/10 px-3 py-1.5">
         <CheckCircle2 className="size-3.5 shrink-0 text-signal" strokeWidth={2} />
         <span className="text-[12.5px] font-medium leading-snug text-signal">
-          Sent automatically, the morning after every tour
+          Sent automatically, the first week of every month
         </span>
       </div>
     </div>

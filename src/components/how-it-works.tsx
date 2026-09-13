@@ -4,11 +4,11 @@ import { motion, useReducedMotion } from "framer-motion";
 import {
   ArrowDown,
   ArrowRight,
-  CalendarCheck,
   CheckCircle2,
-  CreditCard,
-  Lock,
+  LineChart,
   MessageCircle,
+  PencilRuler,
+  TrendingUp,
 } from "lucide-react";
 import { Reveal } from "@/components/reveal";
 import { TiltCard } from "@/components/tilt-card";
@@ -43,10 +43,10 @@ export function HowItWorks() {
           </h2>
           <p className="mt-4 max-w-[58ch] text-[15px] leading-relaxed text-muted">
             <span className="text-fg">
-              Not a chatbot that answers FAQ questions.
+              Not an agency that disappears after launch.
             </span>{" "}
-            It&apos;s a receptionist who never sleeps: it knows your prices and
-            rules, checks your real calendar, and closes the booking itself.
+            We build your website, then stay on it every month: changes,
+            maintenance, and growth, handled by the same team that built it.
           </p>
         </Reveal>
 
@@ -55,16 +55,39 @@ export function HowItWorks() {
             <TiltCard className="glass-slab rounded-2xl" maxTilt={5}>
               <div className="flex h-full flex-col p-7 [transform-style:preserve-3d]">
                 <div className="[transform:translateZ(26px)]">
+                  <PencilRuler className="size-5 text-accent" strokeWidth={1.5} />
+                </div>
+                <h3 className="mt-4 font-display text-[17px] font-semibold text-fg">
+                  We build your website
+                </h3>
+                <div className="mt-4 max-w-[26ch] self-start rounded-2xl rounded-bl-[6px] border border-edge bg-canvas px-4 py-2.5 text-[13.5px] leading-snug text-fg [transform:translateZ(16px)]">
+                  Fast, mobile-first, in your brand. Or we take over the site
+                  you already have.
+                </div>
+                <p className="mt-auto pt-5 font-mono text-[10.5px] tracking-[0.14em] text-muted">
+                  DESIGN + BUILD / PART OF THE PLAN
+                </p>
+              </div>
+            </TiltCard>
+
+            <Connector />
+
+            <TiltCard className="glass-slab rounded-2xl" maxTilt={5}>
+              <div className="flex h-full flex-col p-7 [transform-style:preserve-3d]">
+                <div className="[transform:translateZ(26px)]">
                   <MessageCircle className="size-5 text-accent" strokeWidth={1.5} />
                 </div>
                 <h3 className="mt-4 font-display text-[17px] font-semibold text-fg">
-                  Tourist asks a question
+                  You message, we change
                 </h3>
                 <div className="mt-4 max-w-[26ch] self-start rounded-2xl rounded-bl-[6px] border border-edge bg-canvas px-4 py-2.5 text-[13.5px] leading-snug text-fg [transform:translateZ(16px)]">
-                  Can I book a Jeep for tomorrow?
+                  Can you swap the homepage photos?
+                </div>
+                <div className="mt-2.5 max-w-[26ch] self-end rounded-2xl rounded-br-[6px] border border-[var(--bubble-border)] bg-[var(--bubble-bg)] px-4 py-2.5 text-[13.5px] leading-snug text-fg [transform:translateZ(16px)]">
+                  Done, it&apos;s live!
                 </div>
                 <p className="mt-auto pt-5 font-mono text-[10.5px] tracking-[0.14em] text-muted">
-                  WHATSAPP / YOUR WEBSITE
+                  WHATSAPP / EMAIL / SAME TEAM
                 </p>
               </div>
             </TiltCard>
@@ -74,42 +97,23 @@ export function HowItWorks() {
             <TiltCard className="glass-slab rounded-2xl" maxTilt={5}>
               <div className="flex h-full flex-col p-7 [transform-style:preserve-3d]">
                 <div className="[transform:translateZ(26px)]">
-                  <CalendarCheck className="size-5 text-accent" strokeWidth={1.5} />
+                  <LineChart className="size-5 text-accent" strokeWidth={1.5} />
                 </div>
                 <h3 className="mt-4 font-display text-[17px] font-semibold text-fg">
-                  Sequence checks your schedule
-                </h3>
-                <div className="mt-4 max-w-[26ch] self-end rounded-2xl rounded-br-[6px] border border-[var(--bubble-border)] bg-[var(--bubble-bg)] px-4 py-2.5 text-[13.5px] leading-snug text-fg [transform:translateZ(16px)]">
-                  Yes, we have 2 left!
-                </div>
-                <p className="mt-auto pt-5 font-mono text-[10.5px] tracking-[0.14em] text-muted">
-                  LIVE AVAILABILITY / GOOGLE CALENDAR
-                </p>
-              </div>
-            </TiltCard>
-
-            <Connector />
-
-            <TiltCard className="glass-slab rounded-2xl" maxTilt={5}>
-              <div className="flex h-full flex-col p-7 [transform-style:preserve-3d]">
-                <div className="[transform:translateZ(26px)]">
-                  <CreditCard className="size-5 text-accent" strokeWidth={1.5} />
-                </div>
-                <h3 className="mt-4 font-display text-[17px] font-semibold text-fg">
-                  You get paid
+                  We grow it every month
                 </h3>
                 <div className="mt-4 self-start rounded-[10px] border border-edge bg-canvas px-4 py-2.5 [transform:translateZ(16px)]">
                   <p className="flex items-center gap-2 text-[13.5px] font-medium text-fg">
-                    <Lock className="size-3.5 text-signal" strokeWidth={1.5} />
-                    Secure payment link
+                    <TrendingUp className="size-3.5 text-signal" strokeWidth={1.5} />
+                    Visitors up 23% this month
                   </p>
                   <p className="mt-1.5 flex items-center gap-1.5 text-[12.5px] font-medium text-signal">
                     <CheckCircle2 className="size-3.5" strokeWidth={2} />
-                    Deposit received
+                    Report sent to your inbox
                   </p>
                 </div>
                 <p className="mt-auto pt-5 font-mono text-[10.5px] tracking-[0.14em] text-muted">
-                  CREDIT CARD DEPOSITS / LOCAL BANKS
+                  SEO + GEO / GOOGLE ANALYTICS
                 </p>
               </div>
             </TiltCard>

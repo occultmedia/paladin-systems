@@ -3,7 +3,7 @@ import { SequenceMark } from "@/components/logo";
 const LINKS = [
   { label: "How It Works", href: "#how-it-works" },
   { label: "Live Demo", href: "#demo" },
-  { label: "Products", href: "#systems" },
+  { label: "Plans", href: "#systems" },
   { label: "Why Us", href: "#why-us" },
   { label: "Results", href: "#case-studies" },
   { label: "FAQ", href: "#faq" },
@@ -21,7 +21,8 @@ export function Footer() {
             </span>
           </div>
           <p className="mt-3 max-w-[38ch] text-[13px] leading-relaxed text-muted">
-            High-end AI integration for Aruban businesses. Oranjestad, Aruba.
+            Websites built, maintained, and grown for Aruban businesses.
+            Oranjestad, Aruba.
           </p>
         </div>
 

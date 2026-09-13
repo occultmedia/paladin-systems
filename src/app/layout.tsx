@@ -41,7 +41,7 @@ export const metadata: Metadata = {
         url: "/og.png",
         width: 1200,
         height: 630,
-        alt: "Sequence Labs: never miss another booking.",
+        alt: "Sequence Labs: your website, built, maintained, and grown.",
       },
     ],
   },
