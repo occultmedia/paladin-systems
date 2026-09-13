@@ -21,7 +21,7 @@ export function Footer() {
             </span>
           </div>
           <p className="mt-3 max-w-[38ch] text-[13px] leading-relaxed text-muted">
-            Websites built, maintained, and grown for Aruban businesses.
+            Websites built, maintained, and grown for Aruba companies.
             Oranjestad, Aruba.
           </p>
         </div>

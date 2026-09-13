@@ -31,7 +31,7 @@ export function Positioning() {
 
         <Reveal delay={0.1}>
           <p className="mt-7 max-w-[58ch] text-[16px] leading-relaxed text-muted lg:text-[17px]">
-            We keep Aruban businesses alive online.{" "}
+            We keep Aruba companies alive online.{" "}
             <span className="text-fg">
               We don&apos;t build a website and disappear:
             </span>{" "}

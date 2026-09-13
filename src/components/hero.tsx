@@ -95,7 +95,7 @@ export function Hero() {
               aria-hidden
               className="size-1.5 shrink-0 rounded-full bg-signal shadow-[0_0_10px_2px_var(--btn-glow)] motion-safe:animate-pulse"
             />
-            A boutique web agency for Aruban businesses
+            A boutique web agency for Aruba companies
           </motion.p>
 
           <motion.h1

@@ -35,7 +35,7 @@ type Plan = {
 
 const PLANS: Plan[] = [
   {
-    target: "For businesses that need a solid site, handled",
+    target: "For companies that need a solid site, handled",
     name: "Base",
     price: 250,
     pitch: "We build your website, then keep it healthy month after month.",
@@ -51,7 +51,7 @@ const PLANS: Plan[] = [
     cta: "Start with Base",
   },
   {
-    target: "For businesses that want to grow, not just exist",
+    target: "For companies that want to grow, not just exist",
     name: "Pro",
     price: 500,
     pitch: "Everything in Base, plus someone actively growing your site.",

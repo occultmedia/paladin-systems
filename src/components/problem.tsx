@@ -29,7 +29,7 @@ export function Problem() {
             Sound familiar?
           </h2>
           <p className="mt-4 max-w-[52ch] text-[15px] leading-relaxed text-muted">
-            Every business on the island hits the same three walls.
+            Every company on the island hits the same three walls.
           </p>
         </Reveal>
 

@@ -1,7 +1,7 @@
 # Sequence Labs
 
-Marketing site for Sequence Labs: an Aruban web agency on monthly
-subscriptions. We build, maintain, and grow business websites — Base at
+Marketing site for Sequence Labs: an Aruba web agency on monthly
+subscriptions. We build, maintain, and grow company websites — Base at
 Afl. 250/month, Pro (all-in-one with SEO + GEO and monthly analytics
 reports) at Afl. 500/month, and custom Enterprise plans.
 
