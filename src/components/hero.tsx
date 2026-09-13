@@ -11,8 +11,8 @@ import {
   UtensilsCrossed,
   Waves,
 } from "lucide-react";
-import { ChatPlayer, type ChatStep } from "@/components/chat-player";
 import { CountUp } from "@/components/count-up";
+import { HeroVisual } from "@/components/hero-visual";
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
@@ -31,40 +31,6 @@ const INDUSTRIES = [
   { icon: Map, label: "Tour Operators" },
   { icon: Waves, label: "Watersports" },
   { icon: UtensilsCrossed, label: "Restaurants" },
-];
-
-const CHANGE_SCRIPT: ChatStep[] = [
-  {
-    kind: "in",
-    text: "Hi! Can you put our new Sunday brunch menu on the site?",
-  },
-  {
-    kind: "action",
-    pending: "Updating the menu page",
-    done: "Menu page updated",
-  },
-  {
-    kind: "out",
-    text: "Done, it's live! Want me to feature the brunch on your homepage this week too?",
-  },
-  { kind: "status", text: "Change shipped in 25 minutes." },
-];
-
-const REPORT_SCRIPT: ChatStep[] = [
-  {
-    kind: "in",
-    text: "How did the website do this month?",
-  },
-  {
-    kind: "action",
-    pending: "Pulling your Google Analytics",
-    done: "Report ready: visitors +23%",
-  },
-  {
-    kind: "out",
-    text: "Great month: 23% more visitors, and your sunset tour page is now your top landing page. Full report is in your inbox.",
-  },
-  { kind: "status", text: "Monthly report sent." },
 ];
 
 export function Hero() {
@@ -145,30 +111,8 @@ export function Hero() {
           </motion.div>
         </div>
 
-        <motion.div
-          {...rise(0.3)}
-          className="flex flex-col gap-5 lg:col-span-5"
-        >
-          <ChatPlayer
-            chrome="whatsapp"
-            script={CHANGE_SCRIPT}
-            title="Sequence Labs"
-            subtitle="your web team, one message away"
-            time="8:41 AM"
-            bodyClassName="h-[368px] sm:h-[308px]"
-            className="lg:-translate-x-3"
-            srDescription="Example WhatsApp conversation: a client asks Sequence Labs to put their new Sunday brunch menu on the site, the team updates the menu page, and the change is live 25 minutes later."
-          />
-          <ChatPlayer
-            chrome="widget"
-            script={REPORT_SCRIPT}
-            title="Chat with us"
-            subtitle="your web team, one message away"
-            domain="sequencelabs.aw"
-            bodyClassName="h-[332px] sm:h-[264px]"
-            className="lg:translate-x-3"
-            srDescription="Example chat: a client asks how the website did this month, Sequence Labs pulls Google Analytics, reports visitors up 23%, and sends the full monthly report to their inbox."
-          />
+        <motion.div {...rise(0.3)} className="lg:col-span-5">
+          <HeroVisual />
         </motion.div>
 
         <motion.div {...rise(0.4)} className="lg:col-span-12">

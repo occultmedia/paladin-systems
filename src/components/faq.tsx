@@ -7,12 +7,12 @@ export const FAQS = [
   {
     question: "What do I get for Afl. 250 a month?",
     answer:
-      "The Base plan: we design and build your website, then keep it maintained month after month, with small changes here and there on request. The build is part of the plan, so there's no big upfront project invoice.",
+      "The Starter plan: we design and build your website, then keep it maintained month after month, with small changes here and there on request. The build is part of the plan, so there's no big upfront project invoice.",
   },
   {
     question: "What's different about Pro?",
     answer:
-      "Pro (Afl. 500 a month) is the all-in-one: everything in Base, plus SEO and GEO so people actually find you, monthly content changes to keep the site fresh, and a Google Analytics report in your inbox every month that explains what's working in plain language.",
+      "Pro (Afl. 500 a month) is the all-in-one: everything in Starter, plus SEO and GEO so people actually find you, monthly content changes to keep the site fresh, and a Google Analytics report in your inbox every month that explains what's working in plain language.",
   },
   {
     question: "What is GEO?",

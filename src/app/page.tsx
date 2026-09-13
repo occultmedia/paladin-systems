@@ -38,7 +38,7 @@ const businessJsonLd = {
       priceCurrency: "AWG",
       itemOffered: {
         "@type": "Service",
-        name: "Base",
+        name: "Starter",
         description:
           "Afl. 250 per month: we design and build your website, then keep it maintained with basic upkeep and small site changes on request.",
       },
@@ -51,7 +51,7 @@ const businessJsonLd = {
         "@type": "Service",
         name: "Pro",
         description:
-          "Afl. 500 per month, all in one: everything in Base plus SEO and GEO, monthly content changes, and a Google Analytics report sent every month.",
+          "Afl. 500 per month, all in one: everything in Starter plus SEO and GEO, monthly content changes, and a Google Analytics report sent every month.",
       },
     },
     {

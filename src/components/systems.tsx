@@ -36,7 +36,7 @@ type Plan = {
 const PLANS: Plan[] = [
   {
     target: "For companies that need a solid site, handled",
-    name: "Base",
+    name: "Starter",
     price: 250,
     pitch: "We build your website, then keep it healthy month after month.",
     hero: PencilRuler,
@@ -48,13 +48,13 @@ const PLANS: Plan[] = [
         text: "Small site changes here and there, on request.",
       },
     ],
-    cta: "Start with Base",
+    cta: "Start with Starter",
   },
   {
     target: "For companies that want to grow, not just exist",
     name: "Pro",
     price: 500,
-    pitch: "Everything in Base, plus someone actively growing your site.",
+    pitch: "Everything in Starter, plus someone actively growing your site.",
     hero: TrendingUp,
     features: [
       {
@@ -205,7 +205,7 @@ export function Systems() {
         <Reveal delay={0.12} className="mt-6">
           <p className="max-w-[74ch] text-[13.5px] leading-relaxed text-muted">
             Prices are in Aruban florin, per month. Pro includes everything in
-            Base. We agree the scope with you up front, before anything goes
+            Starter. We agree the scope with you up front, before anything goes
             live, and everything we build stays yours.
           </p>
         </Reveal>
