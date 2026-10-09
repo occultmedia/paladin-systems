@@ -1,0 +1,1201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Book a car — Nexus Car Rental Aruba</title>
+  <meta name="description" content="Book your rental car in Aruba in three steps. Airport pickup or hotel delivery. Pay at the counter.">
+  <meta name="theme-color" content="#F6F5F1">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg: #F6F5F1;
+      --surface: #FFFFFF;
+      --surface-2: #FBFAF8;
+      --ink: #15171B;
+      --ink-2: #4B5058;
+      --ink-3: #7D828A;
+      --line: #E5E2DB;
+      --line-2: #D3CFC6;
+      --accent: #0B6B70;
+      --accent-soft: #E7F1F0;
+      --danger: #B42318;
+      --danger-soft: #FDF0EE;
+      --note: #7A5300;
+      --note-soft: #FBF4E4;
+      --radius: 14px;
+      --radius-sm: 10px;
+      --ease: cubic-bezier(.2, .7, .2, 1);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font: 400 15px/1.5 'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    h1, h2, h3, p { margin: 0; }
+    button, input, select, textarea { font: inherit; color: inherit; }
+    a { color: inherit; }
+    .num { font-variant-numeric: tabular-nums; }
+    .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+    [hidden] { display: none !important; }
+
+    /* ---------- Header ---------- */
+    .topbar {
+      position: sticky; top: 0; z-index: 40;
+      background: rgba(246, 245, 241, .88);
+      backdrop-filter: saturate(1.4) blur(12px);
+      -webkit-backdrop-filter: saturate(1.4) blur(12px);
+      border-bottom: 1px solid var(--line);
+    }
+    .topbar-inner {
+      max-width: 1100px; margin: 0 auto; padding: 0 20px;
+      height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 24px;
+    }
+    .brand { display: flex; align-items: baseline; gap: 8px; text-decoration: none; }
+    .brand b { font-weight: 700; font-size: 18px; letter-spacing: .08em; }
+    .brand span { font-size: 13px; color: var(--ink-3); }
+    .help { font-size: 13px; color: var(--ink-2); text-decoration: none; display: flex; align-items: center; gap: 6px; }
+    .help:hover { color: var(--ink); }
+
+    .steps {
+      max-width: 1100px; margin: 0 auto; padding: 0 20px;
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
+    }
+    .step-tab {
+      appearance: none; background: none; border: 0; padding: 10px 0 12px; text-align: left; cursor: default;
+      font-size: 13px; color: var(--ink-3); position: relative;
+    }
+    .step-tab::after {
+      content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px;
+      background: var(--line); border-radius: 2px; transition: background .3s var(--ease);
+    }
+    .step-tab .n { font-variant-numeric: tabular-nums; margin-right: 6px; }
+    .step-tab.is-current { color: var(--ink); font-weight: 600; }
+    .step-tab.is-current::after { background: var(--ink); }
+    .step-tab.is-done { color: var(--ink-2); cursor: pointer; }
+    .step-tab.is-done::after { background: var(--accent); }
+    .step-tab.is-done:hover { color: var(--ink); }
+
+    /* ---------- Layout ---------- */
+    .layout {
+      max-width: 1100px; margin: 0 auto; padding: 36px 20px 120px;
+      display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 40px; align-items: start;
+    }
+    .layout.is-done { grid-template-columns: minmax(0, 720px); justify-content: center; }
+
+    .step-head { margin-bottom: 24px; }
+    .eyebrow { font-size: 13px; color: var(--ink-3); margin-bottom: 6px; }
+    .step-head h1 { font-size: 30px; line-height: 1.15; font-weight: 600; letter-spacing: -.02em; }
+    .step-head p { color: var(--ink-2); margin-top: 8px; max-width: 52ch; }
+
+    .panel { animation: rise .35s var(--ease); }
+    @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+    .section { padding: 28px 0; border-top: 1px solid var(--line); }
+    .section:first-of-type { border-top: 0; padding-top: 0; }
+    .section-title { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+    .section-sub { font-size: 14px; color: var(--ink-3); margin-bottom: 16px; }
+    .section-title + .grid, .section-title + .stack, .section-title + .seg { margin-top: 14px; }
+
+    /* ---------- Form controls ---------- */
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .grid .wide { grid-column: 1 / -1; }
+    .field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+    .label { font-size: 13.5px; font-weight: 500; color: var(--ink-2); }
+    .label em { font-style: normal; color: var(--ink-3); font-weight: 400; }
+
+    .input, .select, .textarea {
+      width: 100%; height: 48px; padding: 0 14px;
+      background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--radius-sm);
+      font-size: 15.5px; outline: none; transition: border-color .15s, box-shadow .15s;
+      -webkit-appearance: none; appearance: none;
+    }
+    .textarea { height: auto; min-height: 88px; padding: 12px 14px; resize: vertical; line-height: 1.45; }
+    .select {
+      padding-right: 38px; cursor: pointer;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237D828A' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 14px center;
+    }
+    .input::placeholder, .textarea::placeholder { color: #A3A7AD; }
+    .input:hover, .select:hover, .textarea:hover { border-color: #BDB8AD; }
+    .input:focus, .select:focus, .textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(11, 107, 112, .14); }
+    .field.has-error .input, .field.has-error .select { border-color: var(--danger); }
+    .error-msg { font-size: 13px; color: var(--danger); display: none; }
+    .has-error > .error-msg { display: block; }
+
+    .datetime { display: grid; grid-template-columns: 1fr 132px; gap: 8px; }
+    .datetime .select { padding-right: 32px; background-position: right 12px center; }
+    .duration { margin-top: 14px; font-size: 14px; color: var(--ink-2); display: flex; align-items: center; gap: 8px; }
+    .duration strong { color: var(--ink); font-weight: 600; }
+
+    /* Segmented control */
+    .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .seg-opt { position: relative; }
+    .seg-opt input { position: absolute; opacity: 0; pointer-events: none; }
+    .seg-opt label {
+      display: flex; align-items: center; gap: 12px; height: 100%;
+      padding: 14px 16px; background: var(--surface); border: 1px solid var(--line-2);
+      border-radius: var(--radius-sm); cursor: pointer; transition: border-color .15s, box-shadow .15s, background .15s;
+    }
+    .seg-opt label:hover { border-color: #BDB8AD; }
+    .seg-opt input:checked + label { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+    .seg-opt input:focus-visible + label { box-shadow: 0 0 0 3px rgba(11, 107, 112, .25); }
+    .seg-opt .ico { width: 20px; height: 20px; color: var(--ink-2); flex-shrink: 0; }
+    .seg-opt .t { font-weight: 500; font-size: 14.5px; line-height: 1.3; }
+    .seg-opt .s { font-size: 13px; color: var(--ink-3); line-height: 1.3; }
+    .seg.compact label { justify-content: center; padding: 12px; font-weight: 500; font-size: 14.5px; }
+
+    .logistics { display: grid; gap: 18px; }
+
+    /* Choice cards (vehicles, protection) */
+    .stack { display: grid; gap: 10px; }
+    .choice { position: relative; }
+    .choice input { position: absolute; opacity: 0; pointer-events: none; }
+    .choice label {
+      display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 18px;
+      padding: 16px 18px; background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--radius);
+      cursor: pointer; transition: border-color .15s, box-shadow .15s;
+    }
+    .choice label:hover { border-color: #BDB8AD; }
+    .choice input:checked + label { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+    .choice input:focus-visible + label { box-shadow: 0 0 0 3px rgba(11, 107, 112, .25); }
+
+    .radio-dot {
+      width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--line-2); background: var(--surface);
+      display: grid; place-items: center; transition: border-color .15s;
+    }
+    .radio-dot::after { content: ''; width: 10px; height: 10px; border-radius: 50%; background: var(--ink); transform: scale(0); transition: transform .18s var(--ease); }
+    .choice input:checked + label .radio-dot { border-color: var(--ink); }
+    .choice input:checked + label .radio-dot::after { transform: scale(1); }
+
+    .car label { grid-template-columns: 132px 1fr auto; padding: 14px 20px 14px 14px; }
+    .car-art {
+      width: 132px; height: 84px; border-radius: var(--radius-sm); background: var(--surface-2);
+      border: 1px solid var(--line); display: grid; place-items: center; color: var(--ink);
+    }
+    .car-art svg { width: 108px; height: auto; }
+    .car-name { font-weight: 600; font-size: 16px; }
+    .car-class { font-size: 13.5px; color: var(--ink-3); }
+    .specs { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 8px; font-size: 13px; color: var(--ink-2); }
+    .specs span { display: inline-flex; align-items: center; gap: 5px; }
+    .specs svg { width: 14px; height: 14px; color: var(--ink-3); }
+    .price { text-align: right; white-space: nowrap; }
+    .price .big { font-size: 20px; font-weight: 600; letter-spacing: -.01em; }
+    .price .big small { font-size: 13px; font-weight: 400; color: var(--ink-3); letter-spacing: 0; }
+    .price .sub { font-size: 13px; color: var(--ink-3); }
+
+    .plan-name { font-weight: 600; font-size: 15px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .plan-desc { font-size: 13.5px; color: var(--ink-2); margin-top: 2px; }
+    .tag { font-size: 11.5px; font-weight: 500; padding: 2px 8px; border-radius: 99px; background: var(--accent-soft); color: var(--accent); }
+
+    /* Extras */
+    .extra {
+      display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: center;
+      padding: 16px 0; border-bottom: 1px solid var(--line);
+    }
+    .extra:last-child { border-bottom: 0; }
+    .extra-name { font-weight: 500; font-size: 15px; }
+    .extra-desc { font-size: 13.5px; color: var(--ink-3); margin-top: 2px; max-width: 48ch; }
+    .extra-side { display: flex; align-items: center; gap: 14px; }
+    .extra-price { font-size: 14px; color: var(--ink-2); }
+    .toggle-btn {
+      height: 36px; min-width: 84px; padding: 0 14px; border-radius: 99px; cursor: pointer;
+      border: 1px solid var(--line-2); background: var(--surface); font-size: 14px; font-weight: 500;
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: all .15s;
+    }
+    .toggle-btn:hover { border-color: var(--ink-2); }
+    .toggle-btn[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: #fff; }
+    .toggle-btn svg { width: 14px; height: 14px; }
+    .extras-card { background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--radius); padding: 0 18px; }
+
+    /* Checkboxes */
+    .check { display: flex; gap: 12px; align-items: flex-start; cursor: pointer; font-size: 14.5px; color: var(--ink-2); line-height: 1.45; }
+    .check input {
+      -webkit-appearance: none; appearance: none; flex-shrink: 0; margin: 1px 0 0;
+      width: 20px; height: 20px; border-radius: 6px; border: 1.5px solid var(--line-2); background: var(--surface);
+      display: grid; place-items: center; cursor: pointer; transition: all .15s;
+    }
+    .check input::after {
+      content: ''; width: 10px; height: 6px; border: 2px solid #fff; border-top: 0; border-right: 0;
+      transform: rotate(-45deg) translate(1px, -1px) scale(0); transition: transform .15s var(--ease);
+    }
+    .check input:checked { background: var(--ink); border-color: var(--ink); }
+    .check input:checked::after { transform: rotate(-45deg) translate(1px, -1px) scale(1); }
+    .check input:focus-visible { box-shadow: 0 0 0 3px rgba(11, 107, 112, .25); }
+    .check.has-error input { border-color: var(--danger); }
+    .check a { color: var(--ink); font-weight: 500; text-underline-offset: 2px; }
+    .check-small { font-size: 13.5px; margin-top: 2px; }
+
+    .note {
+      font-size: 13.5px; line-height: 1.5; padding: 12px 14px; border-radius: var(--radius-sm);
+      background: var(--note-soft); color: var(--note); margin-top: 12px;
+    }
+
+    details.more { border-top: 1px solid var(--line); padding-top: 4px; }
+    details.more summary {
+      list-style: none; cursor: pointer; padding: 20px 0; display: flex; justify-content: space-between; align-items: center;
+      font-weight: 600; font-size: 16px; gap: 10px;
+    }
+    details.more summary svg { margin-left: auto; }
+    details.more summary::-webkit-details-marker { display: none; }
+    details.more summary span { font-weight: 400; font-size: 14px; color: var(--ink-3); }
+    details.more summary svg { width: 18px; height: 18px; color: var(--ink-3); transition: transform .2s var(--ease); }
+    details.more[open] summary svg { transform: rotate(180deg); }
+    details.more .grid { padding-bottom: 28px; }
+
+    /* ---------- Actions ---------- */
+    .actions { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--line); }
+    .actions-total { display: none; }
+    .btn {
+      height: 50px; padding: 0 24px; border-radius: 12px; border: 0; cursor: pointer;
+      font-size: 15.5px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      transition: background .15s, transform .1s, opacity .15s;
+    }
+    .btn:active { transform: scale(.985); }
+    .btn svg { width: 18px; height: 18px; }
+    .btn-primary { background: var(--ink); color: #fff; min-width: 200px; }
+    .btn-primary:hover { background: #2A2E35; }
+    .btn-primary[disabled] { opacity: .6; cursor: progress; }
+    .btn-ghost { background: transparent; color: var(--ink-2); padding: 0 8px; }
+    .btn-ghost:hover { color: var(--ink); }
+    .spinner { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,.35); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .actions > div:last-child { display: flex; flex-direction: column; align-items: flex-end; }
+    .reassure { font-size: 13px; color: var(--ink-3); text-align: right; margin-top: 10px; }
+
+    /* ---------- Summary ---------- */
+    .summary {
+      position: sticky; top: 128px;
+      background: var(--surface); border: 1px solid var(--line); border-radius: 16px; overflow: hidden;
+    }
+    .sum-head { padding: 20px 22px 16px; border-bottom: 1px solid var(--line); }
+    .sum-head h2 { font-size: 15px; font-weight: 600; }
+    .sum-trip { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
+    .sum-trip .k { font-size: 12.5px; color: var(--ink-3); }
+    .sum-trip .v { font-size: 14px; font-weight: 500; line-height: 1.35; }
+    .sum-trip .v small { display: block; font-weight: 400; color: var(--ink-3); font-size: 13px; }
+    .sum-body { padding: 16px 22px; display: grid; gap: 10px; }
+    .line { display: flex; justify-content: space-between; gap: 16px; font-size: 14px; color: var(--ink-2); }
+    .line span:last-child { color: var(--ink); white-space: nowrap; }
+    .line small { display: block; font-size: 12.5px; color: var(--ink-3); }
+    .sum-total { padding: 16px 22px 20px; border-top: 1px solid var(--line); background: var(--surface-2); }
+    .sum-total .line { font-size: 15px; color: var(--ink); font-weight: 600; }
+    .sum-total .line span:last-child { font-size: 22px; letter-spacing: -.01em; }
+    .sum-total p { font-size: 13px; color: var(--ink-3); margin-top: 6px; line-height: 1.45; }
+    .deposit { display: flex; justify-content: space-between; font-size: 13.5px; color: var(--ink-2); margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--line-2); }
+    .sum-trust { padding: 14px 22px; border-top: 1px solid var(--line); display: grid; gap: 8px; }
+    .sum-trust div { font-size: 13px; color: var(--ink-2); display: flex; gap: 8px; align-items: flex-start; }
+    .sum-trust svg { width: 16px; height: 16px; color: var(--accent); flex-shrink: 0; margin-top: 2px; }
+
+    /* Mobile summary sheet */
+    .sheet-backdrop { position: fixed; inset: 0; background: rgba(21, 23, 27, .4); z-index: 60; opacity: 0; transition: opacity .2s; pointer-events: none; }
+    .sheet {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 61; max-height: 85vh; overflow: auto;
+      background: var(--surface); border-radius: 18px 18px 0 0; transform: translateY(100%); visibility: hidden;
+      transition: transform .3s var(--ease), visibility 0s .3s;
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+    .sheet .summary { position: static; border: 0; border-radius: 0; }
+    .sheet-grip { width: 36px; height: 4px; border-radius: 4px; background: var(--line-2); margin: 10px auto 0; }
+    .sheet-open .sheet { transform: none; visibility: visible; transition: transform .3s var(--ease); }
+    @media (min-width: 901px) { #sheet-root { display: none; } }
+    .sheet-open .sheet-backdrop { opacity: 1; pointer-events: auto; }
+
+    /* ---------- Confirmation ---------- */
+    .done-mark {
+      width: 52px; height: 52px; border-radius: 50%; background: var(--accent); color: #fff;
+      display: grid; place-items: center; margin-bottom: 22px; animation: pop .45s var(--ease);
+    }
+    .done-mark svg { width: 24px; height: 24px; stroke-dasharray: 30; stroke-dashoffset: 30; animation: draw .4s .2s var(--ease) forwards; }
+    @keyframes pop { from { transform: scale(.6); opacity: 0; } to { transform: none; opacity: 1; } }
+    @keyframes draw { to { stroke-dashoffset: 0; } }
+    .ref { display: inline-flex; gap: 8px; align-items: center; font-size: 14px; color: var(--ink-2); margin-top: 16px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+    .ref strong { color: var(--ink); letter-spacing: .04em; }
+    .card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 22px; margin-top: 28px; }
+    .card h3 { font-size: 15px; font-weight: 600; margin-bottom: 14px; }
+    .recap { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .recap .k { font-size: 12.5px; color: var(--ink-3); }
+    .recap .v { font-size: 14.5px; font-weight: 500; line-height: 1.35; }
+    .next { list-style: none; padding: 0; margin: 0; display: grid; gap: 16px; counter-reset: n; }
+    .next li { display: grid; grid-template-columns: 28px 1fr; gap: 12px; counter-increment: n; font-size: 14.5px; color: var(--ink-2); }
+    .next li::before {
+      content: counter(n); width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--line-2);
+      display: grid; place-items: center; font-size: 13px; font-weight: 600; color: var(--ink);
+    }
+    .next strong { color: var(--ink); font-weight: 600; display: block; }
+    .partner { display: grid; grid-template-columns: 1fr auto; gap: 20px; align-items: center; background: var(--note-soft); border-color: #EFE2C2; }
+    .partner p { font-size: 14px; color: var(--ink-2); margin-top: 4px; }
+    .partner h3 { margin: 0; }
+    .btn-outline { background: var(--surface); color: var(--ink); border: 1px solid var(--line-2); text-decoration: none; height: 44px; font-size: 14.5px; white-space: nowrap; }
+    .btn-outline:hover { border-color: var(--ink-2); }
+
+    /* ---------- Responsive ---------- */
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; padding-top: 24px; padding-bottom: 140px; }
+      .layout > aside { display: none; }
+      .actions {
+        position: fixed; left: 0; right: 0; bottom: 0; z-index: 50; margin: 0; align-items: center;
+        padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+        background: rgba(255,255,255,.96); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+        border-top: 1px solid var(--line);
+      }
+      .actions .btn-ghost { display: none; }
+      .actions-total {
+        display: flex; flex-direction: column; align-items: flex-start; background: none; border: 0; padding: 0; cursor: pointer; text-align: left;
+      }
+      .actions-total .amt { font-size: 18px; font-weight: 600; }
+      .actions-total .lbl { font-size: 12.5px; color: var(--ink-3); text-decoration: underline; text-underline-offset: 2px; }
+      .btn-primary { min-width: 0; flex: 0 1 auto; padding: 0 20px; }
+      .reassure { display: none; }
+      .back-link { display: inline-flex !important; }
+    }
+    .back-link { display: none; margin-bottom: 14px; padding: 0; height: auto; font-size: 14px; }
+    .back-link svg { width: 16px; height: 16px; }
+
+    @media (max-width: 600px) {
+      .step-head h1 { font-size: 25px; }
+      .brand span { display: none; }
+      .step-tab { font-size: 12px; }
+      .step-tab .full { display: none; }
+      .grid { grid-template-columns: 1fr; }
+      .datetime { grid-template-columns: 1fr 128px; }
+      .help .long { display: none; }
+      .seg:not(.compact) { grid-template-columns: 1fr; }
+      .car label { grid-template-columns: 88px 1fr; gap: 14px; padding: 14px; }
+      .car-art { width: 88px; height: 64px; }
+      .car-art svg { width: 74px; }
+      .car .price { grid-column: 2; text-align: left; display: flex; align-items: baseline; gap: 10px; }
+      .choice.plan label { grid-template-columns: auto 1fr; }
+      .choice.plan .price { grid-column: 2; text-align: left; }
+      .extra { grid-template-columns: 1fr; gap: 10px; }
+      .extra-side { justify-content: space-between; }
+      .recap { grid-template-columns: 1fr 1fr; }
+      .partner { grid-template-columns: 1fr; }
+    }
+    @media (min-width: 601px) { .step-tab .short { display: none; } }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="/" aria-label="Nexus Car Rental Aruba, home">
+        <b>NEXUS</b><span>Car Rental Aruba</span>
+      </a>
+      <a class="help" id="help-link" href="#">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-12.6 7.3L3 20l1.3-5A8.4 8.4 0 1 1 21 11.5Z"/></svg>
+        <span class="long">Questions?</span> Message us
+      </a>
+    </div>
+    <nav class="steps" aria-label="Booking steps" id="steps-nav">
+      <button type="button" class="step-tab is-current" data-step="1" aria-current="step"><span class="n">1</span><span class="full">Trip &amp; car</span><span class="short">Trip</span></button>
+      <button type="button" class="step-tab" data-step="2"><span class="n">2</span><span class="full">Protection &amp; extras</span><span class="short">Extras</span></button>
+      <button type="button" class="step-tab" data-step="3"><span class="n">3</span><span class="full">Your details</span><span class="short">Details</span></button>
+    </nav>
+  </header>
+
+  <main class="layout" id="layout">
+    <form id="booking" novalidate>
+
+      <!-- ============ STEP 1 ============ -->
+      <section class="panel" data-panel="1">
+        <div class="step-head">
+          <div class="eyebrow">Step 1 of 3</div>
+          <h1>When and where?</h1>
+          <p>Pick your dates, how you'd like to get the car, and the car itself.</p>
+        </div>
+
+        <div class="section">
+          <h2 class="section-title">Dates</h2>
+          <div class="grid">
+            <div class="field" id="f-start">
+              <label class="label" for="start-date">Pickup</label>
+              <div class="datetime">
+                <input class="input" type="date" id="start-date" required>
+                <select class="select" id="start-time" aria-label="Pickup time"></select>
+              </div>
+              <div class="error-msg">Choose a pickup date that isn't in the past.</div>
+            </div>
+            <div class="field" id="f-end">
+              <label class="label" for="end-date">Return</label>
+              <div class="datetime">
+                <input class="input" type="date" id="end-date" required>
+                <select class="select" id="end-time" aria-label="Return time"></select>
+              </div>
+              <div class="error-msg">Return needs to be after pickup.</div>
+            </div>
+          </div>
+          <div class="duration" id="duration" aria-live="polite"></div>
+        </div>
+
+        <div class="section">
+          <h2 class="section-title">Getting the car</h2>
+          <div class="logistics">
+            <div>
+              <div class="label" id="pickup-label" style="margin-bottom:8px">Pickup</div>
+              <div class="seg" role="radiogroup" aria-labelledby="pickup-label">
+                <div class="seg-opt">
+                  <input type="radio" name="pickup" id="pickup-airport" value="Airport pickup" checked>
+                  <label for="pickup-airport">
+                    <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>
+                    <span><span class="t">Queen Beatrix Airport</span><br><span class="s">We meet you at arrivals</span></span>
+                  </label>
+                </div>
+                <div class="seg-opt">
+                  <input type="radio" name="pickup" id="pickup-hotel" value="Hotel delivery">
+                  <label for="pickup-hotel">
+                    <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21h18M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16M9 7h1M14 7h1M9 11h1M14 11h1M10 21v-4h4v4"/></svg>
+                    <span><span class="t">Delivered to your stay</span><br><span class="s">Hotel, resort or villa</span></span>
+                  </label>
+                </div>
+              </div>
+            </div>
+            <div>
+              <div class="label" id="return-label" style="margin-bottom:8px">Return</div>
+              <div class="seg" role="radiogroup" aria-labelledby="return-label">
+                <div class="seg-opt">
+                  <input type="radio" name="return" id="return-airport" value="Airport return" checked>
+                  <label for="return-airport">
+                    <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 22h20M6.4 17.4 3 12.8l1.6-.8 3 1.6 3.6-1.9L6 6.5l2.1-1.1 7.3 4.2 4.1-2.2a2 2 0 0 1 2.7.9c.3.8 0 1.7-.8 2.1L8.5 17.6a1.6 1.6 0 0 1-2.1-.2z"/></svg>
+                    <span><span class="t">At the airport</span><br><span class="s">Drop off before your flight</span></span>
+                  </label>
+                </div>
+                <div class="seg-opt">
+                  <input type="radio" name="return" id="return-hotel" value="Hotel collection">
+                  <label for="return-hotel">
+                    <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 9.8-9.8M16 7l3 3M19 4l2 2"/></svg>
+                    <span><span class="t">Collected from your stay</span><br><span class="s">Leave the keys, we'll pick it up</span></span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2 class="section-title">Your car</h2>
+          <p class="section-sub">Available for your dates. Every car is automatic with A/C.</p>
+          <div class="stack" id="vehicle-list" role="radiogroup" aria-label="Vehicle"></div>
+        </div>
+      </section>
+
+      <!-- ============ STEP 2 ============ -->
+      <section class="panel" data-panel="2" hidden>
+        <button type="button" class="btn btn-ghost back-link" data-back>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>Back
+        </button>
+        <div class="step-head">
+          <div class="eyebrow">Step 2 of 3</div>
+          <h1>Cover and extras</h1>
+          <p>Basic collision cover is included with every rental. Upgrade if you'd rather not think about it.</p>
+        </div>
+
+        <div class="section">
+          <h2 class="section-title">Protection</h2>
+          <div class="stack" id="plan-list" role="radiogroup" aria-label="Protection plan"></div>
+        </div>
+
+        <div class="section">
+          <h2 class="section-title">Extras</h2>
+          <p class="section-sub">Flat price for the whole rental. Ready and waiting when you pick up the car.</p>
+          <div class="extras-card" id="extra-list"></div>
+        </div>
+      </section>
+
+      <!-- ============ STEP 3 ============ -->
+      <section class="panel" data-panel="3" hidden>
+        <button type="button" class="btn btn-ghost back-link" data-back>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>Back
+        </button>
+        <div class="step-head">
+          <div class="eyebrow">Step 3 of 3</div>
+          <h1>Who's driving?</h1>
+          <p>Nothing is charged today. You pay at pickup.</p>
+        </div>
+
+        <div class="section">
+          <h2 class="section-title">Main driver</h2>
+          <div class="grid">
+            <div class="field wide" id="f-name">
+              <label class="label" for="name">Full name <em>as on driver's license</em></label>
+              <input class="input" id="name" autocomplete="name" placeholder="Maria Garcia" required>
+              <div class="error-msg">Enter the driver's full name.</div>
+            </div>
+            <div class="field" id="f-email">
+              <label class="label" for="email">Email</label>
+              <input class="input" type="email" id="email" autocomplete="email" inputmode="email" placeholder="maria@email.com" required>
+              <div class="error-msg">Enter a valid email so we can send your confirmation.</div>
+            </div>
+            <div class="field" id="f-phone">
+              <label class="label" for="phone">Mobile number</label>
+              <input class="input" type="tel" id="phone" autocomplete="tel" inputmode="tel" placeholder="+1 555 010 0192" required>
+              <div class="error-msg">Enter a number we can reach you on.</div>
+              <label class="check check-small"><input type="checkbox" id="whatsapp" checked> I use WhatsApp on this number</label>
+            </div>
+            <div class="field wide" id="f-stay">
+              <label class="label" for="stay">Where are you staying in Aruba?</label>
+              <input class="input" id="stay" placeholder="Hotel, resort or Airbnb address" required>
+              <div class="error-msg">Tell us where you're staying.</div>
+            </div>
+            <div class="field" id="f-flight">
+              <label class="label" for="flight-in">Arrival flight <em>optional</em></label>
+              <input class="input" id="flight-in" placeholder="e.g. B6 1757" autocapitalize="characters">
+            </div>
+            <div class="field" id="f-age">
+              <span class="label" id="age-label">Driver's age</span>
+              <div class="seg compact" role="radiogroup" aria-labelledby="age-label">
+                <div class="seg-opt"><input type="radio" name="age" id="age-25" value="25+"><label for="age-25">25 or older</label></div>
+                <div class="seg-opt"><input type="radio" name="age" id="age-u25" value="Under 25"><label for="age-u25">Under 25</label></div>
+              </div>
+              <div class="error-msg">Let us know the driver's age group.</div>
+            </div>
+          </div>
+          <div class="note" id="u25-note" hidden>Drivers under 25 are subject to approval. We'll confirm eligibility with you by email before your booking is final.</div>
+        </div>
+
+        <div class="section">
+          <h2 class="section-title">Billing address</h2>
+          <p class="section-sub">Used for your rental agreement.</p>
+          <div class="grid">
+            <div class="field wide" id="f-addr">
+              <label class="label" for="addr1">Street address</label>
+              <input class="input" id="addr1" autocomplete="address-line1" required>
+              <div class="error-msg">Enter your street address.</div>
+            </div>
+            <div class="field wide">
+              <label class="label" for="addr2">Apartment, suite <em>optional</em></label>
+              <input class="input" id="addr2" autocomplete="address-line2">
+            </div>
+            <div class="field" id="f-city">
+              <label class="label" for="city">City</label>
+              <input class="input" id="city" autocomplete="address-level2" required>
+              <div class="error-msg">Enter your city.</div>
+            </div>
+            <div class="field">
+              <label class="label" for="country">Country</label>
+              <select class="select" id="country" autocomplete="country-name">
+                <option>United States</option>
+                <option>Canada</option>
+                <option>Aruba</option>
+                <option>Netherlands</option>
+                <option>Colombia</option>
+                <option>United Kingdom</option>
+                <option>Germany</option>
+                <option>Brazil</option>
+                <option>Argentina</option>
+                <option>Other</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <details class="more">
+          <summary>Trip details <span>Optional</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+          </summary>
+          <div class="grid">
+            <div class="field">
+              <label class="label" for="guests">Travelers</label>
+              <select class="select" id="guests">
+                <option value="1">1</option>
+                <option value="2" selected>2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5+">5 or more</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="label" for="extra-drivers">Additional drivers</label>
+              <select class="select" id="extra-drivers">
+                <option value="None">None</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="label" for="flight-out">Departure flight</label>
+              <input class="input" id="flight-out" placeholder="e.g. B6 1758" autocapitalize="characters">
+            </div>
+            <div class="field">
+              <label class="label" for="phone2">Second contact number</label>
+              <input class="input" type="tel" id="phone2" inputmode="tel">
+            </div>
+            <div class="field wide">
+              <label class="label" for="source">How did you hear about us?</label>
+              <select class="select" id="source">
+                <option value="">Choose one</option>
+                <option>Google</option>
+                <option>Instagram or Facebook</option>
+                <option>Friend or family</option>
+                <option>I've rented with Nexus before</option>
+                <option>Other</option>
+              </select>
+            </div>
+            <div class="field wide">
+              <label class="label" for="notes">Anything we should know?</label>
+              <textarea class="textarea" id="notes" rows="3" placeholder="Late arrival, car seat installation, special requests…"></textarea>
+            </div>
+          </div>
+        </details>
+
+        <div class="section" style="display:grid; gap:14px">
+          <label class="check" id="f-license"><input type="checkbox" id="license"> The main driver has a valid driver's license.</label>
+          <label class="check" id="f-terms"><input type="checkbox" id="terms"> <span>I agree to the <a href="#" id="terms-link" target="_blank" rel="noopener">rental terms &amp; conditions</a>.</span></label>
+          <div class="error-msg" id="checks-error" style="display:none">Please confirm both of the above to continue.</div>
+        </div>
+      </section>
+
+      <!-- ============ CONFIRMATION ============ -->
+      <section class="panel" data-panel="done" hidden>
+        <div class="done-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5 10 17.5 19 7"/></svg>
+        </div>
+        <div class="step-head" style="margin-bottom:0">
+          <h1 id="done-title">Request received</h1>
+          <p>We're checking availability for your car now. Your confirmation will arrive at <strong id="done-email"></strong> shortly.</p>
+          <div class="ref">Reference <strong id="done-ref" class="num"></strong></div>
+        </div>
+
+        <div class="card">
+          <h3>Your booking</h3>
+          <div class="recap" id="done-recap"></div>
+        </div>
+
+        <div class="card">
+          <h3>What happens next</h3>
+          <ol class="next">
+            <li><div><strong>We confirm by email</strong>Once confirmed, your car is reserved. Reply to that email if anything changes.</div></li>
+            <li><div><strong>Meet us at pickup</strong><span id="done-pickup-text"></span></div></li>
+            <li><div><strong>Pay at the counter</strong>Your balance of <span id="done-total" class="num"></span> is paid at pickup, plus a refundable <span id="done-deposit" class="num"></span> hold on your card.</div></li>
+          </ol>
+        </div>
+
+        <div class="card partner">
+          <div>
+            <h3>Travelling with kids or gear?</h3>
+            <p>Our partner Happy Toes Rentals delivers strollers, baby gear and water-sports equipment straight to your stay.</p>
+          </div>
+          <a class="btn btn-outline" id="partner-link" href="#" target="_blank" rel="noopener">Browse Happy Toes</a>
+        </div>
+
+        <div style="margin-top:28px">
+          <a class="btn btn-ghost" href="/" style="padding:0">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+            Back to nexuscarsaruba.com
+          </a>
+        </div>
+      </section>
+
+      <!-- Actions (inline on desktop, fixed bar on mobile) -->
+      <div class="actions" id="actions">
+        <button type="button" class="btn btn-ghost" id="btn-back" style="visibility:hidden">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>Back
+        </button>
+        <button type="button" class="actions-total" id="open-sheet" aria-haspopup="dialog">
+          <span class="amt num" id="bar-total"></span>
+          <span class="lbl" id="bar-days">View summary</span>
+        </button>
+        <div>
+          <button type="submit" class="btn btn-primary" id="btn-next">
+            <span id="btn-next-label">Continue</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </button>
+          <div class="reassure" id="reassure">Nothing charged today · Pay at pickup</div>
+        </div>
+      </div>
+    </form>
+
+    <aside aria-label="Booking summary">
+      <div class="summary" id="summary-desktop"></div>
+    </aside>
+  </main>
+
+  <div id="sheet-root">
+    <div class="sheet-backdrop" data-close-sheet></div>
+    <div class="sheet" role="dialog" aria-modal="true" aria-label="Booking summary">
+      <div class="sheet-grip"></div>
+      <div class="summary" id="summary-sheet"></div>
+    </div>
+  </div>
+
+  <script>
+  /* ------------------------------------------------------------------
+     Settings. Rates, cars, plans and links live here — edit freely.
+     ------------------------------------------------------------------ */
+  const CONFIG = {
+    deposit: 300,
+    termsUrl: '#',
+    partnerUrl: '#',
+    helpUrl: '#',
+    minLeadHours: 2,
+    vehicles: [
+      { id: 'suv',     name: 'Compact SUV',    cls: 'Compact SUV or similar', daily: 99, seats: 5, bags: 3, shape: 'suv' },
+      { id: 'economy', name: 'Hyundai Accent', cls: 'Economy sedan',          daily: 80, seats: 5, bags: 2, shape: 'sedan' }
+    ],
+    plans: [
+      { id: 'cdw',      name: 'Basic collision cover (CDW)', desc: 'Covers collision damage, standard deductible applies.', daily: 13, tag: 'Required' },
+      { id: 'cdw-plus', name: 'CDW Plus',                     desc: 'Lower deductible, plus tire and windshield cover.',      daily: 20 },
+      { id: 'ldw',      name: 'Full protection (LDW)',        desc: 'Zero deductible. Covers damage, theft and loss.',        daily: 30 }
+    ],
+    extras: [
+      { id: 'cooler',   name: 'Beach cooler, 50 qt',    desc: 'Heavy-duty and insulated. Holds around 60 cans.', price: 35 },
+      { id: 'chairs',   name: 'Two beach chairs',       desc: 'Lightweight recliners with shoulder straps.',     price: 35 },
+      { id: 'babyseat', name: 'Convertible baby seat',  desc: 'Cleaned and installed before you arrive.',        price: 35 },
+      { id: 'booster',  name: 'Booster seat',           desc: 'Backless booster for older children.',            price: 25 }
+    ]
+  };
+
+  // Hook this up to your booking system. Return { reference } if it provides one.
+  async function submitBooking(payload) {
+    console.log('Booking payload', payload);
+    await new Promise(r => setTimeout(r, 700));
+    return {};
+  }
+
+  /* ------------------------------------------------------------------ */
+
+  const $ = s => document.querySelector(s);
+  const $$ = s => Array.from(document.querySelectorAll(s));
+  const money = n => '$' + n.toLocaleString('en-US', { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 });
+  const pad = n => String(n).padStart(2, '0');
+  const isoDate = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+  const ICON = {
+    seat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7" r="4"/><path d="M5 21v-1a7 7 0 0 1 14 0v1"/></svg>',
+    bag:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="7" width="14" height="13" rx="2"/><path d="M9 7V4h6v3"/></svg>',
+    gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2"/><path d="M12 3v7M5 17l5.3-3.6M19 17l-5.3-3.6"/></svg>',
+    plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+    tick: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5 10 17.5 19 7"/></svg>',
+    check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5 10 17.5 19 7"/></svg>'
+  };
+
+  const CAR_ART = {
+    sedan: `<svg viewBox="0 0 120 50" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true">
+      <path d="M6 35c0-4 3-6.5 8-7.3L31 25l11-9.6c3-2.6 6.5-3.9 10.5-3.9H73c4.6 0 8.6 1.7 11.6 5L93 25.4l14 2.2c4.3.7 7 3.3 7 7.4v2.6c0 1-.8 1.9-1.9 1.9H8c-1.1 0-2-.9-2-2V35Z" fill="#fff"/>
+      <path d="M44 17.5c2-1.9 4.7-3 7.5-3H61V25H35l9-7.5ZM65 14.5h8c3.3 0 6.3 1.3 8.5 3.6L88.6 25H65V14.5Z" fill="#EEF2F2"/>
+      <circle cx="31" cy="39.5" r="7.2" fill="#fff"/><circle cx="31" cy="39.5" r="2.6"/>
+      <circle cx="91" cy="39.5" r="7.2" fill="#fff"/><circle cx="91" cy="39.5" r="2.6"/>
+    </svg>`,
+    suv: `<svg viewBox="0 0 120 50" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true">
+      <path d="M6 33.5c0-3.6 2.6-6 6.8-6.7L24 25l9-13c1.5-2.2 4-3.5 6.7-3.5h48.6c3 0 5.8 1.6 7.3 4.2L102 24.5l7.2 1.3c3 .6 4.8 3 4.8 6V37c0 1-.8 1.9-1.9 1.9H8c-1.1 0-2-.9-2-2v-3.4Z" fill="#fff"/>
+      <path d="M36 13c.8-1.2 2-1.9 3.4-1.9H59V23H29l7-10ZM62 11.1h19V23H62V11.1ZM84 11.1h3.6c2.2 0 4.2 1.2 5.3 3.1L98 23H84V11.1Z" fill="#EEF2F2"/>
+      <path d="M40 6.5h44" stroke-linecap="round"/>
+      <circle cx="30" cy="39" r="7.6" fill="#fff"/><circle cx="30" cy="39" r="2.8"/>
+      <circle cx="92" cy="39" r="7.6" fill="#fff"/><circle cx="92" cy="39" r="2.8"/>
+    </svg>`
+  };
+
+  const state = {
+    step: 1,
+    maxStep: 1,
+    vehicle: CONFIG.vehicles[0].id,
+    plan: CONFIG.plans[0].id,
+    extras: new Set()
+  };
+
+  /* ---------- Build options ---------- */
+  function buildTimes() {
+    const opts = [];
+    for (let h = 6; h <= 22; h++) for (const m of [0, 30]) {
+      if (h === 22 && m) continue;
+      const v = `${pad(h)}:${pad(m)}`;
+      const label = `${(h % 12) || 12}:${pad(m)} ${h < 12 ? 'AM' : 'PM'}`;
+      opts.push(`<option value="${v}">${label}</option>`);
+    }
+    $('#start-time').innerHTML = $('#end-time').innerHTML = opts.join('');
+    $('#start-time').value = $('#end-time').value = '10:00';
+  }
+
+  function buildVehicles() {
+    $('#vehicle-list').innerHTML = CONFIG.vehicles.map(v => `
+      <div class="choice car">
+        <input type="radio" name="vehicle" id="v-${v.id}" value="${v.id}" ${v.id === state.vehicle ? 'checked' : ''}>
+        <label for="v-${v.id}">
+          <div class="car-art">${CAR_ART[v.shape] || CAR_ART.sedan}</div>
+          <div>
+            <div class="car-name">${v.name}</div>
+            <div class="car-class">${v.cls}</div>
+            <div class="specs">
+              <span>${ICON.seat}${v.seats} seats</span>
+              <span>${ICON.bag}${v.bags} bags</span>
+              <span>${ICON.gear}Automatic</span>
+            </div>
+          </div>
+          <div class="price">
+            <div class="big num">${money(v.daily)}<small> /day</small></div>
+            <div class="sub num" data-car-total="${v.id}"></div>
+          </div>
+        </label>
+      </div>`).join('');
+  }
+
+  function buildPlans() {
+    $('#plan-list').innerHTML = CONFIG.plans.map(p => `
+      <div class="choice plan">
+        <input type="radio" name="plan" id="p-${p.id}" value="${p.id}" ${p.id === state.plan ? 'checked' : ''}>
+        <label for="p-${p.id}">
+          <span class="radio-dot" aria-hidden="true"></span>
+          <div>
+            <div class="plan-name">${p.name}${p.tag ? `<span class="tag">${p.tag}</span>` : ''}</div>
+            <div class="plan-desc">${p.desc}</div>
+          </div>
+          <div class="price">
+            <div class="big num" style="font-size:16px">${money(p.daily)}<small> /day</small></div>
+          </div>
+        </label>
+      </div>`).join('');
+  }
+
+  function buildExtras() {
+    $('#extra-list').innerHTML = CONFIG.extras.map(x => `
+      <div class="extra">
+        <div>
+          <div class="extra-name">${x.name}</div>
+          <div class="extra-desc">${x.desc}</div>
+        </div>
+        <div class="extra-side">
+          <span class="extra-price num">${money(x.price)}</span>
+          <button type="button" class="toggle-btn" data-extra="${x.id}" aria-pressed="false" aria-label="Add ${x.name}">${ICON.plus}Add</button>
+        </div>
+      </div>`).join('');
+  }
+
+  /* ---------- Dates ---------- */
+  function getDates() {
+    const s = $('#start-date').value, e = $('#end-date').value;
+    if (!s || !e) return null;
+    return { start: new Date(`${s}T${$('#start-time').value}`), end: new Date(`${e}T${$('#end-time').value}`) };
+  }
+
+  function rentalDays() {
+    const d = getDates();
+    if (!d || d.end <= d.start) return 0;
+    return Math.max(1, Math.ceil((d.end - d.start) / 864e5));
+  }
+
+  const fmtDay = d => d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  const fmtTime = d => d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+
+  function initDates() {
+    const today = new Date();
+    const start = new Date(today); start.setDate(start.getDate() + 14);
+    const end = new Date(start); end.setDate(end.getDate() + 3);
+    $('#start-date').min = $('#end-date').min = isoDate(today);
+    $('#start-date').value = isoDate(start);
+    $('#end-date').value = isoDate(end);
+  }
+
+  function onStartChange() {
+    const s = $('#start-date').value;
+    if (!s) return;
+    $('#end-date').min = s;
+    const d = getDates();
+    if (d && d.end <= d.start) {
+      const e = new Date(`${s}T00:00`); e.setDate(e.getDate() + 3);
+      $('#end-date').value = isoDate(e);
+    }
+  }
+
+  /* ---------- Pricing ---------- */
+  function totals() {
+    const days = rentalDays() || 1;
+    const v = CONFIG.vehicles.find(x => x.id === state.vehicle);
+    const p = CONFIG.plans.find(x => x.id === state.plan);
+    const extras = CONFIG.extras.filter(x => state.extras.has(x.id));
+    const carTotal = v.daily * days;
+    const planTotal = p.daily * days;
+    const extrasTotal = extras.reduce((a, x) => a + x.price, 0);
+    return { days, v, p, extras, carTotal, planTotal, extrasTotal, total: carTotal + planTotal + extrasTotal };
+  }
+
+  function summaryHTML() {
+    const t = totals();
+    const d = getDates();
+    const valid = d && d.end > d.start;
+    const pickup = document.querySelector('input[name="pickup"]:checked').value;
+    const ret = document.querySelector('input[name="return"]:checked').value;
+    const pickupWhere = pickup === 'Hotel delivery' ? 'To your stay' : 'Airport';
+    const returnWhere = ret === 'Hotel collection' ? 'From your stay' : 'Airport';
+    return `
+      <div class="sum-head">
+        <h2>Your rental</h2>
+        <div class="sum-trip">
+          <div><div class="k">Pickup</div><div class="v">${valid ? fmtDay(d.start) : '—'}<small>${valid ? fmtTime(d.start) + ' · ' : ''}${pickupWhere}</small></div></div>
+          <div><div class="k">Return</div><div class="v">${valid ? fmtDay(d.end) : '—'}<small>${valid ? fmtTime(d.end) + ' · ' : ''}${returnWhere}</small></div></div>
+        </div>
+      </div>
+      <div class="sum-body">
+        <div class="line"><span>${t.v.name}<small class="num">${t.days} ${t.days === 1 ? 'day' : 'days'} × ${money(t.v.daily)}</small></span><span class="num">${money(t.carTotal)}</span></div>
+        <div class="line"><span>${t.p.name}<small class="num">${t.days} × ${money(t.p.daily)}</small></span><span class="num">${money(t.planTotal)}</span></div>
+        ${t.extras.map(x => `<div class="line"><span>${x.name}</span><span class="num">${money(x.price)}</span></div>`).join('')}
+      </div>
+      <div class="sum-total">
+        <div class="line"><span>Total</span><span class="num">${money(t.total)}</span></div>
+        <p>Paid at pickup. Nothing is charged today.</p>
+        <div class="deposit"><span>Refundable security hold</span><span class="num">${money(CONFIG.deposit)}</span></div>
+      </div>
+      <div class="sum-trust">
+        <div>${ICON.check}No payment needed to book</div>
+        <div>${ICON.check}Airport pickup or delivery to your stay</div>
+        <div>${ICON.check}Local Aruba team you can message</div>
+      </div>`;
+  }
+
+  function render() {
+    const t = totals();
+    const days = rentalDays();
+    const d = getDates();
+
+    $('#duration').innerHTML = days
+      ? `<strong>${days} ${days === 1 ? 'day' : 'days'}</strong> · ${fmtDay(d.start)} to ${fmtDay(d.end)}`
+      : '';
+
+    CONFIG.vehicles.forEach(v => {
+      const el = document.querySelector(`[data-car-total="${v.id}"]`);
+      if (el) el.textContent = `${money(v.daily * (days || 1))} total`;
+    });
+
+    $$('[data-extra]').forEach(b => {
+      const on = state.extras.has(b.dataset.extra);
+      b.setAttribute('aria-pressed', on);
+      b.innerHTML = on ? `${ICON.tick}Added` : `${ICON.plus}Add`;
+    });
+
+    const html = summaryHTML();
+    $('#summary-desktop').innerHTML = html;
+    $('#summary-sheet').innerHTML = html;
+    $('#bar-total').textContent = money(t.total);
+    $('#bar-days').textContent = `${t.days} ${t.days === 1 ? 'day' : 'days'} · View summary`;
+  }
+
+  /* ---------- Validation ---------- */
+  function setError(id, on) {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('has-error', on);
+    return on;
+  }
+
+  function validate(step) {
+    const bad = [];
+    if (step === 1) {
+      const d = getDates();
+      const earliest = new Date(Date.now() + CONFIG.minLeadHours * 36e5);
+      if (setError('f-start', !d || d.start < earliest)) bad.push('f-start');
+      if (setError('f-end', !d || d.end <= d.start)) bad.push('f-end');
+    }
+    if (step === 3) {
+      const v = id => document.getElementById(id).value.trim();
+      if (setError('f-name', v('name').split(/\s+/).length < 2)) bad.push('f-name');
+      if (setError('f-email', !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v('email')))) bad.push('f-email');
+      if (setError('f-phone', v('phone').replace(/\D/g, '').length < 7)) bad.push('f-phone');
+      if (setError('f-stay', !v('stay'))) bad.push('f-stay');
+      if (setError('f-age', !document.querySelector('input[name="age"]:checked'))) bad.push('f-age');
+      if (setError('f-addr', !v('addr1'))) bad.push('f-addr');
+      if (setError('f-city', !v('city'))) bad.push('f-city');
+      const lic = !$('#license').checked, terms = !$('#terms').checked;
+      setError('f-license', lic); setError('f-terms', terms);
+      $('#checks-error').style.display = lic || terms ? 'block' : 'none';
+      if (lic) bad.push('f-license');
+      if (terms) bad.push('f-terms');
+    }
+    if (bad.length) {
+      const el = document.getElementById(bad[0]);
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const input = el.querySelector('input, select');
+      if (input) setTimeout(() => input.focus({ preventScroll: true }), 300);
+    }
+    return !bad.length;
+  }
+
+  /* ---------- Navigation ---------- */
+  const NEXT_LABEL = { 1: 'Continue', 2: 'Continue', 3: 'Request booking' };
+
+  function goTo(step) {
+    state.step = step;
+    state.maxStep = Math.max(state.maxStep, step);
+    $$('[data-panel]').forEach(p => p.hidden = p.dataset.panel !== String(step));
+    $$('.step-tab').forEach(tab => {
+      const n = +tab.dataset.step;
+      tab.classList.toggle('is-current', n === step);
+      tab.classList.toggle('is-done', n < step || (n <= state.maxStep && n !== step));
+      n === step ? tab.setAttribute('aria-current', 'step') : tab.removeAttribute('aria-current');
+    });
+    $('#btn-back').style.visibility = step > 1 ? 'visible' : 'hidden';
+    $('#btn-next-label').textContent = NEXT_LABEL[step];
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  async function next() {
+    if (!validate(state.step)) return;
+    if (state.step < 3) return goTo(state.step + 1);
+
+    const btn = $('#btn-next');
+    btn.disabled = true;
+    $('#btn-next-label').textContent = 'Sending…';
+    btn.querySelector('svg').outerHTML = '<span class="spinner" aria-hidden="true"></span>';
+
+    try {
+      const res = await submitBooking(buildPayload());
+      showDone(res && res.reference);
+    } catch (err) {
+      console.error(err);
+      btn.disabled = false;
+      $('#btn-next-label').textContent = 'Try again';
+      alert('We couldn\'t send your request. Please try again, or message us and we\'ll book it for you.');
+    }
+  }
+
+  function buildPayload() {
+    const val = id => document.getElementById(id).value.trim();
+    const radio = n => (document.querySelector(`input[name="${n}"]:checked`) || {}).value || '';
+    const t = totals();
+    const s = $('#start-date').value + 'T' + $('#start-time').value;
+    const e = $('#end-date').value + 'T' + $('#end-time').value;
+    return {
+      order: {
+        customer_attributes: { name: val('name'), email: val('email'), phone: val('phone') },
+        starts_at: s,
+        stops_at: e,
+        properties_attributes: [
+          { name: 'Vehicle', value: t.v.name },
+          { name: 'Protection', value: t.p.name },
+          { name: 'Extras', value: t.extras.map(x => x.name).join(', ') || 'None' },
+          { name: 'Pickup Method', value: radio('pickup') },
+          { name: 'Return Method', value: radio('return') },
+          { name: 'Accommodation', value: val('stay') },
+          { name: 'WhatsApp', value: $('#whatsapp').checked ? val('phone') : '' },
+          { name: 'Secondary Phone', value: val('phone2') },
+          { name: 'Driver Age', value: radio('age') },
+          { name: 'Valid License', value: $('#license').checked ? 'Yes' : 'No' },
+          { name: 'Guests', value: val('guests') },
+          { name: 'Additional Drivers', value: val('extra-drivers') },
+          { name: 'Flight Arrival', value: val('flight-in') },
+          { name: 'Flight Departure', value: val('flight-out') },
+          { name: 'Found Us', value: val('source') },
+          { name: 'Special Requests', value: val('notes') },
+          { name: 'Billing Address', value: [val('addr1'), val('addr2'), val('city'), val('country')].filter(Boolean).join(', ') },
+          { name: 'Quoted Total', value: t.total.toFixed(2) }
+        ]
+      }
+    };
+  }
+
+  function showDone(reference) {
+    const t = totals();
+    const d = getDates();
+    const ref = reference || 'NX-' + Math.random().toString(36).slice(2, 8).toUpperCase();
+    const first = $('#name').value.trim().split(/\s+/)[0];
+    const pickupHotel = document.querySelector('input[name="pickup"]:checked').value === 'Hotel delivery';
+
+    $('#done-title').textContent = `Thanks, ${first}. Request received.`;
+    $('#done-email').textContent = $('#email').value.trim();
+    $('#done-ref').textContent = ref;
+    $('#done-total').textContent = money(t.total);
+    $('#done-deposit').textContent = money(CONFIG.deposit);
+    $('#done-pickup-text').textContent = pickupHotel
+      ? `We'll bring the car to ${$('#stay').value.trim()} on ${fmtDay(d.start)} at ${fmtTime(d.start)}.`
+      : `Our team will meet you at Queen Beatrix arrivals on ${fmtDay(d.start)} at ${fmtTime(d.start)}.`;
+
+    const recap = [
+      ['Car', t.v.name],
+      ['Pickup', `${fmtDay(d.start)}, ${fmtTime(d.start)}`],
+      ['Return', `${fmtDay(d.end)}, ${fmtTime(d.end)}`],
+      ['Protection', t.p.name],
+      ['Extras', t.extras.length ? t.extras.map(x => x.name).join(', ') : 'None'],
+      ['Total at pickup', money(t.total)]
+    ];
+    const box = $('#done-recap');
+    box.innerHTML = '';
+    recap.forEach(([k, v]) => {
+      const div = document.createElement('div');
+      div.innerHTML = '<div class="k"></div><div class="v"></div>';
+      div.children[0].textContent = k;
+      div.children[1].textContent = v;
+      box.appendChild(div);
+    });
+
+    $$('[data-panel]').forEach(p => p.hidden = p.dataset.panel !== 'done');
+    $('#actions').hidden = true;
+    $('#steps-nav').hidden = true;
+    $('#layout').classList.add('is-done');
+    document.querySelector('.layout > aside').hidden = true;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  /* ---------- Mobile summary sheet ---------- */
+  function toggleSheet(open) {
+    document.body.classList.toggle('sheet-open', open);
+    document.body.style.overflow = open ? 'hidden' : '';
+  }
+
+  /* ---------- Wire up ---------- */
+  function init() {
+    $('#terms-link').href = CONFIG.termsUrl;
+    $('#partner-link').href = CONFIG.partnerUrl;
+    $('#help-link').href = CONFIG.helpUrl;
+
+    buildTimes();
+    initDates();
+    buildVehicles();
+    buildPlans();
+    buildExtras();
+    render();
+
+    $('#start-date').addEventListener('change', () => { onStartChange(); setError('f-start', false); setError('f-end', false); render(); });
+    ['#end-date', '#start-time', '#end-time'].forEach(s => $(s).addEventListener('change', () => { setError('f-start', false); setError('f-end', false); render(); }));
+
+    document.addEventListener('change', e => {
+      const t = e.target;
+      if (t.name === 'vehicle') state.vehicle = t.value;
+      if (t.name === 'plan') state.plan = t.value;
+      if (t.name === 'age') { $('#u25-note').hidden = t.value !== 'Under 25'; setError('f-age', false); }
+      if (t.name === 'pickup' || t.name === 'return' || t.name === 'vehicle' || t.name === 'plan') render();
+      if (t.id === 'license') setError('f-license', false);
+      if (t.id === 'terms') setError('f-terms', false);
+      if ((t.id === 'license' || t.id === 'terms') && $('#license').checked && $('#terms').checked) $('#checks-error').style.display = 'none';
+    });
+
+    document.addEventListener('input', e => {
+      const field = e.target.closest('.field.has-error');
+      if (field) field.classList.remove('has-error');
+    });
+
+    $('#extra-list').addEventListener('click', e => {
+      const b = e.target.closest('[data-extra]');
+      if (!b) return;
+      const id = b.dataset.extra;
+      state.extras.has(id) ? state.extras.delete(id) : state.extras.add(id);
+      render();
+    });
+
+    $('#booking').addEventListener('submit', e => { e.preventDefault(); next(); });
+    $('#btn-back').addEventListener('click', () => goTo(state.step - 1));
+    $$('[data-back]').forEach(b => b.addEventListener('click', () => goTo(state.step - 1)));
+    $$('.step-tab').forEach(tab => tab.addEventListener('click', () => {
+      const n = +tab.dataset.step;
+      if (n === state.step || n > state.maxStep) return;
+      if (n > state.step && !validate(state.step)) return;
+      goTo(n);
+    }));
+
+    $('#open-sheet').addEventListener('click', () => toggleSheet(true));
+    $$('[data-close-sheet]').forEach(el => el.addEventListener('click', () => toggleSheet(false)));
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') toggleSheet(false); });
+  }
+
+  init();
+  </script>
+</body>
+</html>
