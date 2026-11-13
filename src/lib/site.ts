@@ -1,8 +1,8 @@
 /* Canonical site configuration. Update SITE_URL when the real domain is live. */
 export const SITE_URL = "https://paladin-systems.vercel.app";
-export const SITE_NAME = "Sequence Labs";
+export const SITE_NAME = "Sequence Data";
 export const SITE_TITLE =
-  "Website Design & AI Agents for Aruban Businesses | Sequence Labs";
+  "Aruba Real Estate Market Intelligence | Sequence Data";
 export const SITE_DESCRIPTION =
-  "Boutique web studio in Aruba. We build modern websites for local businesses, plus optional AI Agents that answer WhatsApp, take bookings, and collect deposits 24/7.";
-export const CONTACT_EMAIL = "ops@sequencelabs.aw";
+  "Proprietary short-term rental data for ultra-luxury Caribbean villas. Occupancy, ADR, RevPAR, gross yield and deal signals for real estate agents and investors, starting with Aruba.";
+export const CONTACT_EMAIL = "ops@sequencedata.aw";

@@ -1,21 +1,17 @@
 import Link from "next/link";
-import { SequenceMark } from "@/components/logo";
+import { SequenceLogo } from "@/components/logo";
 
 export default function NotFound() {
   return (
-    <div className="flex min-h-[100svh] flex-col items-center justify-center gap-6 px-5 text-center">
-      <SequenceMark className="size-10 text-accent" />
+    <div className="flex min-h-[100svh] flex-col items-center justify-center gap-8 bg-mint px-5 text-center">
+      <SequenceLogo className="h-48 w-auto" />
       <div>
-        <p className="font-mono text-[12px] uppercase tracking-[0.2em] text-muted">
-          Page not found
-        </p>
-        <h1 className="mt-3 font-display text-3xl font-semibold tracking-tight text-fg">
-          That page doesn&apos;t exist.
-        </h1>
+        <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-zinc-600">Page not found</p>
+        <h1 className="mt-3 font-display text-3xl font-bold tracking-tight text-zinc-950">That page doesn&apos;t exist.</h1>
       </div>
       <Link
         href="/"
-        className="btn-metal rounded-[10px] px-6 py-3 text-[14px] font-medium transition-all hover:-translate-y-0.5"
+        className="rounded-full bg-zinc-950 px-6 py-3 font-display text-[14px] font-semibold text-mint transition-colors hover:bg-zinc-800"
       >
         Back to the homepage
       </Link>

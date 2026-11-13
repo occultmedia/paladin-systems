@@ -10,6 +10,11 @@
   --color-accent: #333a44;
   --color-signal: #3c7d14;
   --color-brand: #b3fd6a;
+
+  /* Sequence Data accent: mint from the logo, always paired with black */
+  --color-mint: #dde5dc;
+  --color-mint-soft: #eff4ef;
+  --color-mint-deep: #c3d2c2;
 }
 
 @theme inline {
@@ -223,6 +228,6 @@ body {
 }
 
 ::selection {
-  background: #b3fd6a;
-  color: #101403;
+  background: #dde5dc;
+  color: #0a0a0a;
 }
