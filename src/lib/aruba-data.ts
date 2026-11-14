@@ -33,9 +33,14 @@ export interface MonthlyPerformance {
 
 /** view: v_active_listing_signals (scraped_listings joined with yield model) */
 export type Signal = "UNDERVALUED" | "AT_MARKET" | "OVERPRICED";
-export type PropertyType = "Villa" | "Estate" | "Penthouse" | "Beach House";
+/** Residential types (scored on short-term-rental yield). */
+export type PropertyType = "Villa" | "Estate" | "Penthouse" | "Beach House" | "Condo" | "Apartment" | "Townhouse";
+export const RESIDENTIAL_TYPES: PropertyType[] = ["Villa", "Estate", "Penthouse", "Beach House", "Condo", "Apartment", "Townhouse"];
+export type CommercialUse = "Retail" | "Office" | "Hospitality" | "Mixed-use" | "Warehouse";
+export const COMMERCIAL_USES: CommercialUse[] = ["Retail", "Office", "Hospitality", "Mixed-use", "Warehouse"];
 
 export type Zoning = "Residential" | "Tourism" | "Commercial" | "Agricultural";
+export const ZONINGS: Zoning[] = ["Residential", "Tourism", "Commercial", "Agricultural"];
 
 /** Columns shared by every scraped listing. */
 export interface ListingBase {
@@ -82,11 +87,22 @@ export interface LandListing extends ListingBase {
   price_vs_district_pct: number; // negative = cheaper than district average
 }
 
+/** A commercial building: scored on price per sq ft vs. the district's commercial average. */
+export interface CommercialListing extends ListingBase {
+  category: "Commercial";
+  property_type: "Commercial";
+  commercial_use: CommercialUse;
+  built_sqft: number;
+  lot_sqft: number | null;
+  district_commercial_psf_usd: number;
+  price_vs_district_pct: number; // negative = cheaper than district average
+}
+
 /**
- * Supabase returns one flat row per listing (category = 'Property' | 'Land',
- * non-applicable columns null). Narrow on `category` in the client.
+ * Supabase returns one flat row per listing (category = 'Property' | 'Land' |
+ * 'Commercial', non-applicable columns null). Narrow on `category` in the client.
  */
-export type Listing = ListingSignal | LandListing;
+export type Listing = ListingSignal | LandListing | CommercialListing;
 
 export interface DashboardRepository {
   getMarketSnapshot(marketId: string): Promise<MarketSnapshot>;
@@ -166,6 +182,13 @@ export const RAW_LISTINGS: readonly RawRow[] = [
   ["AW-0359", "Malmok Sunset House", "Beach House", "Malmok", 5, 5.5, 5700, 11800, 8_250_000, 5900, 48, 58, -1.8, "Private listing"],
   ["AW-0521", "Gold Coast Signature Villa", "Villa", "Gold Coast", 5, 6, 6200, 13400, 7_600_000, 5500, 47, 12, 0, "Developer"],
   ["AW-0233", "Eagle Beach Casa Blanca", "Villa", "Eagle Beach", 6, 6.5, 6500, 12500, 10_200_000, 5700, 49, 133, -3.5, "Broker site"],
+  ["AW-0611", "Palm Beach Ocean Tower 1204", "Condo", "Palm Beach", 2, 2, 1450, null, 1_250_000, 680, 62, 14, 0, "Agency portal"],
+  ["AW-0624", "Eagle Beach Residences 3B", "Condo", "Eagle Beach", 3, 3, 1900, null, 1_650_000, 820, 60, 31, -3.0, "Broker site"],
+  ["AW-0637", "Oranjestad Harbourview 502", "Apartment", "Oranjestad", 2, 2, 1250, null, 690_000, 420, 58, 52, 0, "Agency portal"],
+  ["AW-0642", "Noord Garden Apartment", "Apartment", "Noord", 2, 1.5, 1100, null, 520_000, 380, 61, 8, 0, "Private listing"],
+  ["AW-0655", "Malmok Townhouse 7", "Townhouse", "Malmok", 3, 3.5, 2400, 3200, 1_480_000, 890, 57, 26, 0, "Broker site"],
+  ["AW-0668", "Gold Coast Golf Townhouse", "Townhouse", "Gold Coast", 4, 4, 3100, 4200, 1_950_000, 1150, 52, 3, 0, "Developer"],
+  ["AW-0673", "Savaneta Waterfront Condo", "Condo", "Savaneta", 2, 2, 1350, null, 780_000, 520, 55, 61, -5.0, "Agency portal"],
 ];
 
 /** Mirrors the SQL in v_active_listing_signals so mock and prod agree. */
@@ -186,6 +209,19 @@ export const LAND_PHOTOS = [
   "1647861945045-16a625618203", "1647861944604-428e076ecd6e", "1514130667032-770bbfe7b7b2",
   "1514130546524-5da6eaa36b72", "1748810859309-b943147cdda2",
 ].map(U);
+export const CONDO_PHOTOS = [
+  "1768568080301-053390aed2df", "1768568080838-99d3db4ec953", "1791719422920-e4a9c0881cec",
+  "1768568080576-bcf6bc50336f", "1771457362598-eb92f9f4bf42", "1780483705909-5db833a63590",
+  "1771190252113-aa988822596f",
+].map(U);
+export const COMMERCIAL_PHOTOS: Record<CommercialUse, string[]> = {
+  Retail: ["1791732773810-cc14ffe172de"].map(U),
+  Office: ["1786853156529-3bab0ff01c3b"].map(U),
+  Hospitality: ["1772860812099-30373d1f3045", "1791732773909-1d2e5d621e90"].map(U),
+  "Mixed-use": ["1790214120372-4b3b06e2360a"].map(U),
+  Warehouse: ["1769778674824-e69f58d7c55d"].map(U),
+};
+const COMPACT_TYPES: PropertyType[] = ["Condo", "Apartment", "Townhouse"];
 export const ARUBA_PHOTOS = {
   beach: U("1761254462343-1f46ef277b9a"),
   resort: U("1763402084674-a3a45263ee2c"),
@@ -247,7 +283,9 @@ export function deriveSignal(r: RawRow, marketYieldPct: number): ListingSignal {
     source,
     source_url: null,
     ...locate(district, id),
-    photo_url: VILLA_PHOTOS[RAW_LISTINGS.indexOf(r) % VILLA_PHOTOS.length],
+    photo_url: COMPACT_TYPES.includes(type)
+      ? CONDO_PHOTOS[RAW_LISTINGS.filter((x) => COMPACT_TYPES.includes(x[2])).indexOf(r) % CONDO_PHOTOS.length]
+      : VILLA_PHOTOS[RAW_LISTINGS.indexOf(r) % VILLA_PHOTOS.length],
     sequence_adr_usd: adr,
     projected_occupancy_pct: occ,
     projected_annual_revenue_usd: revenue,
@@ -315,6 +353,61 @@ export function deriveLand(r: RawLandRow): LandListing {
   };
 }
 
+/* id, name, district, use, built sq ft, lot sq ft, asking, days listed, price change %, source */
+type RawCommercialRow = readonly [string, string, string, CommercialUse, number, number | null, number, number, number, string];
+
+export const RAW_COMMERCIAL: readonly RawCommercialRow[] = [
+  ["AW-C701", "Palm Beach Retail Strip", "Palm Beach", "Retail", 8200, 14000, 6_400_000, 33, 0, "Broker site"],
+  ["AW-C712", "Oranjestad Main Street Offices", "Oranjestad", "Office", 6400, null, 2_900_000, 88, -6.0, "Agency portal"],
+  ["AW-C718", "Eagle Beach Boutique Hotel", "Eagle Beach", "Hospitality", 18500, 26000, 14_800_000, 140, -4.0, "Broker site"],
+  ["AW-C725", "Noord Mixed-Use Plaza", "Noord", "Mixed-use", 11200, 20000, 4_100_000, 12, 0, "Developer"],
+  ["AW-C731", "Savaneta Marina Warehouse", "Savaneta", "Warehouse", 15000, 30000, 2_250_000, 47, 0, "Private listing"],
+  ["AW-C744", "Malmok Beach Restaurant", "Malmok", "Hospitality", 4200, 9000, 3_350_000, 5, 0, "Broker site"],
+];
+
+/** Average commercial price per sq ft (built) by district (table: district_commercial_benchmarks). */
+export const DISTRICT_COMMERCIAL_PSF: Record<string, number> = {
+  "Palm Beach": 720,
+  Oranjestad: 520,
+  "Eagle Beach": 760,
+  Noord: 330,
+  Savaneta: 175,
+  Malmok: 690,
+};
+
+/** Commercial signal: ≥10% below district average = Undervalued, ≥10% above = Overpriced. */
+export function deriveCommercial(r: RawCommercialRow): CommercialListing {
+  const [id, name, district, use, built, lot, price, dom, chg, source] = r;
+  const bench = DISTRICT_COMMERCIAL_PSF[district];
+  const diff = Math.round(((price / built - bench) / bench) * 1000) / 10;
+  const signal: Signal = diff <= -10 ? "UNDERVALUED" : diff >= 10 ? "OVERPRICED" : "AT_MARKET";
+  const photos = COMMERCIAL_PHOTOS[use];
+  return {
+    category: "Commercial",
+    listing_id: id,
+    market_id: MARKET_ID,
+    asset_name: name,
+    property_type: "Commercial",
+    commercial_use: use,
+    district,
+    built_sqft: built,
+    lot_sqft: lot,
+    asking_price_usd: price,
+    price_per_sqft_usd: Math.round(price / built),
+    district_commercial_psf_usd: bench,
+    price_vs_district_pct: diff,
+    price_change_pct: chg,
+    days_on_market: dom,
+    first_seen: new Date(Date.parse(SCRAPED_AT) - dom * 86_400_000).toISOString().slice(0, 10),
+    last_scraped: SCRAPED_AT,
+    source,
+    source_url: null,
+    signal,
+    ...locate(district, id),
+    photo_url: photos[RAW_COMMERCIAL.filter((x) => x[3] === use).indexOf(r) % photos.length],
+  };
+}
+
 /* ─────────────────────────────────────────────────────────────────────────
  * Data layer — swap `repository` for the Supabase implementation later
  * ──────────────────────────────────────────────────────────────────────── */
@@ -333,6 +426,7 @@ const mockRepository: DashboardRepository = {
     latency<Listing[]>([
       ...RAW_LISTINGS.map((l) => deriveSignal(l, MOCK_SNAPSHOT.est_gross_yield_pct)),
       ...RAW_LAND.map(deriveLand),
+      ...RAW_COMMERCIAL.map(deriveCommercial),
     ]),
 };
 
@@ -388,6 +482,7 @@ export const repository: DashboardRepository = mockRepository;
 export const ALL_LISTINGS: Listing[] = [
   ...RAW_LISTINGS.map((l) => deriveSignal(l, MOCK_SNAPSHOT.est_gross_yield_pct)),
   ...RAW_LAND.map(deriveLand),
+  ...RAW_COMMERCIAL.map(deriveCommercial),
 ];
 
 const median = (xs: number[]) => {
@@ -412,6 +507,7 @@ export interface DistrictStats {
   rental_supply_yoy_pct: number;
   properties_for_sale: number;
   land_for_sale: number;
+  commercial_for_sale: number;
   median_asking_usd: number | null;
   avg_property_yield_pct: number | null;
   land_psf_usd: number | null;
@@ -462,6 +558,7 @@ export const DISTRICTS: DistrictStats[] = RAW_DISTRICT_RENTALS.map(([district, a
     rental_supply_yoy_pct: supplyYoy,
     properties_for_sale: props.length,
     land_for_sale: land.length,
+    commercial_for_sale: here.filter((l) => l.category === "Commercial").length,
     median_asking_usd: here.length ? median(here.map((l) => l.asking_price_usd)) : null,
     avg_property_yield_pct: avgYield,
     land_psf_usd: DISTRICT_LAND_PSF[district] ?? null,
@@ -505,7 +602,15 @@ export interface Estimate {
   signal: Signal | null;
 }
 
-const TYPE_FACTOR: Record<PropertyType, number> = { Villa: 1, Estate: 1.06, Penthouse: 0.92, "Beach House": 1.03 };
+const TYPE_FACTOR: Record<PropertyType, number> = {
+  Villa: 1,
+  Estate: 1.06,
+  Penthouse: 0.92,
+  "Beach House": 1.03,
+  Condo: 0.14,
+  Apartment: 0.11,
+  Townhouse: 0.18,
+};
 
 /** Comp-based estimate. Mock model; production version queries rental comps within the district. */
 export function estimateRevenue(input: EstimateInput): Estimate {

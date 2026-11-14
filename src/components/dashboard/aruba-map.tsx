@@ -2,31 +2,50 @@
 
 /**
  * Leaflet map of Aruba. Two modes:
- *  - "listings": one marker per listing, coloured by signal (square = land)
- *  - "districts": one circle per district, sized by listings for sale, shaded by Sequence Score
+ *  - "listings": one pin per listing, coloured by signal; shape by category
+ *    (circle = residential, square = land, diamond = commercial). Hover shows a
+ *    property card; click selects it.
+ *  - "districts": one circle per district, sized by listings for sale, shaded by Sequence Score.
  * Loaded with next/dynamic { ssr: false } because Leaflet needs `window`.
  */
 
 import "leaflet/dist/leaflet.css";
-import { useEffect } from "react";
-import { CircleMarker, MapContainer, Rectangle, TileLayer, Tooltip, useMap } from "react-leaflet";
-import type { LatLngBoundsExpression, LatLngExpression } from "leaflet";
+import { useEffect, useMemo } from "react";
+import L, { type LatLngBoundsExpression, type LatLngExpression } from "leaflet";
+import { CircleMarker, MapContainer, Marker, TileLayer, Tooltip, useMap } from "react-leaflet";
 import type { DistrictStats, Listing, Signal } from "@/lib/aruba-data";
 
 const SIGNAL_COLOR: Record<Signal, string> = {
-  UNDERVALUED: "#5E8A6B",
+  UNDERVALUED: "#3F7A55",
   AT_MARKET: "#52525B",
   OVERPRICED: "#A05A5D",
+};
+const SIGNAL_LABEL: Record<Signal, string> = {
+  UNDERVALUED: "Undervalued",
+  AT_MARKET: "At Market",
+  OVERPRICED: "Overpriced",
 };
 
 const ARUBA_CENTER: LatLngExpression = [12.53, -70.0];
 const ARUBA_BOUNDS: LatLngBoundsExpression = [
-  [12.40, -70.10],
+  [12.4, -70.1],
   [12.64, -69.85],
 ];
 
 const usd = (n: number) =>
   n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(2)}M` : `$${Math.round(n).toLocaleString("en-US")}`;
+const num = (n: number) => n.toLocaleString("en-US");
+const pct = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : "±"}${Math.abs(n).toFixed(1)}%`;
+
+function pinIcon(l: Listing, active: boolean) {
+  const shape = l.category === "Land" ? "square" : l.category === "Commercial" ? "diamond" : "circle";
+  return L.divIcon({
+    className: "sd-pin-wrap",
+    html: `<span class="sd-pin sd-pin-${shape}${active ? " sd-pin-active" : ""}" style="background:${SIGNAL_COLOR[l.signal]}"></span>`,
+    iconSize: [22, 22],
+    iconAnchor: [11, 11],
+  });
+}
 
 /** Fit to the visible points whenever the set changes. */
 function FitTo({ points }: { points: Array<[number, number]> }) {
@@ -44,14 +63,66 @@ function FitTo({ points }: { points: Array<[number, number]> }) {
   return null;
 }
 
+function HoverCard({ l }: { l: Listing }) {
+  const color = SIGNAL_COLOR[l.signal];
+  const facts =
+    l.category === "Property"
+      ? `${l.bedrooms} bd · ${l.bathrooms} ba · ${num(l.built_sqft)} sq ft`
+      : l.category === "Land"
+        ? `${num(l.lot_sqft)} sq ft lot · ${l.zoning} zoning`
+        : `${l.commercial_use} · ${num(l.built_sqft)} sq ft`;
+  const metric =
+    l.category === "Property"
+      ? { value: `${l.projected_gross_yield_pct.toFixed(1)}%`, label: "rental yield" }
+      : { value: `$${num(l.price_per_sqft_usd)}/sq ft`, label: `${pct(l.price_vs_district_pct)} vs district` };
+  return (
+    <div style={{ width: 250 }}>
+      {l.photo_url && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={`${l.photo_url}?auto=format&fit=crop&w=500&h=270&q=60`}
+          alt=""
+          width={250}
+          height={135}
+          style={{ display: "block", width: 250, height: 135, objectFit: "cover", background: "#F4F4F5" }}
+        />
+      )}
+      <div style={{ padding: "10px 12px 12px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "baseline" }}>
+          <span style={{ fontWeight: 600, fontSize: 13, color: "#09090B", whiteSpace: "normal", lineHeight: 1.25 }}>{l.asset_name}</span>
+        </div>
+        <div style={{ color: "#71717A", fontSize: 11, marginTop: 2 }}>
+          {l.category === "Commercial" ? "Commercial" : l.property_type} · {l.district} · {l.listing_id}
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 8 }}>
+          <span style={{ fontWeight: 700, fontSize: 16, color: "#09090B", fontVariantNumeric: "tabular-nums" }}>{usd(l.asking_price_usd)}</span>
+          <span style={{ fontSize: 12, color: "#09090B", fontVariantNumeric: "tabular-nums" }}>
+            <b>{metric.value}</b> <span style={{ color: "#71717A" }}>{metric.label}</span>
+          </span>
+        </div>
+        <div style={{ color: "#3F3F46", fontSize: 11, marginTop: 4 }}>{facts}</div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8, paddingTop: 8, borderTop: "1px solid #F4F4F5" }}>
+          <span style={{ color, fontSize: 11, fontWeight: 600 }}>● {SIGNAL_LABEL[l.signal]}</span>
+          <span style={{ color: "#A1A1AA", fontSize: 11 }}>
+            {l.days_on_market} days listed{l.price_change_pct < 0 ? ` · price ${pct(l.price_change_pct)}` : ""}
+          </span>
+        </div>
+        <div style={{ color: "#A1A1AA", fontSize: 10, marginTop: 6 }}>Click the pin for full details</div>
+      </div>
+    </div>
+  );
+}
+
 type Props =
   | {
       mode: "listings";
       listings: Listing[];
       selectedId?: string | null;
+      hoveredId?: string | null;
       onSelect?: (id: string) => void;
+      onHover?: (id: string | null) => void;
       height?: number;
-      /** false = static decorative map (no pan/zoom/legend), e.g. on the landing page */
+      /** false = static decorative map (no pan/zoom/legend/hover), e.g. on the landing page */
       interactive?: boolean;
     }
   | {
@@ -65,10 +136,11 @@ type Props =
 export default function ArubaMap(props: Props) {
   const height = props.height ?? 520;
   const interactive = props.interactive ?? true;
-  const points: Array<[number, number]> =
-    props.mode === "listings"
-      ? props.listings.map((l) => [l.lat, l.lng])
-      : props.districts.map((d) => [d.lat, d.lng]);
+  const points: Array<[number, number]> = useMemo(
+    () => (props.mode === "listings" ? props.listings.map((l) => [l.lat, l.lng]) : props.districts.map((d) => [d.lat, d.lng])),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [props.mode === "listings" ? props.listings : props.districts],
+  );
 
   return (
     <div className={`relative ${interactive ? "border border-zinc-200" : ""}`} style={{ height }}>
@@ -102,70 +174,41 @@ export default function ArubaMap(props: Props) {
 
         {props.mode === "listings" &&
           props.listings.map((l) => {
-            const color = SIGNAL_COLOR[l.signal];
-            const selected = props.selectedId === l.listing_id;
-            const tooltip = (
-              <Tooltip direction="top" offset={[0, -6]} opacity={1}>
-                <div style={{ fontFamily: "inherit", minWidth: 180 }}>
-                  <div style={{ fontWeight: 600, color: "#09090B" }}>{l.asset_name}</div>
-                  <div style={{ color: "#71717A", fontSize: 11, marginTop: 2 }}>
-                    {l.property_type} · {l.district}
-                  </div>
-                  <div style={{ marginTop: 6, fontSize: 12 }}>
-                    <b>{usd(l.asking_price_usd)}</b>
-                    {l.category === "Property"
-                      ? ` · ${l.projected_gross_yield_pct.toFixed(1)}% yield`
-                      : ` · $${l.price_per_sqft_usd}/sq ft`}
-                  </div>
-                  <div style={{ color, fontSize: 10, letterSpacing: "0.08em", marginTop: 4, textTransform: "uppercase" }}>
-                    {l.signal.replace("_", " ")}
-                  </div>
-                </div>
-              </Tooltip>
-            );
-            const handlers = { click: () => props.onSelect?.(l.listing_id) };
-            if (l.category === "Land") {
-              const d = selected ? 0.0011 : 0.0008;
-              return (
-                <Rectangle
-                  key={l.listing_id}
-                  bounds={[
-                    [l.lat - d * 0.7, l.lng - d],
-                    [l.lat + d * 0.7, l.lng + d],
-                  ]}
-                  pathOptions={{ color: selected ? "#09090B" : color, weight: selected ? 2.5 : 1.5, fillColor: color, fillOpacity: 0.25 }}
-                  eventHandlers={handlers}
-                >
-                  {tooltip}
-                </Rectangle>
-              );
-            }
+            const active = props.selectedId === l.listing_id || props.hoveredId === l.listing_id;
             return (
-              <CircleMarker
+              <Marker
                 key={l.listing_id}
-                center={[l.lat, l.lng]}
-                radius={selected ? 10 : 7}
-                pathOptions={{ color: selected ? "#09090B" : "#FFFFFF", weight: selected ? 2.5 : 1.5, fillColor: color, fillOpacity: 0.95 }}
-                eventHandlers={handlers}
+                position={[l.lat, l.lng]}
+                icon={pinIcon(l, active)}
+                zIndexOffset={active ? 1000 : 0}
+                eventHandlers={{
+                  click: () => props.onSelect?.(l.listing_id),
+                  mouseover: () => props.onHover?.(l.listing_id),
+                  mouseout: () => props.onHover?.(null),
+                }}
               >
-                {tooltip}
-              </CircleMarker>
+                {interactive && (
+                  <Tooltip direction="top" offset={[0, -12]} opacity={1} className="sd-tooltip">
+                    <HoverCard l={l} />
+                  </Tooltip>
+                )}
+              </Marker>
             );
           })}
 
         {props.mode === "districts" &&
           props.districts.map((d) => {
-            const forSale = d.properties_for_sale + d.land_for_sale;
-            const shade = d.score >= 70 ? "#5E8A6B" : d.score >= 50 ? "#71717A" : "#A05A5D";
+            const forSale = d.properties_for_sale + d.land_for_sale + d.commercial_for_sale;
+            const shade = d.score >= 70 ? "#3F7A55" : d.score >= 50 ? "#71717A" : "#A05A5D";
             return (
               <CircleMarker
                 key={d.district}
                 center={[d.lat, d.lng]}
-                radius={7 + forSale * 2.5}
+                radius={7 + forSale * 2.2}
                 pathOptions={{ color: shade, weight: 1.5, fillColor: shade, fillOpacity: 0.22 }}
                 eventHandlers={{ click: () => props.onSelect?.(d.district) }}
               >
-                <Tooltip direction="top" opacity={1} permanent={false}>
+                <Tooltip direction="top" opacity={1}>
                   <div style={{ minWidth: 170 }}>
                     <div style={{ fontWeight: 600, color: "#09090B" }}>{d.district}</div>
                     <div style={{ fontSize: 12, marginTop: 4 }}>
@@ -182,28 +225,29 @@ export default function ArubaMap(props: Props) {
       </MapContainer>
 
       {interactive && (
-      <div className="pointer-events-none absolute bottom-3 left-3 z-[400] flex flex-wrap gap-3 border border-zinc-200 bg-white/95 px-3 py-2 tabular-nums text-[10px] uppercase tracking-wider text-zinc-600">
-        {props.mode === "listings" ? (
-          <>
-            {(Object.keys(SIGNAL_COLOR) as Signal[]).map((s) => (
-              <span key={s} className="flex items-center gap-1.5">
-                <span className="size-2 rounded-full" style={{ background: SIGNAL_COLOR[s] }} />
-                {s.replace("_", " ")}
-              </span>
-            ))}
-            <span className="flex items-center gap-1.5">
-              <span className="size-2 border border-zinc-500" /> Land
-            </span>
-          </>
-        ) : (
-          <>
-            <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-[#5E8A6B]" />Score 70+</span>
-            <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-[#71717A]" />50–69</span>
-            <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-[#A05A5D]" />Under 50</span>
-            <span>Size = listings for sale</span>
-          </>
-        )}
-      </div>
+        <div className="pointer-events-none absolute bottom-3 left-3 z-[400] flex flex-wrap gap-3 rounded-lg border border-zinc-200 bg-white/95 px-3 py-2 text-[11px] text-zinc-600">
+          {props.mode === "listings" ? (
+            <>
+              {(Object.keys(SIGNAL_COLOR) as Signal[]).map((s) => (
+                <span key={s} className="flex items-center gap-1.5">
+                  <span className="size-2.5 rounded-full" style={{ background: SIGNAL_COLOR[s] }} />
+                  {SIGNAL_LABEL[s]}
+                </span>
+              ))}
+              <span className="text-zinc-300">|</span>
+              <span className="flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-zinc-400" />Residential</span>
+              <span className="flex items-center gap-1.5"><span className="size-2.5 bg-zinc-400" />Land</span>
+              <span className="flex items-center gap-1.5"><span className="size-2 rotate-45 bg-zinc-400" />Commercial</span>
+            </>
+          ) : (
+            <>
+              <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-[#3F7A55]" />Score 70+</span>
+              <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-[#71717A]" />50–69</span>
+              <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-[#A05A5D]" />Under 50</span>
+              <span>Size = listings for sale</span>
+            </>
+          )}
+        </div>
       )}
     </div>
   );

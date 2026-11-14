@@ -43,6 +43,7 @@ const median = (xs: number[]) => {
 };
 
 const LAND = ALL_LISTINGS.filter((l) => l.category === "Land");
+const COMMERCIAL_COUNT = ALL_LISTINGS.filter((l) => l.category === "Commercial").length;
 const PROPERTIES = ALL_LISTINGS.filter((l) => l.category === "Property");
 const NEW_THIS_WEEK = ALL_LISTINGS.filter((l) => l.days_on_market <= 7).length;
 const UNDERVALUED = ALL_LISTINGS.filter((l) => l.signal === "UNDERVALUED").length;
@@ -474,7 +475,7 @@ export default function Home() {
               <SectionHeading
                 eyebrow="Step 01 · Find"
                 title="Every high-value listing in Aruba, in one place."
-                body="Our scrapers pull homes, villas and land for sale from broker, agency, developer and private listings every day, so you see new listings and price drops before everyone else."
+                body="Our scrapers pull homes, condos, land and commercial property for sale from broker, agency, developer and private listings every day, so you see new listings and price drops before everyone else."
               />
               <PrimaryCta>Browse all listings</PrimaryCta>
             </div>
@@ -484,7 +485,7 @@ export default function Home() {
               ))}
             </div>
             <p className="mt-6 text-[13px] text-zinc-500">
-              {PROPERTIES.length} homes and {LAND.length} land parcels for sale right now. Search, filter and sort the full list,
+              {PROPERTIES.length} homes and condos, {LAND.length} land parcels and {COMMERCIAL_COUNT} commercial properties for sale right now. Search, filter and sort the full list,
               or see everything on a map.
             </p>
           </div>
@@ -535,7 +536,7 @@ export default function Home() {
                       RevPAR YoY
                     </span>
                     <span>
-                      <span className="block font-display text-[14px] font-bold tabular-nums text-zinc-950">{d.properties_for_sale + d.land_for_sale}</span>
+                      <span className="block font-display text-[14px] font-bold tabular-nums text-zinc-950">{d.properties_for_sale + d.land_for_sale + d.commercial_for_sale}</span>
                       For sale
                     </span>
                     <span>

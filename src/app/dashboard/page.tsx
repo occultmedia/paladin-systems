@@ -18,8 +18,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { Wordmark } from "@/components/logo";
 import {
+  COMMERCIAL_USES,
   DISTRICTS,
   MARKET_ID,
+  RESIDENTIAL_TYPES,
+  ZONINGS,
   estimateRevenue,
   repository,
   type EstimateInput,
@@ -36,8 +39,6 @@ import {
   ArrowDownRight,
   ArrowRight,
   Calculator,
-  List,
-  Map as MapIcon,
   ArrowUpRight,
   ChevronDown,
   CreditCard,
@@ -46,6 +47,7 @@ import {
   KeyRound,
   LogOut,
   Search,
+  SlidersHorizontal,
   User,
 } from "lucide-react";
 import {
@@ -605,37 +607,57 @@ function YieldRadar({ listings, marketYield }: { listings?: ListingSignal[]; mar
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
- * Active Listings — every scraped property and land parcel for sale
+ * Active Listings — map of every listing on top, the full list below
  * ──────────────────────────────────────────────────────────────────────── */
 
+type Category = "All" | "Property" | "Land" | "Commercial";
 type SortKey = "name" | "district" | "beds" | "size" | "asking" | "psf" | "adr" | "yield" | "vsDistrict" | "listed";
-type Category = "All" | "Property" | "Land";
 
 const SORT_VALUE: Record<SortKey, (l: Listing) => number | string | null> = {
   name: (l) => l.asset_name,
   district: (l) => l.district,
   beds: (l) => (l.category === "Property" ? l.bedrooms : null),
-  size: (l) => (l.category === "Property" ? l.built_sqft : l.lot_sqft),
+  size: (l) => (l.category === "Land" ? l.lot_sqft : l.built_sqft),
   asking: (l) => l.asking_price_usd,
   psf: (l) => l.price_per_sqft_usd,
   adr: (l) => (l.category === "Property" ? l.sequence_adr_usd : null),
   yield: (l) => (l.category === "Property" ? l.projected_gross_yield_pct : null),
-  vsDistrict: (l) => (l.category === "Land" ? l.price_vs_district_pct : null),
+  vsDistrict: (l) => (l.category === "Property" ? null : l.price_vs_district_pct),
   listed: (l) => l.days_on_market,
 };
 
 const CATEGORY_FILTERS: Array<{ value: Category; label: string }> = [
   { value: "All", label: "All" },
-  { value: "Property", label: "Properties" },
+  { value: "Property", label: "Residential" },
   { value: "Land", label: "Land" },
+  { value: "Commercial", label: "Commercial" },
 ];
-const PROPERTY_TYPES: Array<PropertyType | "All"> = ["All", "Villa", "Estate", "Penthouse", "Beach House"];
 const SIGNAL_FILTERS: Array<{ value: Signal | "ALL"; label: string }> = [
   { value: "ALL", label: "All" },
   { value: "UNDERVALUED", label: "Undervalued" },
   { value: "AT_MARKET", label: "At Market" },
   { value: "OVERPRICED", label: "Overpriced" },
 ];
+/** Type chips shown for each category. In "All" the chips are the listing types themselves. */
+const TYPE_OPTIONS: Record<Category, string[]> = {
+  All: [...RESIDENTIAL_TYPES, "Land", "Commercial"],
+  Property: RESIDENTIAL_TYPES,
+  Land: ZONINGS,
+  Commercial: COMMERCIAL_USES,
+};
+const TYPE_LABEL: Record<Category, string> = { All: "Type", Property: "Home type", Land: "Zoning", Commercial: "Use" };
+const PRICE_STEPS = [250_000, 500_000, 750_000, 1_000_000, 2_000_000, 3_000_000, 5_000_000, 7_500_000, 10_000_000, 15_000_000];
+const SIZE_STEPS = [1_000, 2_500, 5_000, 10_000, 20_000, 50_000];
+
+/** The value a listing's type chip compares against, given the category view. */
+function subtypeOf(l: Listing, category: Category): string {
+  if (category === "All") return l.property_type;
+  if (l.category === "Land") return l.zoning;
+  if (l.category === "Commercial") return l.commercial_use;
+  return l.property_type;
+}
+const typeLine = (l: Listing) =>
+  l.category === "Land" ? `Land · ${l.zoning}` : l.category === "Commercial" ? `Commercial · ${l.commercial_use}` : l.property_type;
 
 const median = (xs: number[]) => {
   if (!xs.length) return 0;
@@ -652,27 +674,30 @@ const fmtDate = (iso: string) =>
     year: "numeric",
     timeZone: "UTC",
   });
+const fmtPriceStep = (n: number) => (n >= 1_000_000 ? `$${n / 1_000_000}M` : `$${n / 1000}k`);
 const DASH = <span className="text-zinc-300">—</span>;
 
 function downloadCsv(rows: Listing[]) {
   const p = (l: Listing) => (l.category === "Property" ? l : null);
   const d = (l: Listing) => (l.category === "Land" ? l : null);
+  const c = (l: Listing) => (l.category === "Commercial" ? l : null);
   const cols: Array<[string, (l: Listing) => string | number | null | undefined]> = [
     ["Listing ID", (l) => l.listing_id],
-    ["Category", (l) => l.category],
+    ["Category", (l) => (l.category === "Property" ? "Residential" : l.category)],
     ["Name", (l) => l.asset_name],
     ["Type", (l) => l.property_type],
-    ["District", (l) => l.district],
+    ["Commercial use", (l) => c(l)?.commercial_use],
     ["Zoning", (l) => d(l)?.zoning],
+    ["District", (l) => l.district],
     ["Bedrooms", (l) => p(l)?.bedrooms],
     ["Bathrooms", (l) => p(l)?.bathrooms],
-    ["Built sq ft", (l) => p(l)?.built_sqft],
+    ["Built sq ft", (l) => (l.category === "Land" ? null : l.built_sqft)],
     ["Lot sq ft", (l) => l.lot_sqft],
     ["Asking price USD", (l) => l.asking_price_usd],
     ["Price per sq ft USD", (l) => l.price_per_sqft_usd],
     ["Price change %", (l) => l.price_change_pct],
-    ["District land avg per sq ft USD", (l) => d(l)?.district_land_psf_usd],
-    ["Price vs district %", (l) => d(l)?.price_vs_district_pct],
+    ["District avg per sq ft USD", (l) => d(l)?.district_land_psf_usd ?? c(l)?.district_commercial_psf_usd],
+    ["Price vs district %", (l) => (l.category === "Property" ? null : l.price_vs_district_pct)],
     ["Est. ADR USD", (l) => p(l)?.sequence_adr_usd],
     ["Est. occupancy %", (l) => p(l)?.projected_occupancy_pct],
     ["Est. annual revenue USD", (l) => p(l)?.projected_annual_revenue_usd],
@@ -684,6 +709,8 @@ function downloadCsv(rows: Listing[]) {
     ["Last scraped", (l) => l.last_scraped],
     ["Source", (l) => l.source],
     ["Source URL", (l) => l.source_url],
+    ["Latitude", (l) => l.lat],
+    ["Longitude", (l) => l.lng],
   ];
   const esc = (v: string | number | null | undefined) => {
     const t = v === null || v === undefined ? "" : String(v);
@@ -717,7 +744,7 @@ function SortHeader({
   return (
     <th
       aria-sort={active ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}
-      className={`border-b border-zinc-300 px-3 py-3 text-[10px] font-medium uppercase tracking-[0.16em] ${align === "right" ? "text-right" : "text-left"}`}
+      className={`border-b border-zinc-300 px-3 py-3 text-[10px] font-medium uppercase tracking-[0.14em] ${align === "right" ? "text-right" : "text-left"}`}
     >
       <button
         type="button"
@@ -725,15 +752,17 @@ function SortHeader({
         className={`inline-flex items-center gap-1 uppercase transition-colors ${active ? "text-zinc-950" : "text-zinc-500 hover:text-zinc-800"}`}
       >
         {label}
-        <span className={`${MONO} text-[9px]`}>{active ? (sort.dir === "asc" ? "▲" : "▼") : ""}</span>
+        <span className="text-[9px]">{active ? (sort.dir === "asc" ? "▲" : "▼") : ""}</span>
       </button>
     </th>
   );
 }
 
-function PlainHeader({ label }: { label: string }) {
+function PlainHeader({ label, align = "right" }: { label: string; align?: "left" | "right" }) {
   return (
-    <th className="border-b border-zinc-300 px-3 py-3 text-right text-[10px] font-medium uppercase tracking-[0.16em] text-zinc-500">
+    <th
+      className={`border-b border-zinc-300 px-3 py-3 text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-500 ${align === "right" ? "text-right" : "text-left"}`}
+    >
       {label}
     </th>
   );
@@ -741,16 +770,24 @@ function PlainHeader({ label }: { label: string }) {
 
 function Thumb({ src, alt, w = 64, h = 44 }: { src: string | null; alt: string; w?: number; h?: number }) {
   return src ? (
-    <Image src={`${src}?auto=format&fit=crop&w=${w * 2}&h=${h * 2}&q=60`} alt={alt} width={w} height={h} unoptimized className="shrink-0 bg-zinc-100 object-cover" style={{ width: w, height: h }} />
+    <Image
+      src={`${src}?auto=format&fit=crop&w=${w * 2}&h=${h * 2}&q=60`}
+      alt={alt}
+      width={w}
+      height={h}
+      unoptimized
+      className="shrink-0 rounded-md bg-zinc-100 object-cover"
+      style={{ width: w, height: h }}
+    />
   ) : (
-    <span className="block shrink-0 bg-zinc-100" style={{ width: w, height: h }} />
+    <span className="block shrink-0 rounded-md bg-zinc-100" style={{ width: w, height: h }} />
   );
 }
 
 function DetailItem({ label, value, color }: { label: string; value: React.ReactNode; color?: string }) {
   return (
     <div>
-      <dt className="text-[10px] uppercase tracking-[0.16em] text-zinc-500">{label}</dt>
+      <dt className="text-[10px] uppercase tracking-[0.14em] text-zinc-500">{label}</dt>
       <dd className={`${MONO} mt-1.5 text-[13px] text-zinc-900`} style={color ? { color } : undefined}>
         {value}
       </dd>
@@ -777,15 +814,12 @@ function SourceValue({ l }: { l: Listing }) {
 function ListingDetails({
   l,
   marketYield,
-  compact = false,
   onEstimate,
 }: {
   l: Listing;
   marketYield?: number;
-  compact?: boolean;
   onEstimate?: (l: ListingSignal) => void;
 }) {
-  const grid = compact ? "grid grid-cols-2 gap-x-6 gap-y-5" : "grid grid-cols-2 gap-x-8 gap-y-6 sm:grid-cols-4 lg:grid-cols-6";
   const shared = (
     <>
       <DetailItem label="Asking price" value={fmtUsd(l.asking_price_usd)} />
@@ -800,23 +834,10 @@ function ListingDetails({
     </>
   );
 
-  const photo = l.photo_url ? (
-    <div className={compact ? "col-span-full" : "col-span-2 row-span-2"}>
-      <Image
-        src={`${l.photo_url}?auto=format&fit=crop&w=720&h=440&q=70`}
-        alt={l.asset_name}
-        width={360}
-        height={220}
-        unoptimized
-        className="h-full max-h-[220px] w-full bg-zinc-100 object-cover"
-      />
-    </div>
-  ) : null;
-
+  let facts: React.ReactNode;
   if (l.category === "Land") {
-    return (
-      <dl className={grid}>
-        {photo}
+    facts = (
+      <>
         <DetailItem label="Type" value="Land parcel" />
         <DetailItem label="Zoning" value={l.zoning} />
         <DetailItem label="Lot size" value={fmtSqft(l.lot_sqft)} />
@@ -827,47 +848,78 @@ function ListingDetails({
           value={`${fmtDelta(l.price_vs_district_pct)} ${l.price_vs_district_pct < 0 ? "cheaper" : "pricier"}`}
           color={deltaColor(-l.price_vs_district_pct)}
         />
-        {shared}
-      </dl>
+      </>
+    );
+  } else if (l.category === "Commercial") {
+    facts = (
+      <>
+        <DetailItem label="Use" value={l.commercial_use} />
+        <DetailItem label="Building size" value={fmtSqft(l.built_sqft)} />
+        <DetailItem label="Lot size" value={l.lot_sqft ? fmtSqft(l.lot_sqft) : "N/A (unit)"} />
+        <DetailItem label="Price / sq ft" value={fmtUsd(l.price_per_sqft_usd)} />
+        <DetailItem label="District commercial avg" value={`${fmtUsd(l.district_commercial_psf_usd)} / sq ft`} />
+        <DetailItem
+          label="Vs. district avg"
+          value={`${fmtDelta(l.price_vs_district_pct)} ${l.price_vs_district_pct < 0 ? "cheaper" : "pricier"}`}
+          color={deltaColor(-l.price_vs_district_pct)}
+        />
+      </>
+    );
+  } else {
+    facts = (
+      <>
+        <DetailItem label="Property type" value={l.property_type} />
+        <DetailItem label="Bedrooms / baths" value={`${l.bedrooms} / ${l.bathrooms}`} />
+        <DetailItem label="Built area" value={fmtSqft(l.built_sqft)} />
+        <DetailItem label="Lot size" value={l.lot_sqft ? fmtSqft(l.lot_sqft) : "N/A (unit)"} />
+        <DetailItem label="Price / sq ft" value={fmtUsd(l.price_per_sqft_usd)} />
+        <DetailItem label="Est. annual revenue" value={fmtUsd(l.projected_annual_revenue_usd)} />
+        <DetailItem label="Est. nightly rate" value={fmtUsd(l.sequence_adr_usd)} />
+        <DetailItem
+          label="Est. occupancy"
+          value={`${fmtPct(l.projected_occupancy_pct, 0)} · ${Math.round((365 * l.projected_occupancy_pct) / 100)} nights`}
+        />
+        <DetailItem
+          label="Yield vs market"
+          value={`${fmtPct(l.projected_gross_yield_pct)} vs ${marketYield !== undefined ? fmtPct(marketYield) : "—"}`}
+          color={deltaColor(l.yield_spread_bps)}
+        />
+      </>
     );
   }
 
   return (
-    <dl className={grid}>
-      {photo}
-      <DetailItem label="Property type" value={l.property_type} />
-      <DetailItem label="Bedrooms / baths" value={`${l.bedrooms} / ${l.bathrooms}`} />
-      <DetailItem label="Built area" value={fmtSqft(l.built_sqft)} />
-      <DetailItem label="Lot size" value={l.lot_sqft ? fmtSqft(l.lot_sqft) : "N/A (condo)"} />
-      <DetailItem label="Price / sq ft" value={fmtUsd(l.price_per_sqft_usd)} />
-      <DetailItem label="Est. annual revenue" value={fmtUsd(l.projected_annual_revenue_usd)} />
-      <DetailItem label="Est. nightly rate" value={fmtUsd(l.sequence_adr_usd)} />
-      <DetailItem
-        label="Est. occupancy"
-        value={`${fmtPct(l.projected_occupancy_pct, 0)} · ${Math.round((365 * l.projected_occupancy_pct) / 100)} nights`}
-      />
-      <DetailItem
-        label="Yield vs market"
-        value={`${fmtPct(l.projected_gross_yield_pct)} vs ${marketYield !== undefined ? fmtPct(marketYield) : "—"}`}
-        color={deltaColor(l.yield_spread_bps)}
-      />
-      {shared}
-      {onEstimate && (
-        <div className="col-span-full">
+    <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
+      {l.photo_url && (
+        <Image
+          src={`${l.photo_url}?auto=format&fit=crop&w=720&h=460&q=70`}
+          alt={l.asset_name}
+          width={320}
+          height={205}
+          unoptimized
+          className="h-[205px] w-full rounded-xl bg-zinc-100 object-cover"
+        />
+      )}
+      <div>
+        <dl className="grid grid-cols-2 gap-x-8 gap-y-5 sm:grid-cols-3 xl:grid-cols-4">
+          {facts}
+          {shared}
+        </dl>
+        {onEstimate && l.category === "Property" && (
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
               onEstimate(l);
             }}
-            className="inline-flex items-center gap-2 border border-zinc-950 px-3 py-2 text-[12px] text-zinc-950 transition-colors hover:bg-zinc-950 hover:text-white"
+            className="mt-6 inline-flex items-center gap-2 bg-zinc-950 px-3 py-2 text-[12px] text-mint transition-colors hover:bg-zinc-800"
           >
             <Calculator size={13} strokeWidth={1.5} />
             Open in Revenue Estimator
           </button>
-        </div>
-      )}
-    </dl>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -884,17 +936,25 @@ function ActiveListings({
   initialQuery?: string;
   onEstimate: (l: ListingSignal) => void;
 }) {
-  const [view, setView] = useState<"list" | "map">("list");
   const [query, setQuery] = useState(initialQuery ?? "");
   const [category, setCategory] = useState<Category>("All");
+  const [subtypes, setSubtypes] = useState<string[]>([]);
   const [district, setDistrict] = useState(initialDistrict ?? "All");
-  const [type, setType] = useState<PropertyType | "All">("All");
   const [signal, setSignal] = useState<Signal | "ALL">("ALL");
+  const [priceMin, setPriceMin] = useState(0);
+  const [priceMax, setPriceMax] = useState(0);
+  const [bedsMin, setBedsMin] = useState(0);
+  const [sizeMin, setSizeMin] = useState(0);
+  const [newOnly, setNewOnly] = useState(false);
+  const [dropsOnly, setDropsOnly] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "listed", dir: "asc" });
   const [openId, setOpenId] = useState<string | null>(null);
+  const [hoverId, setHoverId] = useState<string | null>(null);
 
   const landOnly = category === "Land";
-  const propsOnly = category === "Property";
+  const commercialOnly = category === "Commercial";
+  const nonResidential = landOnly || commercialOnly;
 
   const districts = useMemo(
     () => ["All", ...Array.from(new Set((listings ?? []).map((l) => l.district))).sort()],
@@ -904,14 +964,22 @@ function ActiveListings({
   const rows = useMemo(() => {
     if (!listings) return [];
     const q = query.trim().toLowerCase();
-    const filtered = listings.filter(
-      (l) =>
+    const filtered = listings.filter((l) => {
+      const size = l.category === "Land" ? l.lot_sqft : l.built_sqft;
+      return (
         (category === "All" || l.category === category) &&
+        (!subtypes.length || subtypes.includes(subtypeOf(l, category))) &&
         (district === "All" || l.district === district) &&
-        (type === "All" || landOnly || l.property_type === type) &&
         (signal === "ALL" || l.signal === signal) &&
-        (!q || `${l.asset_name} ${l.district} ${l.listing_id} ${l.source} ${l.property_type}`.toLowerCase().includes(q)),
-    );
+        (!priceMin || l.asking_price_usd >= priceMin) &&
+        (!priceMax || l.asking_price_usd <= priceMax) &&
+        (!bedsMin || (l.category === "Property" && l.bedrooms >= bedsMin)) &&
+        (!sizeMin || size >= sizeMin) &&
+        (!newOnly || l.days_on_market <= 7) &&
+        (!dropsOnly || l.price_change_pct < 0) &&
+        (!q || `${l.asset_name} ${l.district} ${l.listing_id} ${l.source} ${typeLine(l)}`.toLowerCase().includes(q))
+      );
+    });
     const dir = sort.dir === "asc" ? 1 : -1;
     const get = SORT_VALUE[sort.key];
     return filtered.sort((a, b) => {
@@ -922,16 +990,16 @@ function ActiveListings({
       if (y === null) return -1;
       return (typeof x === "string" ? x.localeCompare(y as string) : x - (y as number)) * dir;
     });
-  }, [listings, query, category, district, type, landOnly, signal, sort]);
+  }, [listings, query, category, subtypes, district, signal, priceMin, priceMax, bedsMin, sizeMin, newOnly, dropsOnly, sort]);
 
   const stats = useMemo(() => {
     const props = rows.filter((r): r is ListingSignal => r.category === "Property");
     return {
       count: rows.length,
-      properties: props.length,
-      land: rows.length - props.length,
+      residential: props.length,
+      land: rows.filter((r) => r.category === "Land").length,
+      commercial: rows.filter((r) => r.category === "Commercial").length,
       medianAsk: median(rows.map((r) => r.asking_price_usd)),
-      avgYield: props.length ? props.reduce((s, r) => s + r.projected_gross_yield_pct, 0) / props.length : null,
       undervalued: rows.filter((r) => r.signal === "UNDERVALUED").length,
     };
   }, [rows]);
@@ -945,28 +1013,58 @@ function ActiveListings({
 
   const pickCategory = (c: Category) => {
     setCategory(c);
-    if (c === "Land") setType("All");
-    if (c !== "Land" && sort.key === "vsDistrict") setSort({ key: "listed", dir: "asc" });
-    if (c === "Land" && (sort.key === "beds" || sort.key === "adr" || sort.key === "yield")) setSort({ key: "listed", dir: "asc" });
+    setSubtypes([]);
+    if (c !== "All" && c !== "Property") setBedsMin(0);
+    if (c === "Property" && sort.key === "vsDistrict") setSort({ key: "listed", dir: "asc" });
+    if ((c === "Land" || c === "Commercial") && (sort.key === "beds" || sort.key === "adr" || sort.key === "yield"))
+      setSort({ key: "listed", dir: "asc" });
+  };
+  const toggleSubtype = (t: string) => setSubtypes((xs) => (xs.includes(t) ? xs.filter((x) => x !== t) : [...xs, t]));
+
+  const moreCount = [priceMin, priceMax, bedsMin, sizeMin].filter(Boolean).length + (newOnly ? 1 : 0) + (dropsOnly ? 1 : 0);
+  const filtersActive = Boolean(query) || category !== "All" || subtypes.length > 0 || district !== "All" || signal !== "ALL" || moreCount > 0;
+  const clearAll = () => {
+    setQuery("");
+    pickCategory("All");
+    setDistrict("All");
+    setSignal("ALL");
+    setPriceMin(0);
+    setPriceMax(0);
+    setBedsMin(0);
+    setSizeMin(0);
+    setNewOnly(false);
+    setDropsOnly(false);
   };
 
-  const filtersActive = query || category !== "All" || district !== "All" || type !== "All" || signal !== "ALL";
-  const selectCls = `${MONO} border border-zinc-300 bg-white px-3 py-2 text-[12px] text-zinc-800 outline-none transition-colors hover:border-zinc-500 focus:border-zinc-950`;
+  const selectFromMap = (id: string) => {
+    setOpenId(id);
+    requestAnimationFrame(() => document.getElementById(`row-${id}`)?.scrollIntoView({ behavior: "smooth", block: "center" }));
+  };
+
+  const selectCls = `${MONO} rounded-md border border-zinc-300 bg-white px-3 py-2 text-[12px] text-zinc-800 outline-none transition-colors hover:border-zinc-500 focus:border-zinc-950`;
   const segBtn = (on: boolean) =>
-    `${MONO} px-3 py-2 text-[11px] uppercase tracking-wider transition-colors ${on ? "bg-zinc-950 text-mint" : "text-zinc-500 hover:text-zinc-950"}`;
+    `px-3 py-2 text-[12px] font-medium transition-colors ${on ? "bg-zinc-950 text-mint" : "text-zinc-600 hover:text-zinc-950"}`;
+  const chip = (on: boolean) =>
+    `rounded-full border px-3 py-1.5 text-[12px] font-medium transition-colors ${
+      on ? "border-zinc-950 bg-zinc-950 text-mint" : "border-zinc-300 bg-white text-zinc-700 hover:border-zinc-500"
+    }`;
+  const toggleCls = (on: boolean) =>
+    `inline-flex items-center gap-2 rounded-md border px-3 py-2 text-[12px] font-medium transition-colors ${
+      on ? "border-zinc-950 bg-zinc-950 text-mint" : "border-zinc-300 bg-white text-zinc-700 hover:border-zinc-500"
+    }`;
   const td = "px-3 py-4 border-b border-zinc-200 align-top";
   const num = `${td} ${MONO} text-right text-[13px] text-zinc-800`;
-  const colCount = landOnly ? 10 : 11;
+  const colCount = nonResidential ? 10 : 11;
 
   return (
     <>
-      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-zinc-200 py-10">
+      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-zinc-200 py-8">
         <div>
-          <p className={`${MONO} text-[11px] tracking-wider text-zinc-500`}>DATASET / AW-LISTINGS / SCRAPED DAILY</p>
-          <h1 className="font-display mt-3 text-[26px] font-semibold tracking-tight text-zinc-950">Active Listings</h1>
-          <p className="mt-2 max-w-[72ch] text-[13px] leading-relaxed text-zinc-600">
-            Every high-value property and land parcel currently for sale in Aruba, scraped daily from broker, agency,
-            developer and private listings. Click any row for full details.
+          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500">Aruba · Scraped daily</p>
+          <h1 className="mt-2 font-display text-[28px] font-bold tracking-tight text-zinc-950">Active Listings</h1>
+          <p className="mt-1 max-w-[72ch] text-[13px] leading-relaxed text-zinc-600">
+            Every home, condo, piece of land and commercial property for sale in Aruba. Hover a pin for a quick look, click it
+            for full details in the list below.
           </p>
         </div>
         <button
@@ -984,15 +1082,15 @@ function ActiveListings({
       <div className="grid grid-cols-2 border-b border-zinc-200 sm:grid-cols-3 lg:grid-cols-6">
         {[
           ["Listings shown", listings ? int.format(stats.count) : "—", undefined],
-          ["Properties", listings ? int.format(stats.properties) : "—", undefined],
-          ["Land parcels", listings ? int.format(stats.land) : "—", undefined],
+          ["Residential", listings ? int.format(stats.residential) : "—", undefined],
+          ["Land", listings ? int.format(stats.land) : "—", undefined],
+          ["Commercial", listings ? int.format(stats.commercial) : "—", undefined],
           ["Median asking", listings && stats.count ? fmtUsdCompact(stats.medianAsk) : "—", undefined],
-          ["Avg. property yield", stats.avgYield !== null ? fmtPct(stats.avgYield) : "—", undefined],
           ["Undervalued", listings ? int.format(stats.undervalued) : "—", listings ? C.up : undefined],
         ].map(([label, value, color], i) => (
-          <div key={label} className={`py-6 ${i > 0 ? "lg:border-l lg:border-zinc-200 lg:pl-6" : ""}`}>
-            <p className="text-[10px] uppercase tracking-[0.16em] text-zinc-500">{label}</p>
-            <p className={`${MONO} mt-2 font-display text-[24px] font-bold text-zinc-950`} style={color ? { color } : undefined}>
+          <div key={label} className={`py-5 ${i > 0 ? "lg:border-l lg:border-zinc-200 lg:pl-6" : ""}`}>
+            <p className="text-[10px] uppercase tracking-[0.14em] text-zinc-500">{label}</p>
+            <p className={`${MONO} mt-1.5 font-display text-[24px] font-bold text-zinc-950`} style={color ? { color } : undefined}>
               {value}
             </p>
           </div>
@@ -1000,122 +1098,147 @@ function ActiveListings({
       </div>
 
       {/* filters */}
-      <div className="flex flex-wrap items-center gap-3 py-6">
-        <div className="flex border border-zinc-950" role="group" aria-label="Category">
-          {CATEGORY_FILTERS.map((f) => (
-            <button key={f.value} type="button" onClick={() => pickCategory(f.value)} aria-pressed={category === f.value} className={segBtn(category === f.value)}>
-              {f.label}
+      <div className="space-y-3 py-5">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex overflow-hidden rounded-md border border-zinc-950" role="group" aria-label="Category">
+            {CATEGORY_FILTERS.map((f) => (
+              <button key={f.value} type="button" onClick={() => pickCategory(f.value)} aria-pressed={category === f.value} className={segBtn(category === f.value)}>
+                {f.label}
+              </button>
+            ))}
+          </div>
+          <label className="relative">
+            <span className="sr-only">Search listings</span>
+            <Search size={13} strokeWidth={1.5} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search name, district, ID"
+              className={`${selectCls} w-56 pl-8 placeholder:text-zinc-400`}
+            />
+          </label>
+          <label className="sr-only" htmlFor="f-district">District</label>
+          <select id="f-district" value={district} onChange={(e) => setDistrict(e.target.value)} className={selectCls}>
+            {districts.map((d) => (
+              <option key={d} value={d}>{d === "All" ? "All districts" : d}</option>
+            ))}
+          </select>
+          <div className="flex overflow-hidden rounded-md border border-zinc-300" role="group" aria-label="Signal">
+            {SIGNAL_FILTERS.map((f) => (
+              <button key={f.value} type="button" onClick={() => setSignal(f.value)} aria-pressed={signal === f.value} className={segBtn(signal === f.value)}>
+                {f.label}
+              </button>
+            ))}
+          </div>
+          <button type="button" onClick={() => setMoreOpen((v) => !v)} aria-expanded={moreOpen} className={toggleCls(moreOpen || moreCount > 0)}>
+            <SlidersHorizontal size={13} strokeWidth={1.75} />
+            More filters{moreCount > 0 ? ` (${moreCount})` : ""}
+          </button>
+          {filtersActive && (
+            <button type="button" onClick={clearAll} className="text-[12px] text-zinc-500 underline-offset-4 hover:text-zinc-950 hover:underline">
+              Clear all
+            </button>
+          )}
+        </div>
+
+        {/* type chips */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="mr-1 text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500">{TYPE_LABEL[category]}</span>
+          <button type="button" onClick={() => setSubtypes([])} className={chip(subtypes.length === 0)}>
+            All
+          </button>
+          {TYPE_OPTIONS[category].map((t) => (
+            <button key={t} type="button" onClick={() => toggleSubtype(t)} aria-pressed={subtypes.includes(t)} className={chip(subtypes.includes(t))}>
+              {t}
             </button>
           ))}
         </div>
-        <label className="relative">
-          <span className="sr-only">Search listings</span>
-          <Search size={13} strokeWidth={1.5} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search name, district, ID"
-            className={`${selectCls} w-60 pl-8 placeholder:text-zinc-400`}
-          />
-        </label>
-        <label className="sr-only" htmlFor="f-district">District</label>
-        <select id="f-district" value={district} onChange={(e) => setDistrict(e.target.value)} className={selectCls}>
-          {districts.map((d) => (
-            <option key={d} value={d}>{d === "All" ? "All districts" : d}</option>
-          ))}
-        </select>
-        {!landOnly && (
-          <>
-            <label className="sr-only" htmlFor="f-type">Property type</label>
-            <select id="f-type" value={type} onChange={(e) => setType(e.target.value as PropertyType | "All")} className={selectCls}>
-              {PROPERTY_TYPES.map((t) => (
-                <option key={t} value={t}>{t === "All" ? "All property types" : t}</option>
-              ))}
-            </select>
-          </>
-        )}
-        <div className="flex border border-zinc-300" role="group" aria-label="Signal">
-          {SIGNAL_FILTERS.map((f) => (
-            <button key={f.value} type="button" onClick={() => setSignal(f.value)} aria-pressed={signal === f.value} className={segBtn(signal === f.value)}>
-              {f.label}
+
+        {moreOpen && (
+          <div className="flex flex-wrap items-end gap-4 rounded-lg border border-zinc-200 bg-mint-soft p-4">
+            <label className="block">
+              <span className="text-[10px] uppercase tracking-[0.14em] text-zinc-500">Min price</span>
+              <select value={priceMin} onChange={(e) => setPriceMin(Number(e.target.value))} className={`${selectCls} mt-1.5 block`}>
+                <option value={0}>No min</option>
+                {PRICE_STEPS.map((p) => (
+                  <option key={p} value={p}>{fmtPriceStep(p)}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="text-[10px] uppercase tracking-[0.14em] text-zinc-500">Max price</span>
+              <select value={priceMax} onChange={(e) => setPriceMax(Number(e.target.value))} className={`${selectCls} mt-1.5 block`}>
+                <option value={0}>No max</option>
+                {PRICE_STEPS.map((p) => (
+                  <option key={p} value={p}>{fmtPriceStep(p)}</option>
+                ))}
+              </select>
+            </label>
+            {!nonResidential && (
+              <label className="block">
+                <span className="text-[10px] uppercase tracking-[0.14em] text-zinc-500">Bedrooms</span>
+                <select value={bedsMin} onChange={(e) => setBedsMin(Number(e.target.value))} className={`${selectCls} mt-1.5 block`}>
+                  <option value={0}>Any</option>
+                  {[1, 2, 3, 4, 5, 6, 7].map((b) => (
+                    <option key={b} value={b}>{b}+</option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <label className="block">
+              <span className="text-[10px] uppercase tracking-[0.14em] text-zinc-500">{landOnly ? "Min lot size" : "Min size"}</span>
+              <select value={sizeMin} onChange={(e) => setSizeMin(Number(e.target.value))} className={`${selectCls} mt-1.5 block`}>
+                <option value={0}>Any</option>
+                {SIZE_STEPS.map((s) => (
+                  <option key={s} value={s}>{int.format(s)}+ sq ft</option>
+                ))}
+              </select>
+            </label>
+            <button type="button" onClick={() => setNewOnly((v) => !v)} aria-pressed={newOnly} className={toggleCls(newOnly)}>
+              New this week
             </button>
-          ))}
-        </div>
-        {filtersActive && (
-          <button
-            type="button"
-            onClick={() => {
-              setQuery("");
-              pickCategory("All");
-              setDistrict("All");
-              setType("All");
-              setSignal("ALL");
-            }}
-            className="text-[12px] text-zinc-500 underline-offset-4 hover:text-zinc-950 hover:underline"
-          >
-            Clear filters
-          </button>
+            <button type="button" onClick={() => setDropsOnly((v) => !v)} aria-pressed={dropsOnly} className={toggleCls(dropsOnly)}>
+              Price drops
+            </button>
+          </div>
         )}
-        <div className="ml-auto flex border border-zinc-950" role="group" aria-label="View">
-          <button type="button" onClick={() => setView("list")} aria-pressed={view === "list"} className={`${segBtn(view === "list")} inline-flex items-center gap-1.5`}>
-            <List size={12} strokeWidth={1.5} /> List
-          </button>
-          <button type="button" onClick={() => setView("map")} aria-pressed={view === "map"} className={`${segBtn(view === "map")} inline-flex items-center gap-1.5`}>
-            <MapIcon size={12} strokeWidth={1.5} /> Map
-          </button>
-        </div>
       </div>
 
-      {view === "map" ? (
-        <div className="grid gap-6 border-t border-zinc-950 pt-6 lg:grid-cols-[1fr_400px]">
-          <ArubaMap mode="listings" listings={rows} selectedId={openId} onSelect={setOpenId} height={640} />
-          <div className="max-h-[640px] overflow-y-auto border border-zinc-200">
-            {!rows.length && (
-              <p className={`${MONO} p-8 text-center text-[12px] text-zinc-500`}>NO LISTINGS MATCH THESE FILTERS</p>
-            )}
-            {rows.map((l) => {
-              const open = openId === l.listing_id;
-              return (
-                <div key={l.listing_id} className={`border-b border-zinc-200 ${open ? "bg-zinc-50" : ""}`}>
-                  <button
-                    type="button"
-                    onClick={() => setOpenId(open ? null : l.listing_id)}
-                    className="flex w-full items-start justify-between gap-3 px-4 py-3 text-left hover:bg-zinc-50"
-                  >
-                    <Thumb src={l.photo_url} alt={l.asset_name} w={56} h={42} />
-                    <span className="flex-1">
-                      <span className="block text-[13px] font-medium text-zinc-950">{l.asset_name}</span>
-                      <span className={`${MONO} mt-1 block text-[10px] uppercase tracking-wider text-zinc-500`}>
-                        {l.property_type} · {l.district}
-                      </span>
-                    </span>
-                    <span className="text-right">
-                      <span className={`${MONO} block text-[13px] text-zinc-950`}>{fmtUsdCompact(l.asking_price_usd)}</span>
-                      <span className="mt-1 block"><SignalBadge signal={l.signal} /></span>
-                    </span>
-                  </button>
-                  {open && (
-                    <div className="px-4 pb-5 pt-1">
-                      <ListingDetails l={l} marketYield={marketYield} compact onEstimate={onEstimate} />
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      ) : (
-      <div className="overflow-x-auto border-t border-zinc-950">
+      {/* map */}
+      <ArubaMap
+        mode="listings"
+        listings={rows}
+        selectedId={openId}
+        hoveredId={hoverId}
+        onSelect={selectFromMap}
+        onHover={setHoverId}
+        height={560}
+      />
+
+      {/* list */}
+      <div className="mt-8 flex flex-wrap items-baseline justify-between gap-3">
+        <p className="font-display text-[18px] font-bold text-zinc-950">
+          {listings ? `${int.format(stats.count)} listing${stats.count === 1 ? "" : "s"}` : "Loading listings…"}
+        </p>
+        <p className="text-[12px] text-zinc-500">Click a row or a pin for full details · click a column to sort</p>
+      </div>
+      <div className="mt-3 overflow-x-auto border-t border-zinc-950">
         <table className="w-full min-w-[1120px] border-collapse text-left">
           <thead>
             <tr>
               <SortHeader label={landOnly ? "Parcel" : "Listing"} k="name" sort={sort} onSort={onSort} align="left" />
               <SortHeader label="District" k="district" sort={sort} onSort={onSort} align="left" />
-              {landOnly ? <PlainHeader label="Zoning" /> : <SortHeader label="Bd / Ba" k="beds" sort={sort} onSort={onSort} />}
-              <SortHeader label={landOnly ? "Lot (sq ft)" : propsOnly ? "Built (sq ft)" : "Size (sq ft)"} k="size" sort={sort} onSort={onSort} />
+              {landOnly ? (
+                <PlainHeader label="Zoning" />
+              ) : commercialOnly ? (
+                <PlainHeader label="Use" />
+              ) : (
+                <SortHeader label="Bd / Ba" k="beds" sort={sort} onSort={onSort} />
+              )}
+              <SortHeader label={landOnly ? "Lot (sq ft)" : category === "All" ? "Size (sq ft)" : "Built (sq ft)"} k="size" sort={sort} onSort={onSort} />
               <SortHeader label="Asking" k="asking" sort={sort} onSort={onSort} />
               <SortHeader label="$ / sq ft" k="psf" sort={sort} onSort={onSort} />
-              {landOnly ? (
+              {nonResidential ? (
                 <SortHeader label="Vs. District" k="vsDistrict" sort={sort} onSort={onSort} />
               ) : (
                 <>
@@ -1139,44 +1262,55 @@ function ActiveListings({
               ))}
             {listings && !rows.length && (
               <tr>
-                <td colSpan={colCount} className={`${MONO} py-16 text-center text-[12px] text-zinc-500`}>
-                  NO LISTINGS MATCH THESE FILTERS
+                <td colSpan={colCount} className="py-16 text-center text-[13px] text-zinc-500">
+                  No listings match these filters.{" "}
+                  <button type="button" onClick={clearAll} className="underline underline-offset-4 hover:text-zinc-950">
+                    Clear all
+                  </button>
                 </td>
               </tr>
             )}
             {rows.map((l) => {
               const open = openId === l.listing_id;
-              const isLand = l.category === "Land";
+              const hot = hoverId === l.listing_id;
+              const vsDistrict =
+                l.category !== "Property" ? (
+                  <span style={{ color: deltaColor(-l.price_vs_district_pct) }}>{fmtDelta(l.price_vs_district_pct)}</span>
+                ) : null;
               return (
                 <Fragment key={l.listing_id}>
                   <tr
+                    id={`row-${l.listing_id}`}
                     onClick={() => setOpenId(open ? null : l.listing_id)}
-                    className={`cursor-pointer transition-colors hover:bg-zinc-50 ${open ? "bg-zinc-50" : ""}`}
+                    onMouseEnter={() => setHoverId(l.listing_id)}
+                    onMouseLeave={() => setHoverId(null)}
+                    className={`cursor-pointer scroll-mt-24 transition-colors hover:bg-mint-soft ${open || hot ? "bg-mint-soft" : ""}`}
                   >
                     <td className={`${td} pl-0`}>
                       <div className="flex items-start gap-3">
-                      <Thumb src={l.photo_url} alt={l.asset_name} />
-                      <div>
-                      <p className="text-[13px] font-medium text-zinc-950">{l.asset_name}</p>
-                      <p className={`${MONO} mt-1 text-[11px] text-zinc-500`}>
-                        {l.listing_id} ·{" "}
-                        <span className={isLand ? "border border-zinc-400 px-1 text-zinc-700" : ""}>
-                          {l.property_type.toUpperCase()}
-                        </span>
-                        {l.days_on_market <= 7 && <span className="ml-2 bg-zinc-950 px-1.5 py-0.5 text-[9px] text-white">NEW</span>}
-                      </p>
-                      </div>
+                        <Thumb src={l.photo_url} alt={l.asset_name} />
+                        <div>
+                          <p className="text-[13px] font-medium text-zinc-950">{l.asset_name}</p>
+                          <p className="mt-1 text-[11px] text-zinc-500">
+                            {l.listing_id} · {typeLine(l)}
+                            {l.days_on_market <= 7 && (
+                              <span className="ml-2 rounded bg-zinc-950 px-1.5 py-0.5 text-[9px] font-semibold text-mint">NEW</span>
+                            )}
+                          </p>
+                        </div>
                       </div>
                     </td>
                     <td className={`${td} text-[13px] text-zinc-700`}>{l.district}</td>
                     {landOnly ? (
                       <td className={`${td} text-right text-[13px] text-zinc-700`}>{l.category === "Land" ? l.zoning : DASH}</td>
+                    ) : commercialOnly ? (
+                      <td className={`${td} text-right text-[13px] text-zinc-700`}>{l.category === "Commercial" ? l.commercial_use : DASH}</td>
                     ) : (
                       <td className={num}>{l.category === "Property" ? `${l.bedrooms} / ${l.bathrooms}` : DASH}</td>
                     )}
                     <td className={num}>
-                      {int.format(l.category === "Property" ? l.built_sqft : l.lot_sqft)}
-                      {!landOnly && !propsOnly && <p className="mt-1 text-[10px] uppercase text-zinc-400">{isLand ? "lot" : "built"}</p>}
+                      {int.format(l.category === "Land" ? l.lot_sqft : l.built_sqft)}
+                      {category === "All" && <p className="mt-1 text-[10px] uppercase text-zinc-400">{l.category === "Land" ? "lot" : "built"}</p>}
                     </td>
                     <td className={`${num} text-zinc-950`}>
                       {fmtUsdCompact(l.asking_price_usd)}
@@ -1187,12 +1321,8 @@ function ActiveListings({
                       )}
                     </td>
                     <td className={num}>{fmtUsd(l.price_per_sqft_usd)}</td>
-                    {landOnly ? (
-                      <td className={num}>
-                        {l.category === "Land" && (
-                          <span style={{ color: deltaColor(-l.price_vs_district_pct) }}>{fmtDelta(l.price_vs_district_pct)}</span>
-                        )}
-                      </td>
+                    {nonResidential ? (
+                      <td className={num}>{vsDistrict}</td>
                     ) : (
                       <>
                         <td className={num}>{l.category === "Property" ? fmtUsd(l.sequence_adr_usd) : DASH}</td>
@@ -1207,9 +1337,7 @@ function ActiveListings({
                           ) : (
                             <>
                               <p className="text-[13px]">{DASH}</p>
-                              <p className="mt-1 text-[11px]" style={{ color: deltaColor(-l.price_vs_district_pct) }}>
-                                {fmtDelta(l.price_vs_district_pct)} vs dist.
-                              </p>
+                              <p className="mt-1 text-[11px]">{vsDistrict} vs dist.</p>
                             </>
                           )}
                         </td>
@@ -1224,8 +1352,8 @@ function ActiveListings({
                     </td>
                   </tr>
                   {open && (
-                    <tr className="bg-zinc-50">
-                      <td colSpan={colCount} className="border-b border-zinc-300 px-0 pb-8 pt-2">
+                    <tr className="bg-mint-soft">
+                      <td colSpan={colCount} className="border-b border-zinc-300 px-0 pb-8 pt-3">
                         <ListingDetails l={l} marketYield={marketYield} onEstimate={onEstimate} />
                       </td>
                     </tr>
@@ -1236,15 +1364,15 @@ function ActiveListings({
           </tbody>
         </table>
       </div>
-      )}
       <div className="mt-4 space-y-1 text-[11px] leading-relaxed text-zinc-500">
         <p>
-          <span className="text-zinc-700">Properties</span> are scored on projected rental yield: estimated nightly rate and
-          occupancy come from comparable luxury vacation rentals in the same district. Gross, before costs.
+          <span className="text-zinc-700">Residential</span> listings are scored on projected rental yield: estimated nightly
+          rate and occupancy come from comparable vacation rentals in the same district. Gross, before costs.
         </p>
         <p>
-          <span className="text-zinc-700">Land</span> is scored on price per sq ft against the district&apos;s average land
-          price: 10% or more below is Undervalued, 10% or more above is Overpriced.
+          <span className="text-zinc-700">Land</span> and <span className="text-zinc-700">commercial</span> listings are
+          scored on price per sq ft against the district average: 10% or more below is Undervalued, 10% or more above is
+          Overpriced.
         </p>
       </div>
     </>
@@ -1283,7 +1411,7 @@ function Districts({ districts, onOpenDistrict }: { districts: DistrictStats[]; 
   const [sort, setSort] = useState<{ key: DistrictSortKey; dir: "asc" | "desc" }>({ key: "score", dir: "desc" });
 
   const value = (d: DistrictStats, k: DistrictSortKey): number | null =>
-    k === "forSale" ? d.properties_for_sale + d.land_for_sale : d[k];
+    k === "forSale" ? d.properties_for_sale + d.land_for_sale + d.commercial_for_sale : d[k];
 
   const rows = useMemo(() => {
     const dir = sort.dir === "asc" ? 1 : -1;
@@ -1345,7 +1473,7 @@ function Districts({ districts, onOpenDistrict }: { districts: DistrictStats[]; 
                 RevPAR YoY
               </span>
               <span>
-                <span className="block text-[13px] text-zinc-950">{d.properties_for_sale + d.land_for_sale}</span>
+                <span className="block text-[13px] text-zinc-950">{d.properties_for_sale + d.land_for_sale + d.commercial_for_sale}</span>
                 For sale
               </span>
               <span>
@@ -1390,8 +1518,8 @@ function Districts({ districts, onOpenDistrict }: { districts: DistrictStats[]; 
                 </td>
                 <td className={td}><ScoreBar score={d.score} /></td>
                 <td className={td}>
-                  {d.properties_for_sale + d.land_for_sale}
-                  <p className="mt-1 text-[10px] text-zinc-400">{d.properties_for_sale} HOMES · {d.land_for_sale} LAND</p>
+                  {d.properties_for_sale + d.land_for_sale + d.commercial_for_sale}
+                  <p className="mt-1 text-[10px] text-zinc-400">{d.properties_for_sale} HOMES · {d.land_for_sale} LAND · {d.commercial_for_sale} COMM.</p>
                 </td>
                 <td className={td}>{d.median_asking_usd ? fmtUsdCompact(d.median_asking_usd) : DASH}</td>
                 <td className={td}>{d.avg_property_yield_pct !== null ? fmtPct(d.avg_property_yield_pct) : DASH}</td>
@@ -1423,7 +1551,7 @@ export interface EstimatorPrefill extends Partial<EstimateInput> {
   label?: string;
 }
 
-const ESTIMATOR_TYPES: PropertyType[] = ["Villa", "Estate", "Penthouse", "Beach House"];
+const ESTIMATOR_TYPES: PropertyType[] = RESIDENTIAL_TYPES;
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
