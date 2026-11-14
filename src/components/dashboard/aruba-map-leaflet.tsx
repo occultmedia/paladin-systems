@@ -1,0 +1,169 @@
+"use client";
+
+/**
+ * Leaflet map of Aruba. Two modes:
+ *  - "listings": one pin per listing, coloured by signal; shape by category
+ *    (circle = residential, square = land, diamond = commercial). Hover shows a
+ *    property card; click selects it.
+ *  - "districts": one circle per district, sized by listings for sale, shaded by Sequence Score.
+ * Loaded with next/dynamic { ssr: false } because Leaflet needs `window`.
+ */
+
+import "leaflet/dist/leaflet.css";
+import { useEffect, useMemo } from "react";
+import L, { type LatLngBoundsExpression, type LatLngExpression } from "leaflet";
+import { CircleMarker, MapContainer, Marker, TileLayer, Tooltip, useMap } from "react-leaflet";
+import type { Listing, Signal } from "@/lib/aruba-data";
+import { HoverCard, SIGNAL_COLOR, SIGNAL_LABEL, type ArubaMapProps } from "./map-shared";
+
+const ARUBA_CENTER: LatLngExpression = [12.53, -70.0];
+const ARUBA_BOUNDS: LatLngBoundsExpression = [
+  [12.4, -70.1],
+  [12.64, -69.85],
+];
+
+function pinIcon(l: Listing, active: boolean) {
+  const shape = l.category === "Land" ? "square" : l.category === "Commercial" ? "diamond" : "circle";
+  return L.divIcon({
+    className: "sd-pin-wrap",
+    html: `<span class="sd-pin sd-pin-${shape}${active ? " sd-pin-active" : ""}" style="background:${SIGNAL_COLOR[l.signal]}"></span>`,
+    iconSize: [22, 22],
+    iconAnchor: [11, 11],
+  });
+}
+
+/** Fit to the visible points whenever the set changes. */
+function FitTo({ points }: { points: Array<[number, number]> }) {
+  const map = useMap();
+  const key = points.map((p) => p.join(",")).join("|");
+  useEffect(() => {
+    if (!points.length) return;
+    if (points.length === 1) {
+      map.setView(points[0], 14);
+      return;
+    }
+    map.fitBounds(points, { padding: [40, 40], maxZoom: 14 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key, map]);
+  return null;
+}
+
+export default function ArubaMapLeaflet(props: ArubaMapProps) {
+  const height = props.height ?? 520;
+  const interactive = props.interactive ?? true;
+  const points: Array<[number, number]> = useMemo(
+    () => (props.mode === "listings" ? props.listings.map((l) => [l.lat, l.lng]) : props.districts.map((d) => [d.lat, d.lng])),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [props.mode === "listings" ? props.listings : props.districts],
+  );
+
+  return (
+    <div className={`relative ${interactive ? "border border-zinc-200" : ""}`} style={{ height }}>
+      <MapContainer
+        center={ARUBA_CENTER}
+        zoom={11}
+        minZoom={10}
+        maxBounds={ARUBA_BOUNDS}
+        maxBoundsViscosity={0.8}
+        scrollWheelZoom={false}
+        dragging={interactive}
+        zoomControl={interactive}
+        doubleClickZoom={interactive}
+        touchZoom={interactive}
+        keyboard={interactive}
+        boxZoom={interactive}
+        className="h-full w-full"
+        style={{ background: "#F4F4F5" }}
+      >
+        {/* Esri light-gray canvas (no key needed for low-volume use; move to a keyed provider before scaling). */}
+        <TileLayer
+          attribution="Tiles &copy; Esri &mdash; Esri, HERE, Garmin, &copy; OpenStreetMap contributors"
+          url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"
+          maxZoom={16}
+        />
+        <TileLayer
+          url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}"
+          maxZoom={16}
+        />
+        <FitTo points={points} />
+
+        {props.mode === "listings" &&
+          props.listings.map((l) => {
+            const active = props.selectedId === l.listing_id || props.hoveredId === l.listing_id;
+            return (
+              <Marker
+                key={l.listing_id}
+                position={[l.lat, l.lng]}
+                icon={pinIcon(l, active)}
+                zIndexOffset={active ? 1000 : 0}
+                eventHandlers={{
+                  click: () => props.onSelect?.(l.listing_id),
+                  mouseover: () => props.onHover?.(l.listing_id),
+                  mouseout: () => props.onHover?.(null),
+                }}
+              >
+                {interactive && (
+                  <Tooltip direction="top" offset={[0, -12]} opacity={1} className="sd-tooltip">
+                    <HoverCard l={l} />
+                  </Tooltip>
+                )}
+              </Marker>
+            );
+          })}
+
+        {props.mode === "districts" &&
+          props.districts.map((d) => {
+            const forSale = d.properties_for_sale + d.land_for_sale + d.commercial_for_sale;
+            const shade = d.score >= 70 ? "#3F7A55" : d.score >= 50 ? "#71717A" : "#A05A5D";
+            return (
+              <CircleMarker
+                key={d.district}
+                center={[d.lat, d.lng]}
+                radius={7 + forSale * 2.2}
+                pathOptions={{ color: shade, weight: 1.5, fillColor: shade, fillOpacity: 0.22 }}
+                eventHandlers={{ click: () => props.onSelect?.(d.district) }}
+              >
+                <Tooltip direction="top" opacity={1}>
+                  <div style={{ minWidth: 170 }}>
+                    <div style={{ fontWeight: 600, color: "#09090B" }}>{d.district}</div>
+                    <div style={{ fontSize: 12, marginTop: 4 }}>
+                      Score <b>{d.score}</b> · {forSale} for sale
+                    </div>
+                    <div style={{ fontSize: 11, color: "#71717A", marginTop: 2 }}>
+                      RevPAR ${d.revpar_usd.toLocaleString("en-US")} · {d.occupancy_pct}% occ.
+                    </div>
+                  </div>
+                </Tooltip>
+              </CircleMarker>
+            );
+          })}
+      </MapContainer>
+
+      {interactive && (
+        <div className="pointer-events-none absolute bottom-3 left-3 z-[400] flex flex-wrap gap-3 rounded-lg border border-zinc-200 bg-white/95 px-3 py-2 text-[11px] text-zinc-600">
+          {props.mode === "listings" ? (
+            <>
+              {(Object.keys(SIGNAL_COLOR) as Signal[]).map((s) => (
+                <span key={s} className="flex items-center gap-1.5">
+                  <span className="size-2.5 rounded-full" style={{ background: SIGNAL_COLOR[s] }} />
+                  {SIGNAL_LABEL[s]}
+                </span>
+              ))}
+              <span className="text-zinc-300">|</span>
+              <span className="flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-zinc-400" />Residential</span>
+              <span className="flex items-center gap-1.5"><span className="size-2.5 bg-zinc-400" />Land</span>
+              <span className="flex items-center gap-1.5"><span className="size-2 rotate-45 bg-zinc-400" />Commercial</span>
+            </>
+          ) : (
+            <>
+              <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-[#3F7A55]" />Score 70+</span>
+              <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-[#71717A]" />50–69</span>
+              <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-[#A05A5D]" />Under 50</span>
+              <span>Size = listings for sale</span>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}

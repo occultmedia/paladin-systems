@@ -324,7 +324,7 @@ export default function Home() {
                 </div>
               )}
 
-              <div className="absolute bottom-6 left-6 z-[500] flex items-center gap-2 rounded-full bg-zinc-950 px-4 py-2 text-[13px] font-semibold text-white shadow-lg">
+              <div className="absolute bottom-12 left-6 z-[500] flex items-center gap-2 rounded-full bg-zinc-950 px-4 py-2 text-[13px] font-semibold text-white shadow-lg">
                 <span className="size-2 rounded-full bg-mint" />
                 {UNDERVALUED} undervalued listings today
               </div>

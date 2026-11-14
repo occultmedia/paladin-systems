@@ -1,0 +1,277 @@
+"use client";
+
+/**
+ * Mapbox GL map of Aruba (vector tiles). Same props and behaviour as the
+ * Leaflet fallback: pins coloured by signal and shaped by category, a photo
+ * card on hover, click to select, and district circles sized by supply.
+ * Token: NEXT_PUBLIC_MAPBOX_TOKEN (.env.local locally, Vercel env vars in prod).
+ */
+
+import "mapbox-gl/dist/mapbox-gl.css";
+import { useEffect, useMemo, useRef, useState } from "react";
+import Map, { Marker, NavigationControl, Popup, type MapRef } from "react-map-gl/mapbox";
+import type { Listing, Signal } from "@/lib/aruba-data";
+import { HoverCard, SIGNAL_COLOR, SIGNAL_LABEL, type ArubaMapProps } from "./map-shared";
+
+const TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+/** Mapbox Standard: 3D buildings, landmarks, trees and dynamic lighting. */
+const STYLE = "mapbox://styles/mapbox/standard";
+const MAX_BOUNDS: [[number, number], [number, number]] = [
+  [-70.2, 12.36],
+  [-69.78, 12.68],
+];
+const ARUBA_VIEW = { longitude: -69.98, latitude: 12.52, zoom: 10.4 };
+
+/** Standard-style settings: keep 3D on, use bright daytime lighting. */
+function configure(map: ReturnType<MapRef["getMap"]>) {
+  try {
+    map.setConfigProperty("basemap", "lightPreset", "day");
+    map.setConfigProperty("basemap", "show3dObjects", true);
+    map.setConfigProperty("basemap", "showPointOfInterestLabels", true);
+  } catch {
+    /* older style without config properties */
+  }
+}
+
+function boundsOf(points: Array<[number, number]>): [[number, number], [number, number]] | null {
+  if (!points.length) return null;
+  let [minLat, minLng, maxLat, maxLng] = [90, 180, -90, -180];
+  for (const [lat, lng] of points) {
+    minLat = Math.min(minLat, lat);
+    maxLat = Math.max(maxLat, lat);
+    minLng = Math.min(minLng, lng);
+    maxLng = Math.max(maxLng, lng);
+  }
+  return [
+    [minLng, minLat],
+    [maxLng, maxLat],
+  ];
+}
+
+const shapeOf = (l: Listing) => (l.category === "Land" ? "square" : l.category === "Commercial" ? "diamond" : "circle");
+
+export default function ArubaMapMapbox(props: ArubaMapProps) {
+  const height = props.height ?? 520;
+  const interactive = props.interactive ?? true;
+  const mapRef = useRef<MapRef>(null);
+  const [loaded, setLoaded] = useState(false);
+  const [localHover, setLocalHover] = useState<string | null>(null);
+  const [is3d, setIs3d] = useState(false);
+
+  const points: Array<[number, number]> = useMemo(
+    () => (props.mode === "listings" ? props.listings.map((l) => [l.lat, l.lng]) : props.districts.map((d) => [d.lat, d.lng])),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [props.mode === "listings" ? props.listings : props.districts],
+  );
+  const pointsKey = points.map((p) => p.join(",")).join("|");
+
+  // Fit to whatever is visible whenever the set changes.
+  useEffect(() => {
+    const map = mapRef.current;
+    const b = boundsOf(points);
+    if (!loaded || !map || !b) return;
+    // The homepage map is decorative: show the island tilted so it reads as 3D.
+    const tilt = interactive ? { pitch: 0, bearing: 0 } : { pitch: 50, bearing: -18 };
+    if (points.length === 1) map.flyTo({ center: [points[0][1], points[0][0]], zoom: 14, duration: 600, ...tilt });
+    else map.fitBounds(b, { padding: 50, maxZoom: 14, duration: 600, ...tilt });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pointsKey, loaded]);
+
+  // Clicking a pin or a row flies in close and tilts so the buildings show in 3D.
+  const selectedId = props.mode === "listings" ? props.selectedId : null;
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!loaded || !map || !selectedId || props.mode !== "listings") return;
+    const l = props.listings.find((x) => x.listing_id === selectedId);
+    if (!l) return;
+    map.flyTo({ center: [l.lng, l.lat], zoom: 16.6, pitch: 62, bearing: -24, duration: 1800, essential: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId, loaded]);
+
+  const toggle3d = () => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (is3d) map.easeTo({ pitch: 0, bearing: 0, duration: 800 });
+    else map.easeTo({ pitch: 60, bearing: -20, zoom: Math.max(map.getZoom(), 15.5), duration: 1000 });
+  };
+  const resetView = () => {
+    const map = mapRef.current;
+    const b = boundsOf(points);
+    if (!map || !b) return;
+    map.fitBounds(b, { padding: 50, maxZoom: 14, pitch: 0, bearing: 0, duration: 900 });
+  };
+
+  const hoveredId = props.mode === "listings" ? (props.hoveredId ?? localHover) : localHover;
+  const setHover = (id: string | null) => {
+    setLocalHover(id);
+    if (props.mode === "listings") props.onHover?.(id);
+  };
+  const hoveredListing = props.mode === "listings" ? props.listings.find((l) => l.listing_id === hoveredId) : undefined;
+  const hoveredDistrict = props.mode === "districts" ? props.districts.find((d) => d.district === localHover) : undefined;
+
+  if (!TOKEN) return null;
+
+  return (
+    <div className={`relative overflow-hidden ${interactive ? "border border-zinc-200" : ""}`} style={{ height }}>
+      <Map
+        ref={mapRef}
+        mapboxAccessToken={TOKEN}
+        mapStyle={STYLE}
+        initialViewState={ARUBA_VIEW}
+        maxBounds={MAX_BOUNDS}
+        minZoom={9.5}
+        maxZoom={17}
+        interactive={interactive}
+        scrollZoom={false}
+        dragRotate={interactive}
+        pitchWithRotate={interactive}
+        touchPitch={interactive}
+        maxPitch={75}
+        attributionControl
+        style={{ width: "100%", height: "100%" }}
+        onLoad={(e) => {
+          configure(e.target);
+          setLoaded(true);
+        }}
+        onPitchEnd={(e) => setIs3d(e.target.getPitch() > 10)}
+      >
+        {interactive && <NavigationControl position="top-left" visualizePitch />}
+
+        {props.mode === "listings" &&
+          props.listings.map((l) => {
+            const active = props.selectedId === l.listing_id || hoveredId === l.listing_id;
+            return (
+              <Marker
+                key={l.listing_id}
+                longitude={l.lng}
+                latitude={l.lat}
+                anchor="center"
+                style={{ zIndex: active ? 10 : 1 }}
+                onClick={(e) => {
+                  e.originalEvent.stopPropagation();
+                  props.onSelect?.(l.listing_id);
+                }}
+              >
+                <span
+                  className="sd-pin-wrap relative block size-[22px]"
+                  onMouseEnter={() => interactive && setHover(l.listing_id)}
+                  onMouseLeave={() => interactive && setHover(null)}
+                >
+                  <span
+                    className={`sd-pin sd-pin-${shapeOf(l)}${active ? " sd-pin-active" : ""}`}
+                    style={{ background: SIGNAL_COLOR[l.signal] }}
+                  />
+                </span>
+              </Marker>
+            );
+          })}
+
+        {interactive && hoveredListing && (
+          <Popup
+            longitude={hoveredListing.lng}
+            latitude={hoveredListing.lat}
+            anchor="bottom"
+            offset={16}
+            closeButton={false}
+            closeOnClick={false}
+            maxWidth="none"
+            className="sd-popup"
+          >
+            <HoverCard l={hoveredListing} />
+          </Popup>
+        )}
+
+        {props.mode === "districts" &&
+          props.districts.map((d) => {
+            const forSale = d.properties_for_sale + d.land_for_sale + d.commercial_for_sale;
+            const shade = d.score >= 70 ? "#3F7A55" : d.score >= 50 ? "#71717A" : "#A05A5D";
+            const size = 18 + forSale * 6;
+            return (
+              <Marker key={d.district} longitude={d.lng} latitude={d.lat} anchor="center">
+                <button
+                  type="button"
+                  aria-label={`${d.district}, score ${d.score}`}
+                  onClick={() => props.onSelect?.(d.district)}
+                  onMouseEnter={() => setLocalHover(d.district)}
+                  onMouseLeave={() => setLocalHover(null)}
+                  className="block rounded-full transition-transform hover:scale-110"
+                  style={{ width: size, height: size, background: `${shade}38`, border: `1.5px solid ${shade}` }}
+                />
+              </Marker>
+            );
+          })}
+
+        {hoveredDistrict && (
+          <Popup
+            longitude={hoveredDistrict.lng}
+            latitude={hoveredDistrict.lat}
+            anchor="bottom"
+            offset={20}
+            closeButton={false}
+            closeOnClick={false}
+            className="sd-popup"
+          >
+            <div style={{ minWidth: 180, padding: "10px 12px" }}>
+              <div style={{ fontWeight: 600, color: "#09090B" }}>{hoveredDistrict.district}</div>
+              <div style={{ fontSize: 12, marginTop: 4 }}>
+                Score <b>{hoveredDistrict.score}</b> ·{" "}
+                {hoveredDistrict.properties_for_sale + hoveredDistrict.land_for_sale + hoveredDistrict.commercial_for_sale} for sale
+              </div>
+              <div style={{ fontSize: 11, color: "#71717A", marginTop: 2 }}>
+                RevPAR ${hoveredDistrict.revpar_usd.toLocaleString("en-US")} · {hoveredDistrict.occupancy_pct}% occ.
+              </div>
+            </div>
+          </Popup>
+        )}
+      </Map>
+
+      {interactive && (
+        <div className="absolute left-[52px] top-[10px] z-[2] flex gap-1.5">
+          <button
+            type="button"
+            onClick={toggle3d}
+            aria-pressed={is3d}
+            className={`rounded-md px-3 py-1.5 text-[12px] font-semibold shadow-sm ring-1 transition-colors ${
+              is3d ? "bg-zinc-950 text-mint ring-zinc-950" : "bg-white text-zinc-900 ring-zinc-300 hover:bg-zinc-50"
+            }`}
+          >
+            {is3d ? "2D view" : "3D view"}
+          </button>
+          <button
+            type="button"
+            onClick={resetView}
+            className="rounded-md bg-white px-3 py-1.5 text-[12px] font-semibold text-zinc-900 shadow-sm ring-1 ring-zinc-300 transition-colors hover:bg-zinc-50"
+          >
+            Show all
+          </button>
+        </div>
+      )}
+
+      {interactive && (
+        <div className="pointer-events-none absolute right-3 top-3 z-[2] flex max-w-[calc(100%-5rem)] flex-wrap justify-end gap-3 rounded-lg border border-zinc-200 bg-white/95 px-3 py-2 text-[11px] text-zinc-600">
+          {props.mode === "listings" ? (
+            <>
+              {(Object.keys(SIGNAL_COLOR) as Signal[]).map((s) => (
+                <span key={s} className="flex items-center gap-1.5">
+                  <span className="size-2.5 rounded-full" style={{ background: SIGNAL_COLOR[s] }} />
+                  {SIGNAL_LABEL[s]}
+                </span>
+              ))}
+              <span className="text-zinc-300">|</span>
+              <span className="flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-zinc-400" />Residential</span>
+              <span className="flex items-center gap-1.5"><span className="size-2.5 bg-zinc-400" />Land</span>
+              <span className="flex items-center gap-1.5"><span className="size-2 rotate-45 bg-zinc-400" />Commercial</span>
+            </>
+          ) : (
+            <>
+              <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-[#3F7A55]" />Score 70+</span>
+              <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-[#71717A]" />50–69</span>
+              <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-[#A05A5D]" />Under 50</span>
+              <span>Size = listings for sale</span>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}

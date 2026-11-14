@@ -276,3 +276,19 @@ body {
 .leaflet-tooltip.sd-tooltip::before {
   display: none;
 }
+
+/* Mapbox popup (hover card) */
+.sd-popup .mapboxgl-popup-content {
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid #e4e4e7;
+  border-radius: 14px;
+  box-shadow: 0 18px 40px -12px rgb(0 0 0 / 0.3);
+  font-family: var(--font-inter), system-ui, sans-serif;
+}
+.sd-popup .mapboxgl-popup-tip {
+  display: none;
+}
+.mapboxgl-marker .sd-pin-wrap {
+  cursor: pointer;
+}
