@@ -22,6 +22,11 @@ const MAX_BOUNDS: [[number, number], [number, number]] = [
   [-69.78, 12.68],
 ];
 const ARUBA_VIEW = { longitude: -69.98, latitude: 12.52, zoom: 10.4 };
+/** The whole island (used for the decorative homepage map). */
+const ARUBA_ISLAND: [[number, number], [number, number]] = [
+  [-70.075, 12.405],
+  [-69.86, 12.635],
+];
 
 /** Standard-style settings: keep 3D on, use bright daytime lighting. */
 function configure(map: ReturnType<MapRef["getMap"]>) {
@@ -69,10 +74,15 @@ export default function ArubaMapMapbox(props: ArubaMapProps) {
   // Fit to whatever is visible whenever the set changes.
   useEffect(() => {
     const map = mapRef.current;
+    if (!loaded || !map) return;
+    // The homepage map is decorative: always show the whole island, flat and north-up.
+    if (!interactive) {
+      map.fitBounds(ARUBA_ISLAND, { padding: 24, pitch: 0, bearing: 0, duration: 0 });
+      return;
+    }
     const b = boundsOf(points);
-    if (!loaded || !map || !b) return;
-    // The homepage map is decorative: show the island tilted so it reads as 3D.
-    const tilt = interactive ? { pitch: 0, bearing: 0 } : { pitch: 50, bearing: -18 };
+    if (!b) return;
+    const tilt = { pitch: 0, bearing: 0 };
     if (points.length === 1) map.flyTo({ center: [points[0][1], points[0][0]], zoom: 14, duration: 600, ...tilt });
     else map.fitBounds(b, { padding: 50, maxZoom: 14, duration: 600, ...tilt });
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -33,10 +33,17 @@ function pinIcon(l: Listing, active: boolean) {
 }
 
 /** Fit to the visible points whenever the set changes. */
-function FitTo({ points }: { points: Array<[number, number]> }) {
+function FitTo({ points, whole }: { points: Array<[number, number]>; whole?: boolean }) {
   const map = useMap();
   const key = points.map((p) => p.join(",")).join("|");
   useEffect(() => {
+    if (whole) {
+      map.fitBounds([
+        [12.405, -70.075],
+        [12.635, -69.86],
+      ], { padding: [24, 24] });
+      return;
+    }
     if (!points.length) return;
     if (points.length === 1) {
       map.setView(points[0], 14);
@@ -82,7 +89,7 @@ export default function ArubaMapLeaflet(props: ArubaMapProps) {
           url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}"
           maxZoom={16}
         />
-        <FitTo points={points} />
+        <FitTo points={points} whole={!interactive} />
 
         {props.mode === "listings" &&
           props.listings.map((l) => {

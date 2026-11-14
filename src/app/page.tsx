@@ -307,7 +307,7 @@ export default function Home() {
               </Link>
 
               {FEATURED.category === "Property" && (
-                <div className="absolute -right-2 bottom-20 z-[500] w-[210px] rounded-2xl border border-zinc-200 bg-white p-4 shadow-xl sm:-right-6">
+                <div className="absolute -left-2 bottom-14 z-[500] w-[210px] rounded-2xl border border-zinc-200 bg-white p-4 shadow-xl sm:-left-6">
                   <p className="text-[12px] font-medium text-zinc-500">Projected revenue</p>
                   <p className="mt-1 font-display text-[28px] font-bold tabular-nums leading-none text-zinc-950">
                     {usdM(FEATURED.projected_annual_revenue_usd)}
@@ -326,7 +326,7 @@ export default function Home() {
                 </div>
               )}
 
-              <div className="absolute bottom-12 left-6 z-[500] flex items-center gap-2 rounded-full bg-zinc-950 px-4 py-2 text-[13px] font-semibold text-white shadow-lg">
+              <div className="absolute left-6 top-6 z-[500] flex items-center gap-2 rounded-full bg-zinc-950 px-4 py-2 text-[13px] font-semibold text-white shadow-lg">
                 <span className="size-2 rounded-full bg-mint" />
                 {UNDERVALUED} undervalued listings today
               </div>
