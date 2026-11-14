@@ -14,7 +14,7 @@ import { useEffect, useMemo } from "react";
 import L, { type LatLngBoundsExpression, type LatLngExpression } from "leaflet";
 import { CircleMarker, MapContainer, Marker, TileLayer, Tooltip, useMap } from "react-leaflet";
 import type { Listing, Signal } from "@/lib/aruba-data";
-import { HoverCard, SIGNAL_COLOR, SIGNAL_LABEL, type ArubaMapProps } from "./map-shared";
+import { HoverCard, PLATFORM_COLOR, RentalHoverCard, SIGNAL_COLOR, SIGNAL_LABEL, pinPrice, type ArubaMapProps } from "./map-shared";
 
 const ARUBA_CENTER: LatLngExpression = [12.53, -70.0];
 const ARUBA_BOUNDS: LatLngBoundsExpression = [
@@ -51,11 +51,8 @@ function FitTo({ points }: { points: Array<[number, number]> }) {
 export default function ArubaMapLeaflet(props: ArubaMapProps) {
   const height = props.height ?? 520;
   const interactive = props.interactive ?? true;
-  const points: Array<[number, number]> = useMemo(
-    () => (props.mode === "listings" ? props.listings.map((l) => [l.lat, l.lng]) : props.districts.map((d) => [d.lat, d.lng])),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [props.mode === "listings" ? props.listings : props.districts],
-  );
+  const source = props.mode === "listings" ? props.listings : props.mode === "rentals" ? props.rentals : props.districts;
+  const points: Array<[number, number]> = useMemo(() => source.map((x) => [x.lat, x.lng] as [number, number]), [source]);
 
   return (
     <div className={`relative ${interactive ? "border border-zinc-200" : ""}`} style={{ height }}>
@@ -111,6 +108,34 @@ export default function ArubaMapLeaflet(props: ArubaMapProps) {
             );
           })}
 
+        {props.mode === "rentals" &&
+          props.rentals.map((r) => {
+            const active = props.selectedId === r.rental_id || props.hoveredId === r.rental_id;
+            return (
+              <Marker
+                key={r.rental_id}
+                position={[r.lat, r.lng]}
+                zIndexOffset={active ? 1000 : 0}
+                icon={L.divIcon({
+                  className: "sd-pin-wrap",
+                  html: `<span class="sd-price-pin${active ? " sd-price-pin-active" : ""}" style="background:${PLATFORM_COLOR[r.platform]};transform:translate(-50%,-50%)${active ? " scale(1.18)" : ""}">${pinPrice(r.nightly_rate_usd)}</span>`,
+                  iconSize: [0, 0],
+                })}
+                eventHandlers={{
+                  click: () => props.onSelect?.(r.rental_id),
+                  mouseover: () => props.onHover?.(r.rental_id),
+                  mouseout: () => props.onHover?.(null),
+                }}
+              >
+                {interactive && (
+                  <Tooltip direction="top" offset={[0, -12]} opacity={1} className="sd-tooltip">
+                    <RentalHoverCard r={r} />
+                  </Tooltip>
+                )}
+              </Marker>
+            );
+          })}
+
         {props.mode === "districts" &&
           props.districts.map((d) => {
             const forSale = d.properties_for_sale + d.land_for_sale + d.commercial_for_sale;
@@ -141,7 +166,9 @@ export default function ArubaMapLeaflet(props: ArubaMapProps) {
 
       {interactive && (
         <div className="pointer-events-none absolute bottom-3 left-3 z-[400] flex flex-wrap gap-3 rounded-lg border border-zinc-200 bg-white/95 px-3 py-2 text-[11px] text-zinc-600">
-          {props.mode === "listings" ? (
+          {props.mode === "rentals" ? (
+            <span>Pins show the price per night (red Airbnb · blue Vrbo · black direct)</span>
+          ) : props.mode === "listings" ? (
             <>
               {(Object.keys(SIGNAL_COLOR) as Signal[]).map((s) => (
                 <span key={s} className="flex items-center gap-1.5">

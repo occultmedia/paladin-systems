@@ -2,7 +2,7 @@
 
 /* Shared pieces for the Aruba map (Mapbox and Leaflet versions). */
 
-import type { DistrictStats, Listing, Signal } from "@/lib/aruba-data";
+import { PLATFORM_LABEL, type DistrictStats, type Listing, type RentalPlatform, type Signal, type VacationRental } from "@/lib/aruba-data";
 
 export const SIGNAL_COLOR: Record<Signal, string> = {
   UNDERVALUED: "#3F7A55",
@@ -83,10 +83,89 @@ export type ArubaMapProps =
       interactive?: boolean;
     }
   | {
+      mode: "rentals";
+      rentals: VacationRental[];
+      selectedId?: string | null;
+      hoveredId?: string | null;
+      onSelect?: (id: string) => void;
+      onHover?: (id: string | null) => void;
+      height?: number;
+      interactive?: boolean;
+    }
+  | {
       mode: "districts";
       districts: DistrictStats[];
       onSelect?: (district: string) => void;
       height?: number;
       interactive?: boolean;
     };
+
+/* ── Vacation rentals ─────────────────────────────────────────────────── */
+
+export const PLATFORM_COLOR: Record<RentalPlatform, string> = {
+  Airbnb: "#D9485F",
+  Vrbo: "#2C5FA8",
+  Direct: "#0A0A0A",
+};
+
+/** Short price for a map pin: $480, $1.2k, $5.6k */
+export const pinPrice = (n: number) => (n >= 1000 ? `$${(n / 1000).toFixed(n >= 10_000 ? 0 : 1)}k` : `$${n}`);
+
+export function RentalHoverCard({ r }: { r: VacationRental }) {
+  return (
+    <div style={{ width: 260 }}>
+      {r.photo_url && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={`${r.photo_url}?auto=format&fit=crop&w=520&h=270&q=60`}
+          alt=""
+          width={260}
+          height={135}
+          style={{ display: "block", width: 260, height: 135, objectFit: "cover", background: "#F4F4F5" }}
+        />
+      )}
+      <div style={{ padding: "10px 12px 12px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span
+            style={{ background: PLATFORM_COLOR[r.platform], color: "#fff", fontSize: 10, fontWeight: 700, borderRadius: 999, padding: "2px 8px" }}
+          >
+            {PLATFORM_LABEL[r.platform]}
+          </span>
+          <span style={{ color: "#71717A", fontSize: 11 }}>{r.host_type}</span>
+        </div>
+        <div style={{ fontWeight: 600, fontSize: 13, color: "#09090B", marginTop: 6, lineHeight: 1.25 }}>{r.name}</div>
+        <div style={{ color: "#71717A", fontSize: 11, marginTop: 2 }}>
+          {r.property_type} · {r.district} · {r.bedrooms} bd · {r.bathrooms} ba · sleeps {r.sleeps}
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 8 }}>
+          <span style={{ fontVariantNumeric: "tabular-nums" }}>
+            <b style={{ fontSize: 17, color: "#09090B" }}>{usd(r.nightly_rate_usd)}</b>
+            <span style={{ color: "#71717A", fontSize: 12 }}> / night</span>
+          </span>
+          <span style={{ fontSize: 12, color: "#09090B" }}>
+            {r.rating ? (
+              <>
+                ★ {r.rating.toFixed(2)} <span style={{ color: "#A1A1AA" }}>({r.reviews})</span>
+              </>
+            ) : (
+              <span style={{ color: "#A1A1AA" }}>New</span>
+            )}
+          </span>
+        </div>
+        <div style={{ color: "#52525B", fontSize: 11, marginTop: 2 }}>
+          Low season {usd(r.low_season_rate_usd)} · High season {usd(r.high_season_rate_usd)}
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, paddingTop: 8, borderTop: "1px solid #F4F4F5", fontSize: 12 }}>
+          <span>
+            <b style={{ fontVariantNumeric: "tabular-nums" }}>{r.occupancy_pct}%</b> <span style={{ color: "#71717A" }}>booked</span>
+          </span>
+          <span>
+            <b style={{ fontVariantNumeric: "tabular-nums" }}>{usd(r.annual_revenue_usd)}</b> <span style={{ color: "#71717A" }}>/ yr est.</span>
+          </span>
+        </div>
+        <div style={{ color: "#A1A1AA", fontSize: 10, marginTop: 6 }}>Click the pin for full details</div>
+      </div>
+    </div>
+  );
+}
 

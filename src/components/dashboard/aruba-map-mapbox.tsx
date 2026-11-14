@@ -11,7 +11,8 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Map, { Marker, NavigationControl, Popup, type MapRef } from "react-map-gl/mapbox";
 import type { Listing, Signal } from "@/lib/aruba-data";
-import { HoverCard, SIGNAL_COLOR, SIGNAL_LABEL, type ArubaMapProps } from "./map-shared";
+import { HoverCard, PLATFORM_COLOR, RentalHoverCard, SIGNAL_COLOR, SIGNAL_LABEL, pinPrice, type ArubaMapProps } from "./map-shared";
+import { PLATFORM_LABEL, type RentalPlatform } from "@/lib/aruba-data";
 
 const TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 /** Mapbox Standard: 3D buildings, landmarks, trees and dynamic lighting. */
@@ -58,10 +59,10 @@ export default function ArubaMapMapbox(props: ArubaMapProps) {
   const [localHover, setLocalHover] = useState<string | null>(null);
   const [is3d, setIs3d] = useState(false);
 
+  const source = props.mode === "listings" ? props.listings : props.mode === "rentals" ? props.rentals : props.districts;
   const points: Array<[number, number]> = useMemo(
-    () => (props.mode === "listings" ? props.listings.map((l) => [l.lat, l.lng]) : props.districts.map((d) => [d.lat, d.lng])),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [props.mode === "listings" ? props.listings : props.districts],
+    () => source.map((x) => [x.lat, x.lng] as [number, number]),
+    [source],
   );
   const pointsKey = points.map((p) => p.join(",")).join("|");
 
@@ -78,11 +79,14 @@ export default function ArubaMapMapbox(props: ArubaMapProps) {
   }, [pointsKey, loaded]);
 
   // Clicking a pin or a row flies in close and tilts so the buildings show in 3D.
-  const selectedId = props.mode === "listings" ? props.selectedId : null;
+  const selectedId = props.mode !== "districts" ? props.selectedId : null;
   useEffect(() => {
     const map = mapRef.current;
-    if (!loaded || !map || !selectedId || props.mode !== "listings") return;
-    const l = props.listings.find((x) => x.listing_id === selectedId);
+    if (!loaded || !map || !selectedId || props.mode === "districts") return;
+    const l =
+      props.mode === "listings"
+        ? props.listings.find((x) => x.listing_id === selectedId)
+        : props.rentals.find((x) => x.rental_id === selectedId);
     if (!l) return;
     map.flyTo({ center: [l.lng, l.lat], zoom: 16.6, pitch: 62, bearing: -24, duration: 1800, essential: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -101,12 +105,13 @@ export default function ArubaMapMapbox(props: ArubaMapProps) {
     map.fitBounds(b, { padding: 50, maxZoom: 14, pitch: 0, bearing: 0, duration: 900 });
   };
 
-  const hoveredId = props.mode === "listings" ? (props.hoveredId ?? localHover) : localHover;
+  const hoveredId = props.mode !== "districts" ? (props.hoveredId ?? localHover) : localHover;
   const setHover = (id: string | null) => {
     setLocalHover(id);
-    if (props.mode === "listings") props.onHover?.(id);
+    if (props.mode !== "districts") props.onHover?.(id);
   };
   const hoveredListing = props.mode === "listings" ? props.listings.find((l) => l.listing_id === hoveredId) : undefined;
+  const hoveredRental = props.mode === "rentals" ? props.rentals.find((r) => r.rental_id === hoveredId) : undefined;
   const hoveredDistrict = props.mode === "districts" ? props.districts.find((d) => d.district === localHover) : undefined;
 
   if (!TOKEN) return null;
@@ -181,6 +186,48 @@ export default function ArubaMapMapbox(props: ArubaMapProps) {
           </Popup>
         )}
 
+        {props.mode === "rentals" &&
+          props.rentals.map((r) => {
+            const active = props.selectedId === r.rental_id || hoveredId === r.rental_id;
+            return (
+              <Marker
+                key={r.rental_id}
+                longitude={r.lng}
+                latitude={r.lat}
+                anchor="center"
+                style={{ zIndex: active ? 10 : 1 }}
+                onClick={(e) => {
+                  e.originalEvent.stopPropagation();
+                  props.onSelect?.(r.rental_id);
+                }}
+              >
+                <span
+                  className={`sd-price-pin${active ? " sd-price-pin-active" : ""}`}
+                  style={{ background: PLATFORM_COLOR[r.platform] }}
+                  onMouseEnter={() => interactive && setHover(r.rental_id)}
+                  onMouseLeave={() => interactive && setHover(null)}
+                >
+                  {pinPrice(r.nightly_rate_usd)}
+                </span>
+              </Marker>
+            );
+          })}
+
+        {interactive && hoveredRental && (
+          <Popup
+            longitude={hoveredRental.lng}
+            latitude={hoveredRental.lat}
+            anchor="bottom"
+            offset={16}
+            closeButton={false}
+            closeOnClick={false}
+            maxWidth="none"
+            className="sd-popup"
+          >
+            <RentalHoverCard r={hoveredRental} />
+          </Popup>
+        )}
+
         {props.mode === "districts" &&
           props.districts.map((d) => {
             const forSale = d.properties_for_sale + d.land_for_sale + d.commercial_for_sale;
@@ -249,7 +296,18 @@ export default function ArubaMapMapbox(props: ArubaMapProps) {
 
       {interactive && (
         <div className="pointer-events-none absolute right-3 top-3 z-[2] flex max-w-[calc(100%-5rem)] flex-wrap justify-end gap-3 rounded-lg border border-zinc-200 bg-white/95 px-3 py-2 text-[11px] text-zinc-600">
-          {props.mode === "listings" ? (
+          {props.mode === "rentals" ? (
+            <>
+              {(Object.keys(PLATFORM_COLOR) as RentalPlatform[]).map((p) => (
+                <span key={p} className="flex items-center gap-1.5">
+                  <span className="size-2.5 rounded-full" style={{ background: PLATFORM_COLOR[p] }} />
+                  {PLATFORM_LABEL[p]}
+                </span>
+              ))}
+              <span className="text-zinc-300">|</span>
+              <span>Pins show the price per night</span>
+            </>
+          ) : props.mode === "listings" ? (
             <>
               {(Object.keys(SIGNAL_COLOR) as Signal[]).map((s) => (
                 <span key={s} className="flex items-center gap-1.5">

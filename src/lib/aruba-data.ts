@@ -104,6 +104,42 @@ export interface CommercialListing extends ListingBase {
  */
 export type Listing = ListingSignal | LandListing | CommercialListing;
 
+/** table: vacation_rentals — scraped from Airbnb, Vrbo and direct-booking sites. */
+export type RentalPlatform = "Airbnb" | "Vrbo" | "Direct";
+export const RENTAL_PLATFORMS: RentalPlatform[] = ["Airbnb", "Vrbo", "Direct"];
+export const PLATFORM_LABEL: Record<RentalPlatform, string> = {
+  Airbnb: "Airbnb",
+  Vrbo: "Vrbo",
+  Direct: "Direct booking site",
+};
+
+export interface VacationRental {
+  rental_id: string;
+  market_id: string;
+  name: string;
+  platform: RentalPlatform;
+  host_type: string; // e.g. "Superhost", "Property manager", "Owner website"
+  property_type: PropertyType;
+  district: string;
+  bedrooms: number;
+  bathrooms: number;
+  sleeps: number;
+  nightly_rate_usd: number; // average quoted rate, next 30 days
+  low_season_rate_usd: number;
+  high_season_rate_usd: number;
+  cleaning_fee_usd: number;
+  occupancy_pct: number; // booked nights, trailing 12 months (from calendar)
+  annual_revenue_usd: number; // estimated, trailing 12 months
+  rating: number | null; // null = no reviews yet
+  reviews: number;
+  first_seen: string; // ISO date
+  last_scraped: string; // ISO timestamp
+  source_url: string | null;
+  lat: number;
+  lng: number;
+  photo_url: string | null;
+}
+
 export interface DashboardRepository {
   getMarketSnapshot(marketId: string): Promise<MarketSnapshot>;
   getMonthlyPerformance(marketId: string, months: number): Promise<MonthlyPerformance[]>;
@@ -111,6 +147,8 @@ export interface DashboardRepository {
   getActiveListingSignals(marketId: string, limit: number): Promise<ListingSignal[]>;
   /** Every active scraped listing (properties and land), for the Active Listings tab. */
   getActiveListings(marketId: string): Promise<Listing[]>;
+  /** Every tracked vacation rental (Airbnb, Vrbo, direct sites), for the rentals map. */
+  getVacationRentals(marketId: string): Promise<VacationRental[]>;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -428,6 +466,7 @@ const mockRepository: DashboardRepository = {
       ...RAW_LAND.map(deriveLand),
       ...RAW_COMMERCIAL.map(deriveCommercial),
     ]),
+  getVacationRentals: async () => latency(VACATION_RENTALS),
 };
 
 /*
@@ -459,6 +498,13 @@ const mockRepository: DashboardRepository = {
  *       .from("v_active_listing_signals").select("*")
  *       .eq("market_id", marketId)
  *       .order("yield_spread_bps", { ascending: false }).limit(limit);
+ *     if (error) throw error;
+ *     return data;
+ *   },
+ *   async getVacationRentals(marketId) {
+ *     const { data, error } = await supabase
+ *       .from("vacation_rentals").select("*")
+ *       .eq("market_id", marketId).order("annual_revenue_usd", { ascending: false });
  *     if (error) throw error;
  *     return data;
  *   },
@@ -566,6 +612,112 @@ export const DISTRICTS: DistrictStats[] = RAW_DISTRICT_RENTALS.map(([district, a
     lng,
   };
 }).sort((a, b) => b.score - a.score);
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * Vacation rentals (mock) — one row per tracked rental, matching each
+ * district's "rentals tracked" count. Deterministic so the page is stable.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+function seeded(seed: number) {
+  let t = seed >>> 0;
+  return () => {
+    t = (t + 0x6d2b79f5) >>> 0;
+    let r = Math.imul(t ^ (t >>> 15), 1 | t);
+    r = (r + Math.imul(r ^ (r >>> 7), 61 | r)) ^ r;
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const RESORT_DISTRICTS = ["Palm Beach", "Eagle Beach"];
+const LUXURY_DISTRICTS = ["Malmok", "Arashi", "Tierra del Sol", "Gold Coast", "Boca Catalina"];
+const TYPE_MIX: Record<"resort" | "luxury" | "local", Array<[PropertyType, number]>> = {
+  resort: [["Condo", 45], ["Apartment", 15], ["Penthouse", 10], ["Villa", 15], ["Townhouse", 15]],
+  luxury: [["Villa", 45], ["Estate", 15], ["Beach House", 15], ["Townhouse", 15], ["Condo", 10]],
+  local: [["Apartment", 30], ["Villa", 25], ["Townhouse", 20], ["Condo", 15], ["Beach House", 10]],
+};
+/* 2-bedroom base nightly rate, bedroom range, occupancy adjustment */
+const RENTAL_TYPE: Record<PropertyType, { base: number; beds: [number, number]; occAdj: number }> = {
+  Condo: { base: 620, beds: [1, 3], occAdj: 10 },
+  Apartment: { base: 400, beds: [1, 3], occAdj: 8 },
+  Townhouse: { base: 600, beds: [2, 4], occAdj: 4 },
+  Penthouse: { base: 3300, beds: [3, 5], occAdj: -2 },
+  Villa: { base: 2500, beds: [3, 7], occAdj: 0 },
+  Estate: { base: 2600, beds: [6, 9], occAdj: -6 },
+  "Beach House": { base: 2300, beds: [3, 6], occAdj: 0 },
+};
+const NAME_WORDS = [
+  "Casa Azul", "Sunset", "Coral", "Trade Wind", "Bougainvillea", "Sea Breeze", "Cunucu", "Aloe",
+  "Turquoise", "Seagrape", "Mangrove", "Blue Bay", "Flamingo", "Kadushi", "Hibiscus", "Palm Grove",
+  "Shell", "Lighthouse", "Dune", "Island Breeze", "Moonrise", "Salt Pond", "Watapana", "Kibrahacha",
+];
+const NAME_SUFFIX: Record<PropertyType, string[]> = {
+  Condo: ["Suite", "Condo", "Residence"],
+  Apartment: ["Apartment", "Studio Loft", "Garden Apartment"],
+  Townhouse: ["Townhome", "Townhouse"],
+  Penthouse: ["Penthouse", "Sky Penthouse"],
+  Villa: ["Villa", "House", "Retreat"],
+  Estate: ["Estate", "Compound"],
+  "Beach House": ["Beach House", "Beach Cottage"],
+};
+
+function buildRentals(): VacationRental[] {
+  const out: VacationRental[] = [];
+  for (const [district, adr, occ, , , count] of RAW_DISTRICT_RENTALS) {
+    const rand = seeded(district.split("").reduce((a, c) => a * 31 + c.charCodeAt(0), 7));
+    const pick = <T,>(xs: T[]) => xs[Math.floor(rand() * xs.length)];
+    const mix = TYPE_MIX[RESORT_DISTRICTS.includes(district) ? "resort" : LUXURY_DISTRICTS.includes(district) ? "luxury" : "local"];
+    const total = mix.reduce((a, [, w]) => a + w, 0);
+    const code = district.replace(/[^A-Za-z]/g, "").slice(0, 3).toUpperCase();
+    for (let i = 0; i < count; i++) {
+      let r = rand() * total;
+      const type = (mix.find(([, w]) => (r -= w) < 0) ?? mix[0])[0];
+      const spec = RENTAL_TYPE[type];
+      const beds = spec.beds[0] + Math.floor(rand() * (spec.beds[1] - spec.beds[0] + 1));
+      const baths = Math.max(1, beds - (rand() < 0.4 ? 1 : 0) + (rand() < 0.3 ? 0.5 : 0));
+      const districtFactor = adr / 5500;
+      const nightly = Math.round((spec.base * (1 + 0.32 * (beds - 2)) * districtFactor * (0.82 + rand() * 0.36)) / 5) * 5;
+      const occupancy = Math.max(25, Math.min(92, Math.round(occ + spec.occAdj + (rand() - 0.5) * 16)));
+      const reviews = rand() < 0.06 ? 0 : Math.floor(rand() * 380);
+      const roll = rand();
+      const platform: RentalPlatform = roll < 0.55 ? "Airbnb" : roll < 0.83 ? "Vrbo" : "Direct";
+      const id = `R-${code}-${String(101 + i)}`;
+      const luxury = nightly >= 1500;
+      out.push({
+        rental_id: id,
+        market_id: MARKET_ID,
+        name: `${pick(NAME_WORDS)} ${pick(NAME_SUFFIX[type])}${type === "Condo" ? ` ${1 + Math.floor(rand() * 14)}${pick(["A", "B", "C"])}` : ""}`,
+        platform,
+        host_type:
+          platform === "Direct"
+            ? pick(["Owner website", "Property manager site"])
+            : pick(platform === "Airbnb" ? ["Superhost", "Host", "Property manager"] : ["Premier host", "Owner", "Property manager"]),
+        property_type: type,
+        district,
+        bedrooms: beds,
+        bathrooms: baths,
+        sleeps: beds * 2 + (rand() < 0.4 ? 1 : 0),
+        nightly_rate_usd: nightly,
+        low_season_rate_usd: Math.round((nightly * 0.72) / 5) * 5,
+        high_season_rate_usd: Math.round((nightly * 1.38) / 5) * 5,
+        cleaning_fee_usd: Math.round(((60 + beds * 35) * (luxury ? 2.2 : 1)) / 5) * 5,
+        occupancy_pct: occupancy,
+        annual_revenue_usd: Math.round(nightly * 365 * (occupancy / 100)),
+        rating: reviews ? Math.round((4.55 + rand() * 0.45) * 100) / 100 : null,
+        reviews,
+        first_seen: new Date(Date.parse(SCRAPED_AT) - Math.floor(10 + rand() * 900) * 86_400_000).toISOString().slice(0, 10),
+        last_scraped: SCRAPED_AT,
+        source_url: null,
+        ...locate(district, id),
+        photo_url: COMPACT_TYPES.includes(type)
+          ? CONDO_PHOTOS[Math.floor(rand() * CONDO_PHOTOS.length)]
+          : VILLA_PHOTOS[Math.floor(rand() * VILLA_PHOTOS.length)],
+      });
+    }
+  }
+  return out;
+}
+
+export const VACATION_RENTALS: VacationRental[] = buildRentals();
 
 /* ─────────────────────────────────────────────────────────────────────────
  * Revenue Estimator — what would a property earn as a luxury rental?

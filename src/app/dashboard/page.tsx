@@ -21,6 +21,8 @@ import {
   COMMERCIAL_USES,
   DISTRICTS,
   MARKET_ID,
+  PLATFORM_LABEL,
+  RENTAL_PLATFORMS,
   RESIDENTIAL_TYPES,
   ZONINGS,
   estimateRevenue,
@@ -33,7 +35,9 @@ import {
   type MonthlyPerformance,
   type PropertyType,
   type Signal,
+  type VacationRental,
 } from "@/lib/aruba-data";
+import { PLATFORM_COLOR } from "@/components/dashboard/map-shared";
 import { Inter } from "next/font/google";
 import {
   ArrowDownRight,
@@ -98,6 +102,7 @@ interface DashboardData {
   monthly: MonthlyPerformance[];
   listings: ListingSignal[];
   allListings: Listing[];
+  rentals: VacationRental[];
 }
 
 function useDashboardData(marketId: string) {
@@ -111,9 +116,10 @@ function useDashboardData(marketId: string) {
       repository.getMonthlyPerformance(marketId, 12),
       repository.getActiveListingSignals(marketId, 5),
       repository.getActiveListings(marketId),
+      repository.getVacationRentals(marketId),
     ])
-      .then(([snapshot, monthly, listings, allListings]) => {
-        if (!cancelled) setData({ snapshot, monthly, listings, allListings });
+      .then(([snapshot, monthly, listings, allListings, rentals]) => {
+        if (!cancelled) setData({ snapshot, monthly, listings, allListings, rentals });
       })
       .catch((e: unknown) => {
         if (!cancelled) setError(e instanceof Error ? e.message : "Feed unavailable");
@@ -160,10 +166,10 @@ function Logo() {
   );
 }
 
-const TABS = ["Active Listings", "Districts", "Revenue Estimator", "Rental Market"] as const;
+const TABS = ["Listings & Rentals", "Districts", "Revenue Estimator", "Rental Market"] as const;
 type Tab = (typeof TABS)[number];
 const TAB_SLUG: Record<Tab, string> = {
-  "Active Listings": "listings",
+  "Listings & Rentals": "listings",
   Districts: "districts",
   "Revenue Estimator": "estimator",
   "Rental Market": "rental",
@@ -1380,6 +1386,521 @@ function ActiveListings({
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
+ * Vacation Rentals — Airbnb, Vrbo and direct-booking rentals on the map
+ * ──────────────────────────────────────────────────────────────────────── */
+
+type RentalSortKey = "name" | "district" | "beds" | "sleeps" | "nightly" | "occupancy" | "revenue" | "rating";
+
+const RENTAL_SORT: Record<RentalSortKey, (r: VacationRental) => number | string | null> = {
+  name: (r) => r.name,
+  district: (r) => r.district,
+  beds: (r) => r.bedrooms,
+  sleeps: (r) => r.sleeps,
+  nightly: (r) => r.nightly_rate_usd,
+  occupancy: (r) => r.occupancy_pct,
+  revenue: (r) => r.annual_revenue_usd,
+  rating: (r) => r.rating,
+};
+const NIGHTLY_STEPS = [150, 250, 400, 600, 800, 1000, 1500, 2500, 4000, 6000];
+
+function PlatformPill({ platform }: { platform: VacationRental["platform"] }) {
+  return (
+    <span
+      className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold text-white"
+      style={{ background: PLATFORM_COLOR[platform] }}
+    >
+      {PLATFORM_LABEL[platform]}
+    </span>
+  );
+}
+
+function RentalSortHeader({
+  label,
+  k,
+  sort,
+  onSort,
+  align = "right",
+}: {
+  label: string;
+  k: RentalSortKey;
+  sort: { key: RentalSortKey; dir: "asc" | "desc" };
+  onSort: (k: RentalSortKey) => void;
+  align?: "left" | "right";
+}) {
+  const active = sort.key === k;
+  return (
+    <th
+      aria-sort={active ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}
+      className={`border-b border-zinc-300 px-3 py-3 text-[10px] font-medium uppercase tracking-[0.14em] ${align === "right" ? "text-right" : "text-left"}`}
+    >
+      <button
+        type="button"
+        onClick={() => onSort(k)}
+        className={`inline-flex items-center gap-1 uppercase transition-colors ${active ? "text-zinc-950" : "text-zinc-500 hover:text-zinc-800"}`}
+      >
+        {label}
+        <span className="text-[9px]">{active ? (sort.dir === "asc" ? "▲" : "▼") : ""}</span>
+      </button>
+    </th>
+  );
+}
+
+function downloadRentalsCsv(rows: VacationRental[]) {
+  const cols: Array<[string, (r: VacationRental) => string | number | null]> = [
+    ["Rental ID", (r) => r.rental_id],
+    ["Name", (r) => r.name],
+    ["Platform", (r) => PLATFORM_LABEL[r.platform]],
+    ["Host", (r) => r.host_type],
+    ["Type", (r) => r.property_type],
+    ["District", (r) => r.district],
+    ["Bedrooms", (r) => r.bedrooms],
+    ["Bathrooms", (r) => r.bathrooms],
+    ["Sleeps", (r) => r.sleeps],
+    ["Nightly rate USD (next 30 days)", (r) => r.nightly_rate_usd],
+    ["Low season USD", (r) => r.low_season_rate_usd],
+    ["High season USD", (r) => r.high_season_rate_usd],
+    ["Cleaning fee USD", (r) => r.cleaning_fee_usd],
+    ["Occupancy % (12 months)", (r) => r.occupancy_pct],
+    ["Est. yearly revenue USD", (r) => r.annual_revenue_usd],
+    ["Rating", (r) => r.rating],
+    ["Reviews", (r) => r.reviews],
+    ["First seen", (r) => r.first_seen],
+    ["Last scraped", (r) => r.last_scraped],
+    ["Source URL", (r) => r.source_url],
+    ["Latitude", (r) => r.lat],
+    ["Longitude", (r) => r.lng],
+  ];
+  const esc = (v: string | number | null) => {
+    const t = v === null ? "" : String(v);
+    return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
+  };
+  const csv = [cols.map(([h]) => h), ...rows.map((r) => cols.map(([, f]) => f(r)))]
+    .map((line) => line.map(esc).join(","))
+    .join("\n");
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `sequence-data-aruba-vacation-rentals-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function VacationRentals({
+  rentals,
+  initialDistrict,
+  onShowForSale,
+}: {
+  rentals?: VacationRental[];
+  initialDistrict?: string;
+  onShowForSale: (district: string) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [platforms, setPlatforms] = useState<string[]>([]);
+  const [types, setTypes] = useState<string[]>([]);
+  const [district, setDistrict] = useState(initialDistrict ?? "All");
+  const [nightMin, setNightMin] = useState(0);
+  const [nightMax, setNightMax] = useState(0);
+  const [bedsMin, setBedsMin] = useState(0);
+  const [sleepsMin, setSleepsMin] = useState(0);
+  const [ratingMin, setRatingMin] = useState(0);
+  const [newOnly, setNewOnly] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [sort, setSort] = useState<{ key: RentalSortKey; dir: "asc" | "desc" }>({ key: "revenue", dir: "desc" });
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [hoverId, setHoverId] = useState<string | null>(null);
+
+  const districts = useMemo(
+    () => ["All", ...Array.from(new Set((rentals ?? []).map((r) => r.district))).sort()],
+    [rentals],
+  );
+  const newCutoff = Date.parse("2026-11-13T00:00:00Z") - 60 * 86_400_000;
+
+  const rows = useMemo(() => {
+    if (!rentals) return [];
+    const q = query.trim().toLowerCase();
+    const filtered = rentals.filter(
+      (r) =>
+        (!platforms.length || platforms.includes(r.platform)) &&
+        (!types.length || types.includes(r.property_type)) &&
+        (district === "All" || r.district === district) &&
+        (!nightMin || r.nightly_rate_usd >= nightMin) &&
+        (!nightMax || r.nightly_rate_usd <= nightMax) &&
+        (!bedsMin || r.bedrooms >= bedsMin) &&
+        (!sleepsMin || r.sleeps >= sleepsMin) &&
+        (!ratingMin || (r.rating ?? 0) >= ratingMin) &&
+        (!newOnly || Date.parse(r.first_seen) >= newCutoff) &&
+        (!q || `${r.name} ${r.district} ${r.rental_id} ${r.property_type} ${r.platform}`.toLowerCase().includes(q)),
+    );
+    const dir = sort.dir === "asc" ? 1 : -1;
+    const get = RENTAL_SORT[sort.key];
+    return filtered.sort((a, b) => {
+      const x = get(a);
+      const y = get(b);
+      if (x === null && y === null) return 0;
+      if (x === null) return 1;
+      if (y === null) return -1;
+      return (typeof x === "string" ? x.localeCompare(y as string) : x - (y as number)) * dir;
+    });
+  }, [rentals, query, platforms, types, district, nightMin, nightMax, bedsMin, sleepsMin, ratingMin, newOnly, newCutoff, sort]);
+
+  const stats = useMemo(() => {
+    const rated = rows.filter((r) => r.rating !== null);
+    return {
+      count: rows.length,
+      medianNightly: median(rows.map((r) => r.nightly_rate_usd)),
+      avgOcc: rows.length ? rows.reduce((a, r) => a + r.occupancy_pct, 0) / rows.length : 0,
+      medianRevenue: median(rows.map((r) => r.annual_revenue_usd)),
+      avgRating: rated.length ? rated.reduce((a, r) => a + (r.rating ?? 0), 0) / rated.length : null,
+      byPlatform: RENTAL_PLATFORMS.map((p) => [p, rows.filter((r) => r.platform === p).length] as const),
+    };
+  }, [rows]);
+
+  const onSort = (key: RentalSortKey) =>
+    setSort((s) => (s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: key === "name" || key === "district" ? "asc" : "desc" }));
+  const toggle = (set: React.Dispatch<React.SetStateAction<string[]>>, v: string) =>
+    set((xs) => (xs.includes(v) ? xs.filter((x) => x !== v) : [...xs, v]));
+
+  const moreCount = [nightMin, nightMax, bedsMin, sleepsMin, ratingMin].filter(Boolean).length + (newOnly ? 1 : 0);
+  const filtersActive = Boolean(query) || platforms.length > 0 || types.length > 0 || district !== "All" || moreCount > 0;
+  const clearAll = () => {
+    setQuery("");
+    setPlatforms([]);
+    setTypes([]);
+    setDistrict("All");
+    setNightMin(0);
+    setNightMax(0);
+    setBedsMin(0);
+    setSleepsMin(0);
+    setRatingMin(0);
+    setNewOnly(false);
+  };
+  const selectFromMap = (id: string) => {
+    setOpenId(id);
+    requestAnimationFrame(() => document.getElementById(`rental-${id}`)?.scrollIntoView({ behavior: "smooth", block: "center" }));
+  };
+
+  const selectCls = `${MONO} rounded-md border border-zinc-300 bg-white px-3 py-2 text-[12px] text-zinc-800 outline-none transition-colors hover:border-zinc-500 focus:border-zinc-950`;
+  const chip = (on: boolean) =>
+    `rounded-full border px-3 py-1.5 text-[12px] font-medium transition-colors ${
+      on ? "border-zinc-950 bg-zinc-950 text-mint" : "border-zinc-300 bg-white text-zinc-700 hover:border-zinc-500"
+    }`;
+  const toggleCls = (on: boolean) =>
+    `inline-flex items-center gap-2 rounded-md border px-3 py-2 text-[12px] font-medium transition-colors ${
+      on ? "border-zinc-950 bg-zinc-950 text-mint" : "border-zinc-300 bg-white text-zinc-700 hover:border-zinc-500"
+    }`;
+  const td = "px-3 py-4 border-b border-zinc-200 align-top";
+  const num = `${td} ${MONO} text-right text-[13px] text-zinc-800`;
+
+  return (
+    <>
+      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-zinc-200 py-8">
+        <div>
+          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500">Aruba · Airbnb, Vrbo &amp; direct sites</p>
+          <h1 className="mt-2 font-display text-[28px] font-bold tracking-tight text-zinc-950">Vacation Rentals</h1>
+          <p className="mt-1 max-w-[72ch] text-[13px] leading-relaxed text-zinc-600">
+            Every vacation rental we track in Aruba, with what it charges per night, how often it is booked and what it earns.
+            Pins show the nightly price; hover for a quick look, click for full details.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => downloadRentalsCsv(rows)}
+          disabled={!rows.length}
+          className="inline-flex items-center gap-2 bg-zinc-950 px-4 py-2 text-[12px] font-medium tracking-wide text-mint transition-colors hover:bg-zinc-800 disabled:opacity-40"
+        >
+          <Download size={13} strokeWidth={1.5} />
+          Export CSV
+        </button>
+      </div>
+
+      {/* summary */}
+      <div className="grid grid-cols-2 border-b border-zinc-200 sm:grid-cols-3 lg:grid-cols-6">
+        {[
+          ["Rentals shown", rentals ? int.format(stats.count) : "—"],
+          ["Median per night", rentals && stats.count ? fmtUsd(stats.medianNightly) : "—"],
+          ["Avg. occupancy", rentals && stats.count ? fmtPct(stats.avgOcc, 0) : "—"],
+          ["Median yearly revenue", rentals && stats.count ? fmtUsdCompact(stats.medianRevenue) : "—"],
+          ["Avg. rating", stats.avgRating !== null ? `★ ${stats.avgRating.toFixed(2)}` : "—"],
+        ].map(([label, value], i) => (
+          <div key={label} className={`py-5 ${i > 0 ? "lg:border-l lg:border-zinc-200 lg:pl-6" : ""}`}>
+            <p className="text-[10px] uppercase tracking-[0.14em] text-zinc-500">{label}</p>
+            <p className={`${MONO} mt-1.5 font-display text-[24px] font-bold text-zinc-950`}>{value}</p>
+          </div>
+        ))}
+        <div className="py-5 lg:border-l lg:border-zinc-200 lg:pl-6">
+          <p className="text-[10px] uppercase tracking-[0.14em] text-zinc-500">By platform</p>
+          <div className="mt-2 space-y-1">
+            {stats.byPlatform.map(([p, n]) => (
+              <div key={p} className="flex items-center justify-between gap-3 text-[12px]">
+                <span className="flex items-center gap-1.5 text-zinc-700">
+                  <span className="size-2 rounded-full" style={{ background: PLATFORM_COLOR[p] }} />
+                  {PLATFORM_LABEL[p]}
+                </span>
+                <span className={`${MONO} font-semibold text-zinc-950`}>{rentals ? n : "—"}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* filters */}
+      <div className="space-y-3 py-5">
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="relative">
+            <span className="sr-only">Search rentals</span>
+            <Search size={13} strokeWidth={1.5} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search name, district, ID"
+              className={`${selectCls} w-56 pl-8 placeholder:text-zinc-400`}
+            />
+          </label>
+          <label className="sr-only" htmlFor="r-district">District</label>
+          <select id="r-district" value={district} onChange={(e) => setDistrict(e.target.value)} className={selectCls}>
+            {districts.map((d) => (
+              <option key={d} value={d}>{d === "All" ? "All districts" : d}</option>
+            ))}
+          </select>
+          <button type="button" onClick={() => setMoreOpen((v) => !v)} aria-expanded={moreOpen} className={toggleCls(moreOpen || moreCount > 0)}>
+            <SlidersHorizontal size={13} strokeWidth={1.75} />
+            More filters{moreCount > 0 ? ` (${moreCount})` : ""}
+          </button>
+          {filtersActive && (
+            <button type="button" onClick={clearAll} className="text-[12px] text-zinc-500 underline-offset-4 hover:text-zinc-950 hover:underline">
+              Clear all
+            </button>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="mr-1 text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500">Platform</span>
+          <button type="button" onClick={() => setPlatforms([])} className={chip(platforms.length === 0)}>All</button>
+          {RENTAL_PLATFORMS.map((p) => (
+            <button key={p} type="button" onClick={() => toggle(setPlatforms, p)} aria-pressed={platforms.includes(p)} className={chip(platforms.includes(p))}>
+              <span className="mr-1.5 inline-block size-2 rounded-full align-middle" style={{ background: PLATFORM_COLOR[p] }} />
+              {PLATFORM_LABEL[p]}
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="mr-1 text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500">Type</span>
+          <button type="button" onClick={() => setTypes([])} className={chip(types.length === 0)}>All</button>
+          {RESIDENTIAL_TYPES.map((t) => (
+            <button key={t} type="button" onClick={() => toggle(setTypes, t)} aria-pressed={types.includes(t)} className={chip(types.includes(t))}>
+              {t}
+            </button>
+          ))}
+        </div>
+        {moreOpen && (
+          <div className="flex flex-wrap items-end gap-4 rounded-lg border border-zinc-200 bg-mint-soft p-4">
+            <label className="block">
+              <span className="text-[10px] uppercase tracking-[0.14em] text-zinc-500">Min per night</span>
+              <select value={nightMin} onChange={(e) => setNightMin(Number(e.target.value))} className={`${selectCls} mt-1.5 block`}>
+                <option value={0}>No min</option>
+                {NIGHTLY_STEPS.map((n) => (
+                  <option key={n} value={n}>{fmtUsd(n)}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="text-[10px] uppercase tracking-[0.14em] text-zinc-500">Max per night</span>
+              <select value={nightMax} onChange={(e) => setNightMax(Number(e.target.value))} className={`${selectCls} mt-1.5 block`}>
+                <option value={0}>No max</option>
+                {NIGHTLY_STEPS.map((n) => (
+                  <option key={n} value={n}>{fmtUsd(n)}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="text-[10px] uppercase tracking-[0.14em] text-zinc-500">Bedrooms</span>
+              <select value={bedsMin} onChange={(e) => setBedsMin(Number(e.target.value))} className={`${selectCls} mt-1.5 block`}>
+                <option value={0}>Any</option>
+                {[1, 2, 3, 4, 5, 6, 7].map((b) => (
+                  <option key={b} value={b}>{b}+</option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="text-[10px] uppercase tracking-[0.14em] text-zinc-500">Sleeps</span>
+              <select value={sleepsMin} onChange={(e) => setSleepsMin(Number(e.target.value))} className={`${selectCls} mt-1.5 block`}>
+                <option value={0}>Any</option>
+                {[2, 4, 6, 8, 10, 12, 16].map((n) => (
+                  <option key={n} value={n}>{n}+ guests</option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="text-[10px] uppercase tracking-[0.14em] text-zinc-500">Rating</span>
+              <select value={ratingMin} onChange={(e) => setRatingMin(Number(e.target.value))} className={`${selectCls} mt-1.5 block`}>
+                <option value={0}>Any</option>
+                {[4.5, 4.7, 4.8, 4.9].map((n) => (
+                  <option key={n} value={n}>★ {n}+</option>
+                ))}
+              </select>
+            </label>
+            <button type="button" onClick={() => setNewOnly((v) => !v)} aria-pressed={newOnly} className={toggleCls(newOnly)}>
+              New rentals (60 days)
+            </button>
+          </div>
+        )}
+      </div>
+
+      <ArubaMap mode="rentals" rentals={rows} selectedId={openId} hoveredId={hoverId} onSelect={selectFromMap} onHover={setHoverId} height={560} />
+
+      <div className="mt-8 flex flex-wrap items-baseline justify-between gap-3">
+        <p className="font-display text-[18px] font-bold text-zinc-950">
+          {rentals ? `${int.format(stats.count)} rental${stats.count === 1 ? "" : "s"}` : "Loading rentals…"}
+        </p>
+        <p className="text-[12px] text-zinc-500">Click a row or a pin for full details · click a column to sort</p>
+      </div>
+      <div className="mt-3 overflow-x-auto border-t border-zinc-950">
+        <table className="w-full min-w-[1120px] border-collapse text-left">
+          <thead>
+            <tr>
+              <RentalSortHeader label="Rental" k="name" sort={sort} onSort={onSort} align="left" />
+              <RentalSortHeader label="District" k="district" sort={sort} onSort={onSort} align="left" />
+              <th className="border-b border-zinc-300 px-3 py-3 text-left text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-500">Platform</th>
+              <RentalSortHeader label="Bd / Ba" k="beds" sort={sort} onSort={onSort} />
+              <RentalSortHeader label="Sleeps" k="sleeps" sort={sort} onSort={onSort} />
+              <RentalSortHeader label="Per night" k="nightly" sort={sort} onSort={onSort} />
+              <RentalSortHeader label="Occupancy" k="occupancy" sort={sort} onSort={onSort} />
+              <RentalSortHeader label="Est. yearly" k="revenue" sort={sort} onSort={onSort} />
+              <RentalSortHeader label="Rating" k="rating" sort={sort} onSort={onSort} />
+              <th className="w-8 border-b border-zinc-300" aria-label="Details" />
+            </tr>
+          </thead>
+          <tbody>
+            {!rentals &&
+              Array.from({ length: 8 }).map((_, i) => (
+                <tr key={i}>
+                  <td colSpan={10} className="border-b border-zinc-200 py-3">
+                    <Skeleton className="h-8 w-full" />
+                  </td>
+                </tr>
+              ))}
+            {rentals && !rows.length && (
+              <tr>
+                <td colSpan={10} className="py-16 text-center text-[13px] text-zinc-500">
+                  No rentals match these filters.{" "}
+                  <button type="button" onClick={clearAll} className="underline underline-offset-4 hover:text-zinc-950">
+                    Clear all
+                  </button>
+                </td>
+              </tr>
+            )}
+            {rows.map((r) => {
+              const open = openId === r.rental_id;
+              const hot = hoverId === r.rental_id;
+              return (
+                <Fragment key={r.rental_id}>
+                  <tr
+                    id={`rental-${r.rental_id}`}
+                    onClick={() => setOpenId(open ? null : r.rental_id)}
+                    onMouseEnter={() => setHoverId(r.rental_id)}
+                    onMouseLeave={() => setHoverId(null)}
+                    className={`cursor-pointer scroll-mt-24 transition-colors hover:bg-mint-soft ${open || hot ? "bg-mint-soft" : ""}`}
+                  >
+                    <td className={`${td} pl-0`}>
+                      <div className="flex items-start gap-3">
+                        <Thumb src={r.photo_url} alt={r.name} />
+                        <div>
+                          <p className="text-[13px] font-medium text-zinc-950">{r.name}</p>
+                          <p className="mt-1 text-[11px] text-zinc-500">
+                            {r.rental_id} · {r.property_type}
+                          </p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className={`${td} text-[13px] text-zinc-700`}>{r.district}</td>
+                    <td className={td}>
+                      <PlatformPill platform={r.platform} />
+                    </td>
+                    <td className={num}>
+                      {r.bedrooms} / {r.bathrooms}
+                    </td>
+                    <td className={num}>{r.sleeps}</td>
+                    <td className={`${num} text-zinc-950`}>
+                      {fmtUsd(r.nightly_rate_usd)}
+                      <p className="mt-1 text-[10px] text-zinc-400">
+                        {fmtUsd(r.low_season_rate_usd)}–{fmtUsd(r.high_season_rate_usd)}
+                      </p>
+                    </td>
+                    <td className={num}>{r.occupancy_pct}%</td>
+                    <td className={`${num} text-zinc-950`}>{fmtUsdCompact(r.annual_revenue_usd)}</td>
+                    <td className={num}>
+                      {r.rating ? (
+                        <>
+                          ★ {r.rating.toFixed(2)}
+                          <p className="mt-1 text-[10px] text-zinc-400">{r.reviews} reviews</p>
+                        </>
+                      ) : (
+                        <span className="text-[11px] text-zinc-400">New</span>
+                      )}
+                    </td>
+                    <td className={`${td} pr-0 text-right`}>
+                      <ChevronDown size={14} strokeWidth={1.5} className={`ml-auto text-zinc-400 transition-transform ${open ? "rotate-180" : ""}`} />
+                    </td>
+                  </tr>
+                  {open && (
+                    <tr className="bg-mint-soft">
+                      <td colSpan={10} className="border-b border-zinc-300 px-0 pb-8 pt-3">
+                        <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
+                          {r.photo_url && (
+                            <Image
+                              src={`${r.photo_url}?auto=format&fit=crop&w=720&h=460&q=70`}
+                              alt={r.name}
+                              width={320}
+                              height={205}
+                              unoptimized
+                              className="h-[205px] w-full rounded-xl bg-zinc-100 object-cover"
+                            />
+                          )}
+                          <div>
+                            <dl className="grid grid-cols-2 gap-x-8 gap-y-5 sm:grid-cols-3 xl:grid-cols-4">
+                              <DetailItem label="Platform" value={`${PLATFORM_LABEL[r.platform]} · ${r.host_type}`} />
+                              <DetailItem label="Type" value={r.property_type} />
+                              <DetailItem label="Bedrooms / baths" value={`${r.bedrooms} / ${r.bathrooms}`} />
+                              <DetailItem label="Sleeps" value={`${r.sleeps} guests`} />
+                              <DetailItem label="Avg. nightly (next 30 days)" value={fmtUsd(r.nightly_rate_usd)} />
+                              <DetailItem label="Low / high season" value={`${fmtUsd(r.low_season_rate_usd)} / ${fmtUsd(r.high_season_rate_usd)}`} />
+                              <DetailItem label="Cleaning fee" value={fmtUsd(r.cleaning_fee_usd)} />
+                              <DetailItem label="Occupancy (12 months)" value={`${r.occupancy_pct}% · ${Math.round((365 * r.occupancy_pct) / 100)} nights`} />
+                              <DetailItem label="Est. yearly revenue" value={fmtUsd(r.annual_revenue_usd)} />
+                              <DetailItem label="Rating" value={r.rating ? `★ ${r.rating.toFixed(2)} (${r.reviews} reviews)` : "No reviews yet"} />
+                              <DetailItem label="First seen" value={fmtDate(r.first_seen)} />
+                              <DetailItem label="Last scraped" value={fmtTimestamp(r.last_scraped)} />
+                            </dl>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onShowForSale(r.district);
+                              }}
+                              className="mt-6 inline-flex items-center gap-2 bg-zinc-950 px-3 py-2 text-[12px] text-mint transition-colors hover:bg-zinc-800"
+                            >
+                              See properties for sale in {r.district}
+                              <ArrowRight size={13} strokeWidth={1.5} />
+                            </button>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <p className="mt-4 text-[11px] leading-relaxed text-zinc-500">
+        Nightly rates are the average quoted price for the next 30 days. Occupancy is booked nights over the last 12 months,
+        read from each rental&apos;s public calendar; yearly revenue is estimated from rate × booked nights, before fees.
+      </p>
+    </>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
  * Districts — rental performance and for-sale supply by area
  * ──────────────────────────────────────────────────────────────────────── */
 
@@ -1742,24 +2263,32 @@ const SLUG_TAB = Object.fromEntries(Object.entries(TAB_SLUG).map(([t, s]) => [s,
 
 function Dashboard() {
   const params = useSearchParams();
-  const [tab, setTabState] = useState<Tab>(SLUG_TAB[params.get("tab") ?? ""] ?? "Active Listings");
+  const [tab, setTabState] = useState<Tab>(SLUG_TAB[params.get("tab") ?? ""] ?? "Listings & Rentals");
   const [listingsView, setListingsView] = useState({
     key: 0,
     district: params.get("district") ?? undefined,
     query: params.get("q") ?? undefined,
   });
+  const [marketView, setMarketViewState] = useState<"sale" | "rentals">(params.get("view") === "rentals" ? "rentals" : "sale");
   const [prefill, setPrefill] = useState<{ key: number; value: EstimatorPrefill | null }>({ key: 0, value: null });
   const { data, error } = useDashboardData(MARKET_ID);
 
-  const setTab = (t: Tab) => {
+  const setTab = (t: Tab, view: "sale" | "rentals" = marketView) => {
     setTabState(t);
-    window.history.replaceState(null, "", `?tab=${TAB_SLUG[t]}`);
+    const viewParam = t === "Listings & Rentals" && view === "rentals" ? "&view=rentals" : "";
+    window.history.replaceState(null, "", `?tab=${TAB_SLUG[t]}${viewParam}`);
     window.scrollTo({ top: 0 });
   };
-  const openDistrict = (district: string) => {
-    setListingsView((v) => ({ key: v.key + 1, district, query: undefined }));
-    setTab("Active Listings");
+  const setMarketView = (v: "sale" | "rentals") => {
+    setMarketViewState(v);
+    window.history.replaceState(null, "", `?tab=listings${v === "rentals" ? "&view=rentals" : ""}`);
   };
+  const showForSale = (district: string) => {
+    setListingsView((v) => ({ key: v.key + 1, district, query: undefined }));
+    setMarketViewState("sale");
+    setTab("Listings & Rentals", "sale");
+  };
+  const openDistrict = (district: string) => showForSale(district);
   const openEstimator = (l: ListingSignal) => {
     setPrefill((p) => ({
       key: p.key + 1,
@@ -1785,7 +2314,40 @@ function Dashboard() {
           <div className={`${MONO} py-24 text-center text-[12px]`} style={{ color: C.down }}>
             FEED ERROR — {error}
           </div>
-        ) : tab === "Active Listings" ? (
+        ) : tab === "Listings & Rentals" ? (
+          <>
+          <div className="flex flex-wrap items-center justify-between gap-4 pt-6">
+            <div className="inline-flex rounded-xl border border-zinc-300 bg-white p-1 shadow-sm" role="tablist" aria-label="Market view">
+              {(
+                [
+                  ["sale", "For sale", data?.allListings.length],
+                  ["rentals", "Vacation rentals", data?.rentals.length],
+                ] as const
+              ).map(([v, label, count]) => (
+                <button
+                  key={v}
+                  type="button"
+                  role="tab"
+                  aria-selected={marketView === v}
+                  onClick={() => setMarketView(v)}
+                  className={`rounded-lg px-5 py-2.5 font-display text-[14px] font-semibold transition-colors ${
+                    marketView === v ? "bg-zinc-950 text-mint" : "text-zinc-600 hover:text-zinc-950"
+                  }`}
+                >
+                  {label}
+                  {count !== undefined && <span className={`ml-2 text-[12px] ${marketView === v ? "text-mint/70" : "text-zinc-400"}`}>{count}</span>}
+                </button>
+              ))}
+            </div>
+            <p className="text-[12px] text-zinc-500">
+              {marketView === "sale"
+                ? "Properties, land and commercial real estate listed for sale"
+                : "Airbnb, Vrbo and direct-booking rentals with nightly prices"}
+            </p>
+          </div>
+          {marketView === "rentals" ? (
+            <VacationRentals rentals={data?.rentals} initialDistrict={listingsView.district} onShowForSale={showForSale} />
+          ) : (
           <ActiveListings
             key={listingsView.key}
             listings={data?.allListings}
@@ -1794,6 +2356,8 @@ function Dashboard() {
             initialQuery={listingsView.query}
             onEstimate={openEstimator}
           />
+          )}
+          </>
         ) : tab === "Districts" ? (
           <Districts districts={DISTRICTS} onOpenDistrict={openDistrict} />
         ) : tab === "Revenue Estimator" ? (

@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, ArrowUpRight, Building2, Calculator, Download, Map as MapIcon, Search } from "lucide-react";
+import { ArrowRight, ArrowUpRight, BedDouble, Building2, Calculator, Download, Map as MapIcon, Search } from "lucide-react";
 import { SequenceLogo, Wordmark } from "@/components/logo";
 import { HeroMap } from "@/components/landing/hero-map";
 import { CONTACT_EMAIL, SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/site";
@@ -244,8 +244,9 @@ export default function Home() {
                 Aruba Real Estate Market Intelligence
               </h1>
               <p className="mt-6 max-w-[50ch] text-[17px] leading-relaxed text-zinc-600">
-                We scrape every high-value property and land listing in Aruba every day, plus vacation-rental data, and show
-                you what is for sale, what it would earn, and whether the price is right.
+                We scrape every property, land and commercial listing in Aruba every day, plus every Airbnb, Vrbo and
+                direct-booking vacation rental, and show you what is for sale, what rentals charge per night, and whether the
+                price is right.
               </p>
 
               <div className="mt-9 max-w-[540px] rounded-2xl border border-zinc-200 bg-white p-2 shadow-xl shadow-zinc-900/5">
@@ -267,6 +268,7 @@ export default function Home() {
                   {[
                     { icon: Building2, label: "Browse listings", href: DASHBOARD },
                     { icon: MapIcon, label: "Compare districts", href: `${DASHBOARD}?tab=districts` },
+                    { icon: BedDouble, label: "Vacation rentals", href: `${DASHBOARD}?tab=listings&view=rentals` },
                     { icon: Calculator, label: "Estimate revenue", href: `${DASHBOARD}?tab=estimator` },
                   ].map(({ icon: Icon, label, href }) => (
                     <Link

@@ -292,3 +292,23 @@ body {
 .mapboxgl-marker .sd-pin-wrap {
   cursor: pointer;
 }
+
+/* Vacation rental price pins */
+.sd-price-pin {
+  display: inline-block;
+  white-space: nowrap;
+  border: 2px solid #ffffff;
+  border-radius: 999px;
+  padding: 2px 7px;
+  font: 700 11px/1.3 var(--font-inter), system-ui, sans-serif;
+  color: #ffffff;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.35);
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+.sd-price-pin:hover,
+.sd-price-pin-active {
+  transform: scale(1.18);
+  border-color: #0a0a0a;
+  box-shadow: 0 0 0 3px rgb(221 229 220 / 0.95), 0 2px 8px rgb(0 0 0 / 0.35);
+}
