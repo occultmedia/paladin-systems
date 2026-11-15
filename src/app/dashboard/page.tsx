@@ -1135,12 +1135,6 @@ function ListingDetails({
         <DetailItem label="Built area" value={fmtSqft(l.built_sqft)} />
         <DetailItem label="Lot size" value={l.lot_sqft ? fmtSqft(l.lot_sqft) : "N/A (unit)"} />
         <DetailItem label="Price / sq ft" value={fmtUsd(l.price_per_sqft_usd)} />
-        <DetailItem label="Est. annual revenue" value={fmtUsd(l.projected_annual_revenue_usd)} />
-        <DetailItem label="Est. nightly rate" value={fmtUsd(l.sequence_adr_usd)} />
-        <DetailItem
-          label="Est. occupancy"
-          value={`${fmtPct(l.projected_occupancy_pct, 0)} · ${Math.round((365 * l.projected_occupancy_pct) / 100)} nights`}
-        />
         <DetailItem
           label="Yield vs market"
           value={`${fmtPct(l.projected_gross_yield_pct)} vs ${marketYield !== undefined ? fmtPct(marketYield) : "—"}`}
