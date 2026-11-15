@@ -15,6 +15,9 @@ export const SIGNAL_LABEL: Record<Signal, string> = {
   OVERPRICED: "Overpriced",
 };
 
+/** Asking-price moves: up = green, down = red, no change = orange. */
+export const priceColor = (n: number) => (n > 0 ? "#2E9E5B" : n < 0 ? "#D64545" : "#E08A1E");
+
 export const usd = (n: number) =>
   n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(2)}M` : `$${Math.round(n).toLocaleString("en-US")}`;
 export const num = (n: number) => n.toLocaleString("en-US");
@@ -65,7 +68,11 @@ export function HoverCard({ l }: { l: Listing }) {
           <span style={{ color, fontSize: 11, fontWeight: 600 }}>● {SIGNAL_LABEL[l.signal]}</span>
           <span style={{ color: "#A1A1AA", fontSize: 11 }}>
             {l.is_new ? "Found today" : `${l.days_on_market} days listed`}
-            {l.last_price_change ? ` · price ${pct(l.last_price_change.change_pct ?? 0)} ${l.last_price_change.date.slice(5).replace("-", "/")}` : ""}
+            {" · "}
+            <span style={{ color: priceColor(l.price_change_pct), fontWeight: 600 }}>
+              {l.price_change_pct > 0 ? "↑" : l.price_change_pct < 0 ? "↓" : "→"}{" "}
+              {l.price_change_pct ? `${Math.abs(l.price_change_pct).toFixed(1)}%` : "no change"}
+            </span>
           </span>
         </div>
         <div style={{ color: "#A1A1AA", fontSize: 10, marginTop: 6 }}>Click the pin for full details</div>

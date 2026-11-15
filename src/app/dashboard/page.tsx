@@ -11,7 +11,7 @@
  * `repository` to it. Nothing in the UI layer needs to change.
  */
 
-import { Fragment, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
@@ -50,6 +50,8 @@ import {
   ArrowRight,
   Calculator,
   ArrowUpRight,
+  ArrowDown,
+  ArrowUp,
   Bell,
   ChevronDown,
   CreditCard,
@@ -160,6 +162,23 @@ const fmtTimestamp = (iso: string) =>
   new Date(iso).toISOString().replace("T", " ").slice(0, 16) + " UTC";
 
 const deltaColor = (n: number) => (n > 0 ? C.up : n < 0 ? C.down : C.slate500);
+
+/* Asking-price moves: up = green, down = red, no change = orange. */
+const PRICE_UP = "#2E9E5B";
+const PRICE_DOWN = "#D64545";
+const PRICE_FLAT = "#E08A1E";
+const priceColor = (n: number) => (n > 0 ? PRICE_UP : n < 0 ? PRICE_DOWN : PRICE_FLAT);
+
+function PriceMove({ pct, label = true, size = 12 }: { pct: number; label?: boolean; size?: number }) {
+  const Icon = pct > 0 ? ArrowUp : pct < 0 ? ArrowDown : ArrowRight;
+  return (
+    <span className={`${MONO} inline-flex items-center gap-0.5 font-semibold`} style={{ color: priceColor(pct) }}>
+      <Icon size={size} strokeWidth={2.5} aria-hidden />
+      {pct === 0 ? (label ? "No change" : "0%") : `${Math.abs(pct).toFixed(1)}%`}
+      <span className="sr-only">{pct > 0 ? "price up" : pct < 0 ? "price down" : "no price change"}</span>
+    </span>
+  );
+}
 
 /* ─────────────────────────────────────────────────────────────────────────
  * Header
@@ -864,7 +883,7 @@ function ScrapeTags({ l }: { l: Listing }) {
       {moved && (
         <span
           className="rounded px-1.5 py-0.5 text-[9px] font-semibold tracking-wide text-white"
-          style={{ background: moved.event === "Price drop" ? C.up : C.down }}
+          style={{ background: moved.event === "Price drop" ? PRICE_DOWN : PRICE_UP }}
         >
           PRICE {moved.event === "Price drop" ? "↓" : "↑"} TODAY
         </span>
@@ -936,8 +955,8 @@ function PriceHistory({ history }: { history: PriceEvent[] }) {
                 <span className="text-zinc-700">{e.event}</span>
                 <span className={`${MONO} font-semibold text-zinc-950`}>{fmtUsd(e.price_usd)}</span>
                 {e.change_pct !== null && (
-                  <span className={`${MONO} w-12 text-right`} style={{ color: deltaColor(e.change_pct) }}>
-                    {fmtDelta(e.change_pct)}
+                  <span className="w-14 text-right">
+                    <PriceMove pct={e.change_pct} />
                   </span>
                 )}
               </span>
@@ -963,8 +982,7 @@ function ListingDetails({
       <DetailItem label="Asking price" value={fmtUsd(l.asking_price_usd)} />
       <DetailItem
         label="Price change"
-        value={l.price_change_pct === 0 ? "No change" : fmtDelta(l.price_change_pct)}
-        color={l.price_change_pct ? deltaColor(l.price_change_pct) : undefined}
+        value={<PriceMove pct={l.price_change_pct} />}
       />
       <DetailItem
         label="Land title"
@@ -1500,11 +1518,9 @@ function ActiveListings({
                     </td>
                     <td className={`${num} text-zinc-950`}>
                       {fmtUsdCompact(l.asking_price_usd)}
-                      {l.price_change_pct !== 0 && (
-                        <p className="mt-1 text-[11px]" style={{ color: deltaColor(l.price_change_pct) }}>
-                          {fmtDelta(l.price_change_pct)}
-                        </p>
-                      )}
+                      <p className="mt-1 text-[11px]">
+                        <PriceMove pct={l.price_change_pct} size={11} />
+                      </p>
                     </td>
                     <td className={num}>{fmtUsd(l.price_per_sqft_usd)}</td>
                     {nonResidential ? (
@@ -2477,136 +2493,134 @@ function TerminalUpdates({
   const latest = runs[0];
   const drops = latest.price_changes.filter((c) => c.change.event === "Price drop").length;
   const ups = latest.price_changes.length - drops;
+  const boxRef = useRef<HTMLDivElement>(null);
+
+  // close on outside click / Escape
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (boxRef.current && !boxRef.current.contains(e.target as Node)) onToggle();
+    };
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onToggle();
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open, onToggle]);
+
   return (
-    <section id="terminal-updates" className="mt-6 scroll-mt-6 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-mint-deep bg-mint px-5 py-3">
-        <div className="flex items-center gap-3">
-          <span className="relative flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-60" style={{ background: C.up }} />
-            <span className="relative inline-flex h-2 w-2 rounded-full" style={{ background: C.up }} />
+    <div ref={boxRef} id="terminal-updates" className="relative mt-4 scroll-mt-4">
+      {/* slim bar */}
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        className="flex w-full flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-mint-deep bg-mint-soft px-4 py-2 text-left text-[12px] transition-colors hover:bg-mint"
+      >
+        <span className="flex items-center gap-2 font-semibold text-zinc-950">
+          <span className="relative flex h-1.5 w-1.5">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-60" style={{ background: PRICE_UP }} />
+            <span className="relative inline-flex h-1.5 w-1.5 rounded-full" style={{ background: PRICE_UP }} />
           </span>
-          <p className="font-display text-[15px] font-bold text-zinc-950">Terminal updated</p>
-          <p className="text-[12px] text-zinc-600">
-            Today {fmtRunTime(latest.run_at)} AST · {latest.new_listings.length} new · {latest.price_changes.length} price change
-            {latest.price_changes.length === 1 ? "" : "s"}
-          </p>
-        </div>
-        <button type="button" onClick={onToggle} aria-expanded={open} className="inline-flex items-center gap-1 text-[12px] font-medium text-zinc-700 hover:text-zinc-950">
-          {open ? "Hide updates" : "Show updates"}
-          <ChevronDown size={14} strokeWidth={1.75} className={`transition-transform ${open ? "rotate-180" : ""}`} />
-        </button>
-      </div>
+          Terminal updated
+        </span>
+        <span className="text-zinc-500">Today {fmtRunTime(latest.run_at)} AST</span>
+        <span className="flex items-center gap-3 text-zinc-700">
+          <span>
+            <b className={`${MONO} text-zinc-950`}>{latest.new_listings.length}</b> new
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <ArrowDown size={12} strokeWidth={2.5} style={{ color: PRICE_DOWN }} />
+            <b className={MONO}>{drops}</b>
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <ArrowUp size={12} strokeWidth={2.5} style={{ color: PRICE_UP }} />
+            <b className={MONO}>{ups}</b>
+          </span>
+        </span>
+        <span className="ml-auto inline-flex items-center gap-1 font-medium text-zinc-700">
+          {open ? "Close" : "View updates"}
+          <ChevronDown size={13} strokeWidth={1.75} className={`transition-transform ${open ? "rotate-180" : ""}`} />
+        </span>
+      </button>
 
+      {/* dropdown feed */}
       {open && (
-        <div className="grid lg:grid-cols-[280px_1fr]">
-          {/* latest scrape summary */}
-          <div className="border-b border-zinc-200 p-5 lg:border-b-0 lg:border-r">
-            <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-500">Latest scrape</p>
-            <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-4">
-              {(
-                [
-                  ["New listings", latest.new_listings.length, undefined],
-                  ["Price drops", drops, C.up],
-                  ["Price increases", ups, C.down],
-                  ["Listings checked", latest.listings_checked, undefined],
-                ] as const
-              ).map(([label, value, color]) => (
-                <div key={label}>
-                  <dt className="text-[11px] text-zinc-500">{label}</dt>
-                  <dd className={`${MONO} mt-0.5 font-display text-[22px] font-bold text-zinc-950`} style={color && value ? { color } : undefined}>
-                    {value}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-            <p className="mt-4 text-[11px] leading-relaxed text-zinc-500">
-              Plus {int.format(latest.rentals_checked)} vacation rentals re-checked. We scrape every listing site once a day; anything
-              new or changed shows up here.
-            </p>
-            {latest.new_listings.length > 0 && (
-              <button
-                type="button"
-                onClick={onShowNew}
-                className="mt-4 inline-flex w-full items-center justify-center gap-2 bg-zinc-950 px-3 py-2 text-[12px] font-medium text-mint transition-colors hover:bg-zinc-800"
-              >
-                Show the {latest.new_listings.length} new listings
-                <ArrowRight size={13} strokeWidth={1.75} />
-              </button>
-            )}
-          </div>
-
-          {/* message board */}
-          <div className="max-h-[380px] overflow-y-auto" role="log" aria-label="Terminal updates">
+        <div className="absolute right-0 top-full z-40 mt-2 w-full max-w-[560px] overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-[0_18px_40px_-12px_rgb(0_0_0/0.25)]">
+          <div className="max-h-[360px] overflow-y-auto" role="log" aria-label="Terminal updates">
             {runs.map((run, i) => (
               <div key={run.run_at}>
-                <p className="sticky top-0 z-10 border-b border-zinc-100 bg-white/95 px-5 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500 backdrop-blur">
-                  {fmtRunDay(run, i)}
+                <p className="sticky top-0 z-10 flex justify-between border-b border-zinc-100 bg-white/95 px-4 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500 backdrop-blur">
+                  <span>{fmtRunDay(run, i)}</span>
+                  <span className="font-normal normal-case tracking-normal text-zinc-400">
+                    {fmtRunTime(run.run_at)} · {run.listings_checked} listings, {int.format(run.rentals_checked)} rentals checked
+                  </span>
                 </p>
                 <ul>
+                  {!run.new_listings.length && !run.price_changes.length && (
+                    <li className="px-4 py-2 text-[12px] text-zinc-400">Terminal updated, no changes</li>
+                  )}
                   {runMessages(run).map((m) => {
-                    if (m.kind === "run") {
+                      if (m.kind === "run") return null;
                       return (
-                        <li key="run" className="flex items-start gap-3 px-5 py-2.5 text-[12px] text-zinc-500">
-                          <span className={`${MONO} w-16 shrink-0 text-zinc-400`}>{fmtRunTime(run.run_at)}</span>
-                          <span>
-                            <span className="font-semibold text-zinc-800">Terminal updated.</span> {run.listings_checked} listings and{" "}
-                            {int.format(run.rentals_checked)} rentals checked
-                            {run.new_listings.length || run.price_changes.length
-                              ? ` · ${run.new_listings.length} new · ${run.price_changes.length} price change${run.price_changes.length === 1 ? "" : "s"}`
-                              : " · no changes"}
-                          </span>
+                        <li key={`${m.kind}-${m.l.listing_id}-${m.kind === "price" ? m.e.date : ""}`}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onOpenListing(m.l.listing_id);
+                              onToggle();
+                            }}
+                            className="flex w-full items-center gap-3 px-4 py-2 text-left text-[12px] transition-colors hover:bg-mint-soft"
+                          >
+                            <span className="w-[52px] shrink-0">
+                              {m.kind === "new" ? (
+                                <span className="rounded bg-zinc-950 px-1.5 py-0.5 text-[9px] font-semibold tracking-wide text-mint">NEW</span>
+                              ) : (
+                                <PriceMove pct={m.e.change_pct ?? 0} label={false} />
+                              )}
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate font-medium text-zinc-950">{m.l.asset_name}</span>
+                              <span className="block truncate text-[11px] text-zinc-500">
+                                {typeLine(m.l)} · {m.l.district} · {m.l.tenure}
+                              </span>
+                            </span>
+                            <span className={`${MONO} shrink-0 text-right`}>
+                              {m.kind === "new" ? (
+                                <span className="font-semibold text-zinc-950">{fmtUsdCompact(m.l.asking_price_usd)}</span>
+                              ) : (
+                                <>
+                                  <span className="text-zinc-400 line-through">{fmtUsdCompact(m.from)}</span>{" "}
+                                  <span className="font-semibold text-zinc-950">{fmtUsdCompact(m.e.price_usd)}</span>
+                                </>
+                              )}
+                            </span>
+                          </button>
                         </li>
                       );
-                    }
-                    const isNew = m.kind === "new";
-                    const drop = m.kind === "price" && m.e.event === "Price drop";
-                    return (
-                      <li key={`${m.kind}-${m.l.listing_id}-${isNew ? "" : m.e.date}`}>
-                        <button
-                          type="button"
-                          onClick={() => onOpenListing(m.l.listing_id)}
-                          className="flex w-full items-center gap-3 px-5 py-2.5 text-left text-[12px] transition-colors hover:bg-mint-soft"
-                        >
-                          <span className="w-16 shrink-0">
-                            {isNew ? (
-                              <span className="rounded bg-zinc-950 px-1.5 py-0.5 text-[9px] font-semibold tracking-wide text-mint">NEW</span>
-                            ) : (
-                              <span className="rounded px-1.5 py-0.5 text-[9px] font-semibold tracking-wide text-white" style={{ background: drop ? C.up : C.down }}>
-                                {drop ? "PRICE ↓" : "PRICE ↑"}
-                              </span>
-                            )}
-                          </span>
-                          <Thumb src={m.l.photo_url} alt="" w={44} h={30} />
-                          <span className="min-w-0 flex-1">
-                            <span className="block truncate font-medium text-zinc-950">{m.l.asset_name}</span>
-                            <span className="block truncate text-[11px] text-zinc-500">
-                              {typeLine(m.l)} · {m.l.district} · {m.l.tenure}
-                            </span>
-                          </span>
-                          <span className={`${MONO} shrink-0 text-right`}>
-                            {m.kind === "new" ? (
-                              <span className="font-semibold text-zinc-950">{fmtUsdCompact(m.l.asking_price_usd)}</span>
-                            ) : (
-                              <>
-                                <span className="text-zinc-400 line-through">{fmtUsdCompact(m.from)}</span>{" "}
-                                <span className="font-semibold text-zinc-950">{fmtUsdCompact(m.e.price_usd)}</span>
-                                <span className="ml-2" style={{ color: deltaColor(m.e.change_pct ?? 0) }}>
-                                  {fmtDelta(m.e.change_pct ?? 0)}
-                                </span>
-                              </>
-                            )}
-                          </span>
-                        </button>
-                      </li>
-                    );
-                  })}
+                    })}
                 </ul>
               </div>
             ))}
           </div>
+          {latest.new_listings.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                onShowNew();
+                onToggle();
+              }}
+              className="flex w-full items-center justify-center gap-2 border-t border-zinc-200 bg-zinc-950 px-3 py-2.5 text-[12px] font-medium text-mint transition-colors hover:bg-zinc-800"
+            >
+              Show the {latest.new_listings.length} new listings
+              <ArrowRight size={13} strokeWidth={1.75} />
+            </button>
+          )}
         </div>
       )}
-    </section>
+    </div>
   );
 }
 
@@ -2626,7 +2640,8 @@ function Dashboard() {
     district: params.get("district") ?? undefined,
     query: params.get("q") ?? undefined,
   });
-  const [boardOpen, setBoardOpen] = useState(true);
+  const [boardOpen, setBoardOpen] = useState(false);
+  const toggleBoard = useCallback(() => setBoardOpen((o) => !o), []);
   const updatesToday = SCRAPE_RUNS[0].new_listings.length + SCRAPE_RUNS[0].price_changes.length;
   const [marketView, setMarketViewState] = useState<"sale" | "rentals">(params.get("view") === "rentals" ? "rentals" : "sale");
   const [prefill, setPrefill] = useState<{ key: number; value: EstimatorPrefill | null }>({ key: 0, value: null });
@@ -2694,7 +2709,7 @@ function Dashboard() {
           <TerminalUpdates
             runs={SCRAPE_RUNS}
             open={boardOpen}
-            onToggle={() => setBoardOpen((o) => !o)}
+            onToggle={toggleBoard}
             onOpenListing={openListing}
             onShowNew={showNewToday}
           />
