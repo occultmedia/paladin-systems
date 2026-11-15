@@ -56,6 +56,9 @@ function boundsOf(points: Array<[number, number]>): [[number, number], [number, 
 
 const shapeOf = (l: Listing) => (l.category === "Land" ? "square" : l.category === "Commercial" ? "diamond" : "circle");
 
+/** Phones get a map that never fills more than ~70% of the screen. */
+const interactiveHeight = (h: number) => `min(${h}px, 70svh)`;
+
 export default function ArubaMapMapbox(props: ArubaMapProps) {
   const height = props.height ?? 520;
   const interactive = props.interactive ?? true;
@@ -127,7 +130,7 @@ export default function ArubaMapMapbox(props: ArubaMapProps) {
   if (!TOKEN) return null;
 
   return (
-    <div className={`relative overflow-hidden ${interactive ? "border border-zinc-200" : ""}`} style={{ height }}>
+    <div className={`relative overflow-hidden ${interactive ? "border border-zinc-200" : ""}`} style={{ height: interactiveHeight(height) }}>
       <Map
         ref={mapRef}
         mapboxAccessToken={TOKEN}
@@ -305,7 +308,7 @@ export default function ArubaMapMapbox(props: ArubaMapProps) {
       )}
 
       {interactive && (
-        <div className="pointer-events-none absolute right-3 top-3 z-[2] flex max-w-[calc(100%-5rem)] flex-wrap justify-end gap-3 rounded-lg border border-zinc-200 bg-white/95 px-3 py-2 text-[11px] text-zinc-600">
+        <div className="pointer-events-none absolute inset-x-2 bottom-7 z-[2] flex flex-wrap gap-x-3 gap-y-1 rounded-lg border border-zinc-200 bg-white/95 px-2.5 py-1.5 text-[10px] text-zinc-600 sm:inset-x-auto sm:bottom-auto sm:right-3 sm:top-3 sm:max-w-[calc(100%-5rem)] sm:justify-end sm:gap-3 sm:px-3 sm:py-2 sm:text-[11px]">
           {props.mode === "rentals" ? (
             <>
               {(Object.keys(PLATFORM_COLOR) as RentalPlatform[]).map((p) => (

@@ -6,6 +6,7 @@ import {
   SITE_TITLE,
   SITE_URL,
 } from "@/lib/site";
+import { SmoothScroll } from "@/components/motion/smooth-scroll";
 import "./globals.css";
 
 const archivo = Archivo({
@@ -78,6 +79,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         >
           Skip to content
         </a>
+        <SmoothScroll />
         {children}
       </body>
     </html>

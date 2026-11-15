@@ -215,6 +215,44 @@ footer::before {
 html {
   scroll-behavior: smooth;
   background: var(--color-canvas);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Lenis drives smooth scrolling; native smooth behaviour would fight it. */
+html.lenis {
+  scroll-behavior: auto;
+}
+
+/* Hide scrollbars on horizontally scrolling chip / tab rows. */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Small lift used on clickable cards. */
+@utility lift {
+  transition:
+    transform 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.2s ease;
+  @media (hover: hover) and (prefers-reduced-motion: no-preference) {
+    &:hover {
+      transform: translateY(-3px);
+    }
+  }
+}
+
+/* Feature tab progress bar in the hero. */
+@keyframes sd-progress {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+@keyframes sd-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
 }
 
 @media (prefers-reduced-motion: reduce) {

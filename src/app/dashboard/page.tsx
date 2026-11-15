@@ -210,7 +210,7 @@ const TAB_SLUG: Record<Tab, string> = {
   "Rental Market": "rental",
 };
 
-function AccountMenu() {
+function AccountMenu({ compact = false }: { compact?: boolean }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -241,15 +241,22 @@ function AccountMenu() {
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="menu"
         aria-expanded={open}
-        className="flex items-center gap-2 border border-zinc-950/15 bg-white/70 px-3 py-1.5 text-[12px] tracking-wide text-zinc-800 transition-colors hover:bg-white hover:text-zinc-950"
+        aria-label="Account"
+        className={`flex items-center gap-2 border border-zinc-950/15 bg-white/70 text-[12px] tracking-wide text-zinc-800 transition-colors hover:bg-white hover:text-zinc-950 ${
+          compact ? "size-9 justify-center rounded-full" : "px-3 py-1.5"
+        }`}
       >
-        <User size={13} strokeWidth={1.5} />
-        Account
-        <ChevronDown size={13} strokeWidth={1.5} className={`transition-transform ${open ? "rotate-180" : ""}`} />
+        <User size={compact ? 15 : 13} strokeWidth={1.5} />
+        {!compact && (
+          <>
+            Account
+            <ChevronDown size={13} strokeWidth={1.5} className={`transition-transform ${open ? "rotate-180" : ""}`} />
+          </>
+        )}
       </button>
 
       {open && (
-        <div role="menu" className="absolute right-0 z-20 mt-2 w-60 border border-zinc-300 bg-white">
+        <div role="menu" className="absolute right-0 z-[1100] mt-2 w-60 border border-zinc-300 bg-white shadow-xl">
           <div className="border-b border-zinc-200 px-4 py-3">
             <p className="text-[12px] text-zinc-950">Investor Account</p>
             <p className={`${MONO} mt-1 text-[11px] text-zinc-500`}>TIER: ARUBA CORE · $150/MO</p>
@@ -282,9 +289,25 @@ function AccountMenu() {
 function Header({ tab, onTab, updates, onUpdates }: { tab: Tab; onTab: (t: Tab) => void; updates: number; onUpdates: () => void }) {
   return (
     <header className="border-b border-mint-deep bg-mint">
-      <div className="mx-auto flex max-w-[1400px] flex-col gap-4 px-6 py-4 lg:h-16 lg:flex-row lg:items-center lg:justify-between lg:gap-0 lg:py-0">
-        <div className="flex items-center gap-12">
+      <div className="mx-auto flex max-w-[1400px] flex-col px-4 pt-3 sm:px-6 lg:h-16 lg:flex-row lg:items-center lg:justify-between lg:pt-0">
+        <div className="flex items-center justify-between gap-4 lg:justify-start lg:gap-12">
           <Logo />
+          <div className="flex items-center gap-2 lg:hidden">
+            <button
+              type="button"
+              onClick={onUpdates}
+              aria-label={`Terminal updates: ${updates} today`}
+              className="relative flex size-9 items-center justify-center rounded-full border border-zinc-950/15 bg-white/60 text-zinc-800 transition-colors hover:bg-white"
+            >
+              <Bell size={15} strokeWidth={1.75} />
+              {updates > 0 && (
+                <span className={`${MONO} absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-zinc-950 px-1 text-[10px] font-semibold text-mint`}>
+                  {updates}
+                </span>
+              )}
+            </button>
+            <AccountMenu compact />
+          </div>
           <nav className="hidden items-center gap-8 lg:flex" aria-label="Primary">
             {TABS.map((t) => (
               <button
@@ -302,7 +325,7 @@ function Header({ tab, onTab, updates, onUpdates }: { tab: Tab; onTab: (t: Tab) 
           </nav>
         </div>
 
-        <div className="flex items-center justify-between gap-6">
+        <div className="hidden items-center justify-between gap-6 lg:flex">
           <div className="flex items-center gap-2.5">
             <span className="relative flex h-1.5 w-1.5">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-60" style={{ background: C.up }} />
@@ -329,15 +352,16 @@ function Header({ tab, onTab, updates, onUpdates }: { tab: Tab; onTab: (t: Tab) 
         </div>
 
         {/* mobile tabs */}
-        <nav className="flex gap-6 overflow-x-auto lg:hidden" aria-label="Primary mobile">
+        <nav className="no-scrollbar -mx-4 mt-2 flex gap-6 overflow-x-auto px-4 lg:hidden" aria-label="Primary mobile">
           {TABS.map((t) => (
             <button
               key={t}
               type="button"
               onClick={() => onTab(t)}
-              className={`whitespace-nowrap pb-2 text-[12px] ${tab === t ? "border-b border-zinc-950 text-zinc-950" : "text-zinc-500"}`}
+              className={`relative shrink-0 whitespace-nowrap py-3 text-[13px] transition-colors ${tab === t ? "font-medium text-zinc-950" : "text-zinc-500"}`}
             >
               {t}
+              {tab === t && <span className="absolute inset-x-0 bottom-0 h-0.5 bg-zinc-950" />}
             </button>
           ))}
         </nav>
@@ -349,6 +373,12 @@ function Header({ tab, onTab, updates, onUpdates }: { tab: Tab; onTab: (t: Tab) 
 /* ─────────────────────────────────────────────────────────────────────────
  * Shared bits
  * ──────────────────────────────────────────────────────────────────────── */
+
+/** Scrolls to the visible copy of a row (desktop table row or mobile card). */
+function scrollToRow(key: string, block: ScrollLogicalPosition = "center") {
+  const el = [...document.querySelectorAll<HTMLElement>(`[data-row="${key}"]`)].find((e) => e.offsetParent !== null);
+  el?.scrollIntoView({ behavior: "smooth", block });
+}
 
 function SectionLabel({ index, title, meta }: { index: string; title: string; meta?: string }) {
   return (
@@ -603,7 +633,7 @@ function YieldRadar({ listings, marketYield }: { listings?: ListingSignal[]; mar
         title="Yield Radar — Villas For Sale"
         meta={marketYield !== undefined ? `BENCHMARK GROSS YIELD ${fmtPct(marketYield)}` : undefined}
       />
-      <div className="overflow-x-auto border-t border-zinc-300">
+      <div className="relative overflow-x-auto border-t border-zinc-300">
         <table className="w-full min-w-[820px] border-collapse text-left">
           <thead>
             <tr>
@@ -666,6 +696,18 @@ function YieldRadar({ listings, marketYield }: { listings?: ListingSignal[]; mar
 
 type Category = "All" | "Property" | "Land" | "Commercial";
 type SortKey = "name" | "district" | "beds" | "baths" | "built" | "lot" | "asking" | "psf" | "adr" | "yield" | "vsDistrict" | "listed" | "status";
+
+/** Sort choices for the phone layout (no column headers there). */
+const MOBILE_SORTS: Array<[SortKey, "asc" | "desc", string]> = [
+  ["listed", "asc", "Newest"],
+  ["asking", "desc", "Price: high to low"],
+  ["asking", "asc", "Price: low to high"],
+  ["yield", "desc", "Highest yield"],
+  ["psf", "asc", "Lowest $ / sq ft"],
+  ["beds", "desc", "Most bedrooms"],
+  ["built", "desc", "Largest built-up"],
+  ["lot", "desc", "Largest lot"],
+];
 
 const SORT_VALUE: Record<SortKey, (l: Listing) => number | string | null> = {
   name: (l) => l.asset_name,
@@ -1373,7 +1415,7 @@ function ActiveListings({
   useEffect(() => {
     if (!initialOpenId || !listings) return;
     const t = window.setTimeout(
-      () => document.getElementById(`row-${initialOpenId}`)?.scrollIntoView({ behavior: "smooth", block: "center" }),
+      () => scrollToRow(`row-${initialOpenId}`),
       150,
     );
     return () => window.clearTimeout(t);
@@ -1474,18 +1516,18 @@ function ActiveListings({
 
   const selectFromMap = (id: string) => {
     setOpenId(id);
-    requestAnimationFrame(() => document.getElementById(`row-${id}`)?.scrollIntoView({ behavior: "smooth", block: "center" }));
+    requestAnimationFrame(() => scrollToRow(`row-${id}`));
   };
 
   const selectCls = `${MONO} rounded-md border border-zinc-300 bg-white px-3 py-2 text-[12px] text-zinc-800 outline-none transition-colors hover:border-zinc-500 focus:border-zinc-950`;
   const segBtn = (on: boolean) =>
-    `px-3 py-2 text-[12px] font-medium transition-colors ${on ? "bg-zinc-950 text-mint" : "text-zinc-600 hover:text-zinc-950"}`;
+    `shrink-0 whitespace-nowrap px-3 py-2 text-[12px] font-medium transition-colors ${on ? "bg-zinc-950 text-mint" : "text-zinc-600 hover:text-zinc-950"}`;
   const chip = (on: boolean) =>
-    `rounded-full border px-3 py-1.5 text-[12px] font-medium transition-colors ${
+    `rounded-full border px-3 py-1.5 text-[12px] font-medium transition-[colors,transform] active:scale-[0.96] ${
       on ? "border-zinc-950 bg-zinc-950 text-mint" : "border-zinc-300 bg-white text-zinc-700 hover:border-zinc-500"
     }`;
   const toggleCls = (on: boolean) =>
-    `inline-flex items-center gap-2 rounded-md border px-3 py-2 text-[12px] font-medium transition-colors ${
+    `inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-md border px-3 py-2 text-[12px] font-medium transition-colors active:scale-[0.97] ${
       on ? "border-zinc-950 bg-zinc-950 text-mint" : "border-zinc-300 bg-white text-zinc-700 hover:border-zinc-500"
     }`;
   const td = "px-3 py-4 border-b border-zinc-200 align-top";
@@ -1495,7 +1537,7 @@ function ActiveListings({
 
   return (
     <>
-      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-zinc-200 py-8">
+      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-zinc-200 py-6 sm:py-8">
         <div>
           <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500">Aruba · Scraped daily</p>
           <h1 className="mt-2 font-display text-[28px] font-bold tracking-tight text-zinc-950">Active Listings</h1>
@@ -1516,7 +1558,7 @@ function ActiveListings({
       </div>
 
       {/* summary */}
-      <div className="grid grid-cols-2 border-b border-zinc-200 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-3 gap-x-4 border-b border-zinc-200 lg:grid-cols-6 lg:gap-x-0">
         {[
           ["Listings shown", listings ? int.format(stats.count) : "—", undefined],
           ["Residential", listings ? int.format(stats.residential) : "—", undefined],
@@ -1525,9 +1567,9 @@ function ActiveListings({
           ["Median asking", listings && stats.count ? fmtUsdCompact(stats.medianAsk) : "—", undefined],
           ["Undervalued", listings ? int.format(stats.undervalued) : "—", listings ? C.up : undefined],
         ].map(([label, value, color], i) => (
-          <div key={label} className={`py-5 ${i > 0 ? "lg:border-l lg:border-zinc-200 lg:pl-6" : ""}`}>
-            <p className="text-[10px] uppercase tracking-[0.14em] text-zinc-500">{label}</p>
-            <p className={`${MONO} mt-1.5 font-display text-[24px] font-bold text-zinc-950`} style={color ? { color } : undefined}>
+          <div key={label} className={`py-3 sm:py-5 ${i > 0 ? "lg:border-l lg:border-zinc-200 lg:pl-6" : ""}`}>
+            <p className="truncate text-[9px] uppercase tracking-[0.12em] text-zinc-500 sm:text-[10px] sm:tracking-[0.14em]">{label}</p>
+            <p className={`${MONO} mt-1 font-display text-[19px] font-bold text-zinc-950 sm:mt-1.5 sm:text-[24px]`} style={color ? { color } : undefined}>
               {value}
             </p>
           </div>
@@ -1537,21 +1579,21 @@ function ActiveListings({
       {/* filters */}
       <div className="space-y-3 py-5">
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex overflow-hidden rounded-md border border-zinc-950" role="group" aria-label="Category">
+          <div className="no-scrollbar flex max-w-full overflow-x-auto rounded-md border border-zinc-950" role="group" aria-label="Category">
             {CATEGORY_FILTERS.map((f) => (
               <button key={f.value} type="button" onClick={() => pickCategory(f.value)} aria-pressed={category === f.value} className={segBtn(category === f.value)}>
                 {f.label}
               </button>
             ))}
           </div>
-          <label className="relative">
+          <label className="relative w-full sm:w-auto">
             <span className="sr-only">Search listings</span>
             <Search size={13} strokeWidth={1.5} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search name, district, ID"
-              className={`${selectCls} w-56 pl-8 placeholder:text-zinc-400`}
+              className={`${selectCls} w-full pl-8 placeholder:text-zinc-400 sm:w-56`}
             />
           </label>
           <label className="sr-only" htmlFor="f-district">District</label>
@@ -1560,14 +1602,14 @@ function ActiveListings({
               <option key={d} value={d}>{d === "All" ? "All districts" : d}</option>
             ))}
           </select>
-          <div className="flex overflow-hidden rounded-md border border-zinc-300" role="group" aria-label="Signal">
+          <div className="no-scrollbar flex max-w-full overflow-x-auto rounded-md border border-zinc-300" role="group" aria-label="Signal">
             {SIGNAL_FILTERS.map((f) => (
               <button key={f.value} type="button" onClick={() => setSignal(f.value)} aria-pressed={signal === f.value} className={segBtn(signal === f.value)}>
                 {f.label}
               </button>
             ))}
           </div>
-          <div className="flex overflow-hidden rounded-md border border-zinc-300" role="group" aria-label="Status">
+          <div className="no-scrollbar flex max-w-full overflow-x-auto rounded-md border border-zinc-300" role="group" aria-label="Status">
             {(["All", ...LISTING_STATUSES] as const).map((st) => (
               <button key={st} type="button" onClick={() => setStatus(st)} aria-pressed={status === st} className={segBtn(status === st)}>
                 {st === "All" ? "Any status" : st}
@@ -1579,7 +1621,7 @@ function ActiveListings({
               </button>
             ))}
           </div>
-          <div className="flex overflow-hidden rounded-md border border-zinc-300" role="group" aria-label="Land title">
+          <div className="no-scrollbar flex max-w-full overflow-x-auto rounded-md border border-zinc-300" role="group" aria-label="Land title">
             {(["All", ...TENURES] as const).map((t) => (
               <button
                 key={t}
@@ -1697,13 +1739,104 @@ function ActiveListings({
       />
 
       {/* list */}
-      <div className="mt-8 flex flex-wrap items-baseline justify-between gap-3">
+      <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
         <p className="font-display text-[18px] font-bold text-zinc-950">
           {listings ? `${int.format(stats.count)} listing${stats.count === 1 ? "" : "s"}` : "Loading listings…"}
         </p>
-        <p className="text-[12px] text-zinc-500">Click a row or a pin for full details · click a column to sort</p>
+        <p className="hidden text-[12px] text-zinc-500 md:block">Click a row or a pin for full details · click a column to sort</p>
+        <label className="flex items-center gap-2 text-[12px] text-zinc-500 md:hidden">
+          Sort
+          <select
+            value={`${sort.key}:${sort.dir}`}
+            onChange={(e) => {
+              const [key, dir] = e.target.value.split(":") as [SortKey, "asc" | "desc"];
+              setSort({ key, dir });
+            }}
+            className={selectCls}
+          >
+            {MOBILE_SORTS.filter(([k]) => !(landOnly && (k === "beds" || k === "built"))).map(([k, d, label]) => (
+              <option key={`${k}:${d}`} value={`${k}:${d}`}>{label}</option>
+            ))}
+          </select>
+        </label>
       </div>
-      <div className="mt-3 overflow-x-auto border-t border-zinc-950">
+
+      {/* phones: cards */}
+      <ul className="mt-3 divide-y divide-zinc-200 border-t border-zinc-950 md:hidden">
+        {!listings &&
+          Array.from({ length: 5 }).map((_, i) => (
+            <li key={i} className="py-4">
+              <Skeleton className="h-20 w-full" />
+            </li>
+          ))}
+        {listings && !rows.length && (
+          <li className="py-12 text-center text-[13px] text-zinc-500">
+            No listings match these filters.{" "}
+            <button type="button" onClick={clearAll} className="underline underline-offset-4">
+              Clear all
+            </button>
+          </li>
+        )}
+        {rows.map((l) => {
+          const open = openId === l.listing_id;
+          return (
+            <li key={l.listing_id} data-row={`row-${l.listing_id}`} className={`scroll-mt-24 ${open ? "bg-mint-soft" : ""}`}>
+              <button
+                type="button"
+                onClick={() => setOpenId(open ? null : l.listing_id)}
+                aria-expanded={open}
+                className="flex w-full gap-3 py-4 text-left transition-colors active:bg-mint-soft"
+              >
+                <span className="relative shrink-0">
+                  <Thumb src={l.photo_url} alt={l.asset_name} w={96} h={72} />
+                  <span className="absolute -bottom-1.5 -right-1.5 rounded-[5px] ring-2 ring-white">
+                    <AgencyLogo agency={l.agency} size={20} rounded={4} />
+                  </span>
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-start justify-between gap-2">
+                    <span className="text-[14px] font-medium leading-snug text-zinc-950">{l.asset_name}</span>
+                    <ChevronDown size={15} strokeWidth={1.5} className={`mt-0.5 shrink-0 text-zinc-400 transition-transform ${open ? "rotate-180" : ""}`} />
+                  </span>
+                  <span className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-500">
+                    {l.district} · {typeLine(l)}
+                  </span>
+                  <span className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                    <ScrapeTags l={l} />
+                    <TenureTag l={l} />
+                    <PoolTag pool={l.pool} />
+                  </span>
+                  <span className="mt-2.5 flex items-end justify-between gap-2">
+                    <span>
+                      <span className={`${MONO} block font-display text-[16px] font-bold text-zinc-950`}>{fmtUsdCompact(l.asking_price_usd)}</span>
+                      <span className="text-[11px]">
+                        <PriceMove pct={l.price_change_pct} size={11} />
+                      </span>
+                    </span>
+                    <span className="flex flex-col items-end gap-1">
+                      <StatusBadge l={l} align="end" />
+                      <SignalBadge signal={l.signal} />
+                    </span>
+                  </span>
+                  <span className="mt-2 block truncate text-[11px] text-zinc-500">
+                    {l.agency.name}
+                    {l.agent && <> · {l.agent.name}</>}
+                    {" · "}
+                    {l.is_new ? "Listed today" : `${l.days_on_market}d listed`}
+                  </span>
+                </span>
+              </button>
+              {open && (
+                <div className="pb-6">
+                  <ListingDetails l={l} marketYield={marketYield} onEstimate={onEstimate} />
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+
+      <div className="relative mt-3 hidden overflow-x-auto border-t border-zinc-950 md:block">
         <table className="w-full min-w-[1320px] border-collapse text-left">
           <thead>
             <tr>
@@ -1764,6 +1897,7 @@ function ActiveListings({
                 <Fragment key={l.listing_id}>
                   <tr
                     id={`row-${l.listing_id}`}
+                    data-row={`row-${l.listing_id}`}
                     onClick={() => setOpenId(open ? null : l.listing_id)}
                     onMouseEnter={() => setHoverId(l.listing_id)}
                     onMouseLeave={() => setHoverId(null)}
@@ -1890,7 +2024,60 @@ const RENTAL_SORT: Record<RentalSortKey, (r: VacationRental) => number | string 
   revenue: (r) => r.annual_revenue_usd,
   rating: (r) => r.rating,
 };
+const RENTAL_MOBILE_SORTS: Array<[RentalSortKey, "asc" | "desc", string]> = [
+  ["revenue", "desc", "Highest yearly revenue"],
+  ["nightly", "desc", "Price per night: high to low"],
+  ["nightly", "asc", "Price per night: low to high"],
+  ["occupancy", "desc", "Highest occupancy"],
+  ["rating", "desc", "Best rated"],
+  ["beds", "desc", "Most bedrooms"],
+];
 const NIGHTLY_STEPS = [150, 250, 400, 600, 800, 1000, 1500, 2500, 4000, 6000];
+
+/** Full details of one vacation rental (desktop row expansion and phone card). */
+function RentalDetails({ r, onShowForSale }: { r: VacationRental; onShowForSale: (district: string) => void }) {
+  return (
+    <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
+      {r.photo_url && (
+        <Image
+          src={`${r.photo_url}?auto=format&fit=crop&w=720&h=460&q=70`}
+          alt={r.name}
+          width={320}
+          height={205}
+          unoptimized
+          className="h-[205px] w-full rounded-xl bg-zinc-100 object-cover"
+        />
+      )}
+      <div>
+        <dl className="grid grid-cols-2 gap-x-8 gap-y-5 sm:grid-cols-3 xl:grid-cols-4">
+          <DetailItem label="Platform" value={`${PLATFORM_LABEL[r.platform]} · ${r.host_type}`} />
+          <DetailItem label="Type" value={r.property_type} />
+          <DetailItem label="Bedrooms / baths" value={`${r.bedrooms} / ${r.bathrooms}`} />
+          <DetailItem label="Sleeps" value={`${r.sleeps} guests`} />
+          <DetailItem label="Avg. nightly (next 30 days)" value={fmtUsd(r.nightly_rate_usd)} />
+          <DetailItem label="Low / high season" value={`${fmtUsd(r.low_season_rate_usd)} / ${fmtUsd(r.high_season_rate_usd)}`} />
+          <DetailItem label="Cleaning fee" value={fmtUsd(r.cleaning_fee_usd)} />
+          <DetailItem label="Occupancy (12 months)" value={`${r.occupancy_pct}% · ${Math.round((365 * r.occupancy_pct) / 100)} nights`} />
+          <DetailItem label="Est. yearly revenue" value={fmtUsd(r.annual_revenue_usd)} />
+          <DetailItem label="Rating" value={r.rating ? `★ ${r.rating.toFixed(2)} (${r.reviews} reviews)` : "No reviews yet"} />
+          <DetailItem label="First seen" value={fmtDate(r.first_seen)} />
+          <DetailItem label="Last scraped" value={fmtTimestamp(r.last_scraped)} />
+        </dl>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onShowForSale(r.district);
+          }}
+          className="mt-6 inline-flex items-center gap-2 bg-zinc-950 px-3 py-2 text-[12px] text-mint transition-colors hover:bg-zinc-800"
+        >
+          See properties for sale in {r.district}
+          <ArrowRight size={13} strokeWidth={1.5} />
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function PlatformPill({ platform }: { platform: VacationRental["platform"] }) {
   return (
@@ -2065,16 +2252,16 @@ function VacationRentals({
   };
   const selectFromMap = (id: string) => {
     setOpenId(id);
-    requestAnimationFrame(() => document.getElementById(`rental-${id}`)?.scrollIntoView({ behavior: "smooth", block: "center" }));
+    requestAnimationFrame(() => scrollToRow(`rental-${id}`));
   };
 
   const selectCls = `${MONO} rounded-md border border-zinc-300 bg-white px-3 py-2 text-[12px] text-zinc-800 outline-none transition-colors hover:border-zinc-500 focus:border-zinc-950`;
   const chip = (on: boolean) =>
-    `rounded-full border px-3 py-1.5 text-[12px] font-medium transition-colors ${
+    `rounded-full border px-3 py-1.5 text-[12px] font-medium transition-[colors,transform] active:scale-[0.96] ${
       on ? "border-zinc-950 bg-zinc-950 text-mint" : "border-zinc-300 bg-white text-zinc-700 hover:border-zinc-500"
     }`;
   const toggleCls = (on: boolean) =>
-    `inline-flex items-center gap-2 rounded-md border px-3 py-2 text-[12px] font-medium transition-colors ${
+    `inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-md border px-3 py-2 text-[12px] font-medium transition-colors active:scale-[0.97] ${
       on ? "border-zinc-950 bg-zinc-950 text-mint" : "border-zinc-300 bg-white text-zinc-700 hover:border-zinc-500"
     }`;
   const td = "px-3 py-4 border-b border-zinc-200 align-top";
@@ -2082,7 +2269,7 @@ function VacationRentals({
 
   return (
     <>
-      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-zinc-200 py-8">
+      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-zinc-200 py-6 sm:py-8">
         <div>
           <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500">Aruba · Airbnb, Vrbo &amp; direct sites</p>
           <h1 className="mt-2 font-display text-[28px] font-bold tracking-tight text-zinc-950">Vacation Rentals</h1>
@@ -2103,7 +2290,7 @@ function VacationRentals({
       </div>
 
       {/* summary */}
-      <div className="grid grid-cols-2 border-b border-zinc-200 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-3 gap-x-4 border-b border-zinc-200 lg:grid-cols-6 lg:gap-x-0">
         {[
           ["Rentals shown", rentals ? int.format(stats.count) : "—"],
           ["Median per night", rentals && stats.count ? fmtUsd(stats.medianNightly) : "—"],
@@ -2111,8 +2298,8 @@ function VacationRentals({
           ["Median yearly revenue", rentals && stats.count ? fmtUsdCompact(stats.medianRevenue) : "—"],
           ["Avg. rating", stats.avgRating !== null ? `★ ${stats.avgRating.toFixed(2)}` : "—"],
         ].map(([label, value], i) => (
-          <div key={label} className={`py-5 ${i > 0 ? "lg:border-l lg:border-zinc-200 lg:pl-6" : ""}`}>
-            <p className="text-[10px] uppercase tracking-[0.14em] text-zinc-500">{label}</p>
+          <div key={label} className={`py-3 sm:py-5 ${i > 0 ? "lg:border-l lg:border-zinc-200 lg:pl-6" : ""}`}>
+            <p className="truncate text-[9px] uppercase tracking-[0.12em] text-zinc-500 sm:text-[10px] sm:tracking-[0.14em]">{label}</p>
             <p className={`${MONO} mt-1.5 font-display text-[24px] font-bold text-zinc-950`}>{value}</p>
           </div>
         ))}
@@ -2135,14 +2322,14 @@ function VacationRentals({
       {/* filters */}
       <div className="space-y-3 py-5">
         <div className="flex flex-wrap items-center gap-3">
-          <label className="relative">
+          <label className="relative w-full sm:w-auto">
             <span className="sr-only">Search rentals</span>
             <Search size={13} strokeWidth={1.5} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search name, district, ID"
-              className={`${selectCls} w-56 pl-8 placeholder:text-zinc-400`}
+              className={`${selectCls} w-full pl-8 placeholder:text-zinc-400 sm:w-56`}
             />
           </label>
           <label className="sr-only" htmlFor="r-district">District</label>
@@ -2240,9 +2427,88 @@ function VacationRentals({
         <p className="font-display text-[18px] font-bold text-zinc-950">
           {rentals ? `${int.format(stats.count)} rental${stats.count === 1 ? "" : "s"}` : "Loading rentals…"}
         </p>
-        <p className="text-[12px] text-zinc-500">Click a row or a pin for full details · click a column to sort</p>
+        <p className="hidden text-[12px] text-zinc-500 md:block">Click a row or a pin for full details · click a column to sort</p>
+        <label className="flex items-center gap-2 text-[12px] text-zinc-500 md:hidden">
+          Sort
+          <select
+            value={`${sort.key}:${sort.dir}`}
+            onChange={(e) => {
+              const [key, dir] = e.target.value.split(":") as [RentalSortKey, "asc" | "desc"];
+              setSort({ key, dir });
+            }}
+            className={selectCls}
+          >
+            {RENTAL_MOBILE_SORTS.map(([k, d, label]) => (
+              <option key={`${k}:${d}`} value={`${k}:${d}`}>{label}</option>
+            ))}
+          </select>
+        </label>
       </div>
-      <div className="mt-3 overflow-x-auto border-t border-zinc-950">
+      {/* phones: cards */}
+      <ul className="mt-3 divide-y divide-zinc-200 border-t border-zinc-950 md:hidden">
+        {!rentals &&
+          Array.from({ length: 5 }).map((_, i) => (
+            <li key={i} className="py-4">
+              <Skeleton className="h-20 w-full" />
+            </li>
+          ))}
+        {rentals && !rows.length && (
+          <li className="py-12 text-center text-[13px] text-zinc-500">
+            No rentals match these filters.{" "}
+            <button type="button" onClick={clearAll} className="underline underline-offset-4">
+              Clear all
+            </button>
+          </li>
+        )}
+        {rows.map((r) => {
+          const open = openId === r.rental_id;
+          return (
+            <li key={r.rental_id} data-row={`rental-${r.rental_id}`} className={`scroll-mt-24 ${open ? "bg-mint-soft" : ""}`}>
+              <button
+                type="button"
+                onClick={() => setOpenId(open ? null : r.rental_id)}
+                aria-expanded={open}
+                className="flex w-full gap-3 py-4 text-left transition-colors active:bg-mint-soft"
+              >
+                <Thumb src={r.photo_url} alt={r.name} w={96} h={72} />
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-start justify-between gap-2">
+                    <span className="text-[14px] font-medium leading-snug text-zinc-950">{r.name}</span>
+                    <ChevronDown size={15} strokeWidth={1.5} className={`mt-0.5 shrink-0 text-zinc-400 transition-transform ${open ? "rotate-180" : ""}`} />
+                  </span>
+                  <span className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-500">
+                    {r.district} · {r.bedrooms} bd / {r.bathrooms} ba · sleeps {r.sleeps}
+                  </span>
+                  <span className="mt-1.5 block">
+                    <PlatformPill platform={r.platform} />
+                  </span>
+                  <span className={`${MONO} mt-2.5 grid grid-cols-3 gap-2 text-[11px] text-zinc-500`}>
+                    <span>
+                      <span className="block font-display text-[15px] font-bold text-zinc-950">{fmtUsd(r.nightly_rate_usd)}</span>
+                      per night
+                    </span>
+                    <span>
+                      <span className="block font-display text-[15px] font-bold text-zinc-950">{r.occupancy_pct}%</span>
+                      occupancy
+                    </span>
+                    <span>
+                      <span className="block font-display text-[15px] font-bold text-zinc-950">{fmtUsdCompact(r.annual_revenue_usd)}</span>
+                      per year
+                    </span>
+                  </span>
+                </span>
+              </button>
+              {open && (
+                <div className="pb-6">
+                  <RentalDetails r={r} onShowForSale={onShowForSale} />
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+
+      <div className="relative mt-3 hidden overflow-x-auto border-t border-zinc-950 md:block">
         <table className="w-full min-w-[1120px] border-collapse text-left">
           <thead>
             <tr>
@@ -2284,6 +2550,7 @@ function VacationRentals({
                 <Fragment key={r.rental_id}>
                   <tr
                     id={`rental-${r.rental_id}`}
+                    data-row={`rental-${r.rental_id}`}
                     onClick={() => setOpenId(open ? null : r.rental_id)}
                     onMouseEnter={() => setHoverId(r.rental_id)}
                     onMouseLeave={() => setHoverId(null)}
@@ -2333,45 +2600,7 @@ function VacationRentals({
                   {open && (
                     <tr className="bg-mint-soft">
                       <td colSpan={10} className="border-b border-zinc-300 px-0 pb-8 pt-3">
-                        <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
-                          {r.photo_url && (
-                            <Image
-                              src={`${r.photo_url}?auto=format&fit=crop&w=720&h=460&q=70`}
-                              alt={r.name}
-                              width={320}
-                              height={205}
-                              unoptimized
-                              className="h-[205px] w-full rounded-xl bg-zinc-100 object-cover"
-                            />
-                          )}
-                          <div>
-                            <dl className="grid grid-cols-2 gap-x-8 gap-y-5 sm:grid-cols-3 xl:grid-cols-4">
-                              <DetailItem label="Platform" value={`${PLATFORM_LABEL[r.platform]} · ${r.host_type}`} />
-                              <DetailItem label="Type" value={r.property_type} />
-                              <DetailItem label="Bedrooms / baths" value={`${r.bedrooms} / ${r.bathrooms}`} />
-                              <DetailItem label="Sleeps" value={`${r.sleeps} guests`} />
-                              <DetailItem label="Avg. nightly (next 30 days)" value={fmtUsd(r.nightly_rate_usd)} />
-                              <DetailItem label="Low / high season" value={`${fmtUsd(r.low_season_rate_usd)} / ${fmtUsd(r.high_season_rate_usd)}`} />
-                              <DetailItem label="Cleaning fee" value={fmtUsd(r.cleaning_fee_usd)} />
-                              <DetailItem label="Occupancy (12 months)" value={`${r.occupancy_pct}% · ${Math.round((365 * r.occupancy_pct) / 100)} nights`} />
-                              <DetailItem label="Est. yearly revenue" value={fmtUsd(r.annual_revenue_usd)} />
-                              <DetailItem label="Rating" value={r.rating ? `★ ${r.rating.toFixed(2)} (${r.reviews} reviews)` : "No reviews yet"} />
-                              <DetailItem label="First seen" value={fmtDate(r.first_seen)} />
-                              <DetailItem label="Last scraped" value={fmtTimestamp(r.last_scraped)} />
-                            </dl>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onShowForSale(r.district);
-                              }}
-                              className="mt-6 inline-flex items-center gap-2 bg-zinc-950 px-3 py-2 text-[12px] text-mint transition-colors hover:bg-zinc-800"
-                            >
-                              See properties for sale in {r.district}
-                              <ArrowRight size={13} strokeWidth={1.5} />
-                            </button>
-                          </div>
-                        </div>
+                        <RentalDetails r={r} onShowForSale={onShowForSale} />
                       </td>
                     </tr>
                   )}
@@ -2530,7 +2759,7 @@ function Districts({ districts, onOpenDistrict }: { districts: DistrictStats[]; 
         )}
       </div>
 
-      <div className="overflow-x-auto border-t border-zinc-950">
+      <div className="relative overflow-x-auto border-t border-zinc-950">
         <table className="w-full min-w-[1180px] border-collapse text-left">
           <thead>
             <tr>
@@ -2965,7 +3194,7 @@ function TerminalUpdates({
       {/* dropdown feed */}
       {open && (
         <div className="absolute right-0 top-full z-40 mt-2 w-full max-w-[560px] overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-[0_18px_40px_-12px_rgb(0_0_0/0.25)]">
-          <div className="max-h-[360px] overflow-y-auto" role="log" aria-label="Terminal updates">
+          <div className="max-h-[360px] overflow-y-auto overscroll-contain" data-lenis-prevent role="log" aria-label="Terminal updates">
             {runs.map((run, i) => (
               <div key={run.run_at}>
                 <p className="sticky top-0 z-10 flex justify-between border-b border-zinc-100 bg-white/95 px-4 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500 backdrop-blur">
@@ -3122,7 +3351,7 @@ function Dashboard() {
     <div className={`${inter.className} min-h-screen bg-white text-zinc-800 antialiased selection:bg-mint selection:text-zinc-950`}>
       <Header tab={tab} onTab={setTab} updates={updatesToday} onUpdates={openUpdates} />
 
-      <main className="mx-auto max-w-[1400px] px-6 pb-20">
+      <main className="mx-auto max-w-[1400px] px-4 pb-20 sm:px-6">
         {error ? (
           <div className={`${MONO} py-24 text-center text-[12px]`} style={{ color: C.down }}>
             FEED ERROR — {error}

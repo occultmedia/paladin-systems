@@ -151,7 +151,7 @@ export default function DistrictMapMapbox({ layer, districts, metric = "median_a
   const hovered = hoverDistrict ? byName[hoverDistrict] : undefined;
 
   return (
-    <div className="relative overflow-hidden border border-zinc-200" style={{ height }}>
+    <div className="relative overflow-hidden border border-zinc-200" style={{ height: `min(${height}px, 70svh)` }}>
       <Map
         ref={mapRef}
         mapboxAccessToken={TOKEN}
