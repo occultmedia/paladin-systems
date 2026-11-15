@@ -23,14 +23,21 @@ export const usd = (n: number) =>
 export const num = (n: number) => n.toLocaleString("en-US");
 export const pct = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : "±"}${Math.abs(n).toFixed(1)}%`;
 
+const STATUS_PILL: Record<Listing["status"], { color: string; bg: string }> = {
+  Available: { color: "#1F7A45", bg: "#E6F4EC" },
+  "Under contract": { color: "#9A5B00", bg: "#FDF1DC" },
+  Sold: { color: "#B42318", bg: "#FDE8E7" },
+};
+
 export function HoverCard({ l }: { l: Listing }) {
   const color = SIGNAL_COLOR[l.signal];
   const facts =
     l.category === "Property"
-      ? `${l.bedrooms} bd · ${l.bathrooms} ba · ${num(l.built_sqft)} sq ft`
+      ? `${l.bedrooms} beds · ${l.bathrooms} baths · ${num(l.built_sqft)} sq ft built${l.lot_sqft ? ` · ${num(l.lot_sqft)} lot` : ""}`
       : l.category === "Land"
         ? `${num(l.lot_sqft)} sq ft lot · ${l.zoning} zoning`
-        : `${l.commercial_use} · ${num(l.built_sqft)} sq ft`;
+        : `${l.commercial_use} · ${num(l.built_sqft)} sq ft built${l.lot_sqft ? ` · ${num(l.lot_sqft)} lot` : ""}`;
+  const status = STATUS_PILL[l.status];
   const metric =
     l.category === "Property"
       ? { value: `${l.projected_gross_yield_pct.toFixed(1)}%`, label: "rental yield" }
@@ -64,6 +71,16 @@ export function HoverCard({ l }: { l: Listing }) {
           </span>
         </div>
         <div style={{ color: "#3F3F46", fontSize: 11, marginTop: 4 }}>{facts}</div>
+        <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
+          <span style={{ color: status.color, background: status.bg, fontSize: 10, fontWeight: 700, borderRadius: 999, padding: "2px 8px" }}>
+            {l.status}
+          </span>
+          {l.pool && l.pool !== "No pool" && (
+            <span style={{ color: "#0369A1", background: "#F0F9FF", fontSize: 10, fontWeight: 700, borderRadius: 999, padding: "2px 8px" }}>
+              {l.pool}
+            </span>
+          )}
+        </div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8, paddingTop: 8, borderTop: "1px solid #F4F4F5" }}>
           <span style={{ color, fontSize: 11, fontWeight: 600 }}>● {SIGNAL_LABEL[l.signal]}</span>
           <span style={{ color: "#A1A1AA", fontSize: 11 }}>

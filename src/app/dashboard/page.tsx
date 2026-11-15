@@ -24,6 +24,7 @@ import {
   PLATFORM_LABEL,
   RENTAL_PLATFORMS,
   RESIDENTIAL_TYPES,
+  LISTING_STATUSES,
   SCRAPE_RUNS,
   TENURES,
   TENURE_HINT,
@@ -36,6 +37,8 @@ import {
   type ListingSignal,
   type MarketSnapshot,
   type MonthlyPerformance,
+  type ListingStatus,
+  type Pool,
   type PriceEvent,
   type PropertyType,
   type ScrapeRun,
@@ -54,6 +57,7 @@ import {
   ArrowUp,
   Bell,
   ChevronDown,
+  Waves,
   CreditCard,
   Download,
   ExternalLink,
@@ -172,7 +176,7 @@ const priceColor = (n: number) => (n > 0 ? PRICE_UP : n < 0 ? PRICE_DOWN : PRICE
 function PriceMove({ pct, label = true, size = 12 }: { pct: number; label?: boolean; size?: number }) {
   const Icon = pct > 0 ? ArrowUp : pct < 0 ? ArrowDown : ArrowRight;
   return (
-    <span className={`${MONO} inline-flex items-center gap-0.5 font-semibold`} style={{ color: priceColor(pct) }}>
+    <span className={`${MONO} inline-flex items-center gap-0.5 whitespace-nowrap font-semibold`} style={{ color: priceColor(pct) }}>
       <Icon size={size} strokeWidth={2.5} aria-hidden />
       {pct === 0 ? (label ? "No change" : "0%") : `${Math.abs(pct).toFixed(1)}%`}
       <span className="sr-only">{pct > 0 ? "price up" : pct < 0 ? "price down" : "no price change"}</span>
@@ -656,13 +660,16 @@ function YieldRadar({ listings, marketYield }: { listings?: ListingSignal[]; mar
  * ──────────────────────────────────────────────────────────────────────── */
 
 type Category = "All" | "Property" | "Land" | "Commercial";
-type SortKey = "name" | "district" | "beds" | "size" | "asking" | "psf" | "adr" | "yield" | "vsDistrict" | "listed";
+type SortKey = "name" | "district" | "beds" | "baths" | "built" | "lot" | "asking" | "psf" | "adr" | "yield" | "vsDistrict" | "listed" | "status";
 
 const SORT_VALUE: Record<SortKey, (l: Listing) => number | string | null> = {
   name: (l) => l.asset_name,
   district: (l) => l.district,
   beds: (l) => (l.category === "Property" ? l.bedrooms : null),
-  size: (l) => (l.category === "Land" ? l.lot_sqft : l.built_sqft),
+  baths: (l) => (l.category === "Property" ? l.bathrooms : null),
+  built: (l) => (l.category === "Land" ? null : l.built_sqft),
+  lot: (l) => l.lot_sqft ?? null,
+  status: (l) => LISTING_STATUSES.indexOf(l.status),
   asking: (l) => l.asking_price_usd,
   psf: (l) => l.price_per_sqft_usd,
   adr: (l) => (l.category === "Property" ? l.sequence_adr_usd : null),
@@ -734,13 +741,16 @@ function downloadCsv(rows: Listing[]) {
     ["Commercial use", (l) => c(l)?.commercial_use],
     ["Zoning", (l) => d(l)?.zoning],
     ["District", (l) => l.district],
+    ["Status", (l) => l.status],
+    ["Status since", (l) => l.status_changed],
+    ["Pool", (l) => l.pool],
     ["Land title", (l) => l.tenure],
     ["Erfpacht years left", (l) => l.lease_years_left],
     ["New today", (l) => (l.is_new ? "Yes" : "")],
     ["Last price change", (l) => l.last_price_change?.date],
     ["Bedrooms", (l) => p(l)?.bedrooms],
     ["Bathrooms", (l) => p(l)?.bathrooms],
-    ["Built sq ft", (l) => (l.category === "Land" ? null : l.built_sqft)],
+    ["Built-up sq ft", (l) => (l.category === "Land" ? null : l.built_sqft)],
     ["Lot sq ft", (l) => l.lot_sqft],
     ["Asking price USD", (l) => l.asking_price_usd],
     ["Price per sq ft USD", (l) => l.price_per_sqft_usd],
@@ -870,6 +880,35 @@ function TenureTag({ l }: { l: Listing }) {
       style={{ color: TENURE_COLOR[l.tenure], borderColor: `${TENURE_COLOR[l.tenure]}55` }}
     >
       {l.tenure}
+    </span>
+  );
+}
+
+const STATUS_STYLE: Record<ListingStatus, { color: string; bg: string }> = {
+  Available: { color: "#1F7A45", bg: "#E6F4EC" },
+  "Under contract": { color: "#9A5B00", bg: "#FDF1DC" },
+  Sold: { color: "#B42318", bg: "#FDE8E7" },
+};
+
+function StatusBadge({ l, withDate = false, align = "start" }: { l: Listing; withDate?: boolean; align?: "start" | "end" }) {
+  const st = STATUS_STYLE[l.status];
+  return (
+    <span className={`inline-flex flex-col gap-0.5 ${align === "end" ? "items-end" : "items-start"}`}>
+      <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ color: st.color, background: st.bg }}>
+        <span className="h-1.5 w-1.5 rounded-full" style={{ background: st.color }} />
+        {l.status}
+      </span>
+      {withDate && l.status_changed && <span className="text-[10px] text-zinc-400">since {fmtDate(l.status_changed)}</span>}
+    </span>
+  );
+}
+
+function PoolTag({ pool }: { pool: Pool | null }) {
+  if (!pool || pool === "No pool") return null;
+  return (
+    <span className="inline-flex items-center gap-1 rounded border border-sky-200 bg-sky-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-sky-700">
+      <Waves size={10} strokeWidth={2} />
+      {pool}
     </span>
   );
 }
@@ -1080,6 +1119,7 @@ function ListingDetails({
 }) {
   const shared = (
     <>
+      <DetailItem label="Status" value={<StatusBadge l={l} withDate />} />
       <DetailItem label="Asking price" value={fmtUsd(l.asking_price_usd)} />
       <DetailItem
         label="Price change"
@@ -1102,7 +1142,8 @@ function ListingDetails({
       <>
         <DetailItem label="Type" value="Land parcel" />
         <DetailItem label="Zoning" value={l.zoning} />
-        <DetailItem label="Lot size" value={fmtSqft(l.lot_sqft)} />
+        <DetailItem label="Lot size (land)" value={fmtSqft(l.lot_sqft)} />
+        <DetailItem label="Built-up size" value="None (vacant land)" />
         <DetailItem label="Price / sq ft" value={fmtUsd(l.price_per_sqft_usd)} />
         <DetailItem label="District land avg" value={`${fmtUsd(l.district_land_psf_usd)} / sq ft`} />
         <DetailItem
@@ -1116,8 +1157,9 @@ function ListingDetails({
     facts = (
       <>
         <DetailItem label="Use" value={l.commercial_use} />
-        <DetailItem label="Building size" value={fmtSqft(l.built_sqft)} />
-        <DetailItem label="Lot size" value={l.lot_sqft ? fmtSqft(l.lot_sqft) : "N/A (unit)"} />
+        <DetailItem label="Built-up size (total)" value={fmtSqft(l.built_sqft)} />
+        <DetailItem label="Lot size (land)" value={l.lot_sqft ? fmtSqft(l.lot_sqft) : "No land (unit in building)"} />
+        <DetailItem label="Pool" value={l.pool ?? "—"} />
         <DetailItem label="Price / sq ft" value={fmtUsd(l.price_per_sqft_usd)} />
         <DetailItem label="District commercial avg" value={`${fmtUsd(l.district_commercial_psf_usd)} / sq ft`} />
         <DetailItem
@@ -1131,9 +1173,19 @@ function ListingDetails({
     facts = (
       <>
         <DetailItem label="Property type" value={l.property_type} />
-        <DetailItem label="Bedrooms / baths" value={`${l.bedrooms} / ${l.bathrooms}`} />
-        <DetailItem label="Built area" value={fmtSqft(l.built_sqft)} />
-        <DetailItem label="Lot size" value={l.lot_sqft ? fmtSqft(l.lot_sqft) : "N/A (unit)"} />
+        <DetailItem label="Bedrooms" value={l.bedrooms} />
+        <DetailItem label="Bathrooms" value={l.bathrooms} />
+        <DetailItem label="Built-up size (total)" value={fmtSqft(l.built_sqft)} />
+        <DetailItem label="Lot size (land)" value={l.lot_sqft ? fmtSqft(l.lot_sqft) : "No land (unit in building)"} />
+        <DetailItem
+          label="Pool"
+          value={
+            <span className="inline-flex items-center gap-1.5">
+              {l.pool && l.pool !== "No pool" && <Waves size={13} strokeWidth={1.75} className="text-sky-600" />}
+              {l.pool}
+            </span>
+          }
+        />
         <DetailItem label="Price / sq ft" value={fmtUsd(l.price_per_sqft_usd)} />
         <DetailItem
           label="Yield vs market"
@@ -1199,6 +1251,8 @@ function ActiveListings({
 }) {
   const [query, setQuery] = useState(initialQuery ?? "");
   const [tenure, setTenure] = useState<Tenure | "All">("All");
+  const [status, setStatus] = useState<ListingStatus | "All">("All");
+  const [pool, setPool] = useState<"Any" | "Has pool" | Pool>("Any");
   const [newToday, setNewToday] = useState(Boolean(initialNewToday));
   const [category, setCategory] = useState<Category>("All");
   const [subtypes, setSubtypes] = useState<string[]>([]);
@@ -1244,6 +1298,8 @@ function ActiveListings({
         (district === "All" || l.district === district) &&
         (signal === "ALL" || l.signal === signal) &&
         (tenure === "All" || l.tenure === tenure) &&
+        (status === "All" || l.status === status) &&
+        (pool === "Any" || (pool === "Has pool" ? l.pool === "Private pool" || l.pool === "Shared pool" : l.pool === pool)) &&
         (!newToday || l.is_new) &&
         (!priceMin || l.asking_price_usd >= priceMin) &&
         (!priceMax || l.asking_price_usd <= priceMax) &&
@@ -1264,7 +1320,7 @@ function ActiveListings({
       if (y === null) return -1;
       return (typeof x === "string" ? x.localeCompare(y as string) : x - (y as number)) * dir;
     });
-  }, [listings, query, category, subtypes, district, signal, priceMin, priceMax, bedsMin, sizeMin, newOnly, dropsOnly, sort, tenure, newToday]);
+  }, [listings, query, category, subtypes, district, signal, priceMin, priceMax, bedsMin, sizeMin, newOnly, dropsOnly, sort, tenure, newToday, status, pool]);
 
   const stats = useMemo(() => {
     const props = rows.filter((r): r is ListingSignal => r.category === "Property");
@@ -1290,16 +1346,19 @@ function ActiveListings({
     setSubtypes([]);
     if (c !== "All" && c !== "Property") setBedsMin(0);
     if (c === "Property" && sort.key === "vsDistrict") setSort({ key: "listed", dir: "asc" });
-    if ((c === "Land" || c === "Commercial") && (sort.key === "beds" || sort.key === "adr" || sort.key === "yield"))
+    if ((c === "Land" || c === "Commercial") && (sort.key === "beds" || sort.key === "baths" || sort.key === "adr" || sort.key === "yield" || (c === "Land" && sort.key === "built")))
       setSort({ key: "listed", dir: "asc" });
   };
   const toggleSubtype = (t: string) => setSubtypes((xs) => (xs.includes(t) ? xs.filter((x) => x !== t) : [...xs, t]));
 
-  const moreCount = [priceMin, priceMax, bedsMin, sizeMin].filter(Boolean).length + (newOnly ? 1 : 0) + (dropsOnly ? 1 : 0);
-  const filtersActive = Boolean(query) || tenure !== "All" || newToday || category !== "All" || subtypes.length > 0 || district !== "All" || signal !== "ALL" || moreCount > 0;
+  const moreCount =
+    [priceMin, priceMax, bedsMin, sizeMin].filter(Boolean).length + (newOnly ? 1 : 0) + (dropsOnly ? 1 : 0) + (pool !== "Any" ? 1 : 0);
+  const filtersActive = Boolean(query) || tenure !== "All" || status !== "All" || newToday || category !== "All" || subtypes.length > 0 || district !== "All" || signal !== "ALL" || moreCount > 0;
   const clearAll = () => {
     setQuery("");
     setTenure("All");
+    setStatus("All");
+    setPool("Any");
     setNewToday(false);
     pickCategory("All");
     setDistrict("All");
@@ -1330,7 +1389,8 @@ function ActiveListings({
     }`;
   const td = "px-3 py-4 border-b border-zinc-200 align-top";
   const num = `${td} ${MONO} text-right text-[13px] text-zinc-800`;
-  const colCount = nonResidential ? 10 : 11;
+  // listing, district, status, asking, $/sqft, signal, listed, chevron + the category-dependent columns
+  const colCount = 8 + (nonResidential ? 1 : 2) + (landOnly ? 1 : 2) + 1;
 
   return (
     <>
@@ -1403,6 +1463,18 @@ function ActiveListings({
             {SIGNAL_FILTERS.map((f) => (
               <button key={f.value} type="button" onClick={() => setSignal(f.value)} aria-pressed={signal === f.value} className={segBtn(signal === f.value)}>
                 {f.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex overflow-hidden rounded-md border border-zinc-300" role="group" aria-label="Status">
+            {(["All", ...LISTING_STATUSES] as const).map((st) => (
+              <button key={st} type="button" onClick={() => setStatus(st)} aria-pressed={status === st} className={segBtn(status === st)}>
+                {st === "All" ? "Any status" : st}
+                {st !== "All" && listings && (
+                  <span className={`${MONO} ml-1.5 text-[10px] ${status === st ? "text-mint/70" : "text-zinc-400"}`}>
+                    {listings.filter((l) => l.status === st).length}
+                  </span>
+                )}
               </button>
             ))}
           </div>
@@ -1492,6 +1564,16 @@ function ActiveListings({
                 ))}
               </select>
             </label>
+            <label className="block">
+              <span className="text-[10px] uppercase tracking-[0.14em] text-zinc-500">Pool</span>
+              <select value={pool} onChange={(e) => setPool(e.target.value as typeof pool)} className={`${selectCls} mt-1.5 block`}>
+                <option value="Any">Any</option>
+                <option value="Has pool">Has a pool</option>
+                <option value="Private pool">Private pool</option>
+                <option value="Shared pool">Shared pool</option>
+                <option value="No pool">No pool</option>
+              </select>
+            </label>
             <button type="button" onClick={() => setNewOnly((v) => !v)} aria-pressed={newOnly} className={toggleCls(newOnly)}>
               New this week
             </button>
@@ -1521,7 +1603,7 @@ function ActiveListings({
         <p className="text-[12px] text-zinc-500">Click a row or a pin for full details · click a column to sort</p>
       </div>
       <div className="mt-3 overflow-x-auto border-t border-zinc-950">
-        <table className="w-full min-w-[1120px] border-collapse text-left">
+        <table className="w-full min-w-[1320px] border-collapse text-left">
           <thead>
             <tr>
               <SortHeader label={landOnly ? "Parcel" : "Listing"} k="name" sort={sort} onSort={onSort} align="left" />
@@ -1531,19 +1613,21 @@ function ActiveListings({
               ) : commercialOnly ? (
                 <PlainHeader label="Use" />
               ) : (
-                <SortHeader label="Bd / Ba" k="beds" sort={sort} onSort={onSort} />
+                <>
+                  <SortHeader label="Beds" k="beds" sort={sort} onSort={onSort} />
+                  <SortHeader label="Baths" k="baths" sort={sort} onSort={onSort} />
+                </>
               )}
-              <SortHeader label={landOnly ? "Lot (sq ft)" : category === "All" ? "Size (sq ft)" : "Built (sq ft)"} k="size" sort={sort} onSort={onSort} />
+              {!landOnly && <SortHeader label="Built-up (sq ft)" k="built" sort={sort} onSort={onSort} />}
+              <SortHeader label="Lot (sq ft)" k="lot" sort={sort} onSort={onSort} />
               <SortHeader label="Asking" k="asking" sort={sort} onSort={onSort} />
               <SortHeader label="$ / sq ft" k="psf" sort={sort} onSort={onSort} />
               {nonResidential ? (
                 <SortHeader label="Vs. District" k="vsDistrict" sort={sort} onSort={onSort} />
               ) : (
-                <>
-                  <SortHeader label="Est. ADR" k="adr" sort={sort} onSort={onSort} />
-                  <SortHeader label="Proj. Yield" k="yield" sort={sort} onSort={onSort} />
-                </>
+                <SortHeader label="Proj. Yield" k="yield" sort={sort} onSort={onSort} />
               )}
+              <SortHeader label="Status" k="status" sort={sort} onSort={onSort} />
               <PlainHeader label="Signal" />
               <SortHeader label="Listed" k="listed" sort={sort} onSort={onSort} />
               <th className="w-8 border-b border-zinc-300" aria-label="Details" />
@@ -1584,7 +1668,7 @@ function ActiveListings({
                     onMouseLeave={() => setHoverId(null)}
                     className={`cursor-pointer scroll-mt-24 transition-colors hover:bg-mint-soft ${open || hot ? "bg-mint-soft" : ""}`}
                   >
-                    <td className={`${td} pl-0`}>
+                    <td className={`${td} min-w-[300px] pl-0`}>
                       <div className="flex items-start gap-3">
                         <Thumb src={l.photo_url} alt={l.asset_name} />
                         <div>
@@ -1595,6 +1679,7 @@ function ActiveListings({
                           <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-500">
                             {l.listing_id} · {typeLine(l)}
                             <TenureTag l={l} />
+                            <PoolTag pool={l.pool} />
                           </p>
                         </div>
                       </div>
@@ -1605,12 +1690,13 @@ function ActiveListings({
                     ) : commercialOnly ? (
                       <td className={`${td} text-right text-[13px] text-zinc-700`}>{l.category === "Commercial" ? l.commercial_use : DASH}</td>
                     ) : (
-                      <td className={num}>{l.category === "Property" ? `${l.bedrooms} / ${l.bathrooms}` : DASH}</td>
+                      <>
+                        <td className={num}>{l.category === "Property" ? l.bedrooms : DASH}</td>
+                        <td className={num}>{l.category === "Property" ? l.bathrooms : DASH}</td>
+                      </>
                     )}
-                    <td className={num}>
-                      {int.format(l.category === "Land" ? l.lot_sqft : l.built_sqft)}
-                      {category === "All" && <p className="mt-1 text-[10px] uppercase text-zinc-400">{l.category === "Land" ? "lot" : "built"}</p>}
-                    </td>
+                    {!landOnly && <td className={num}>{l.category === "Land" ? DASH : int.format(l.built_sqft)}</td>}
+                    <td className={num}>{l.lot_sqft ? int.format(l.lot_sqft) : DASH}</td>
                     <td className={`${num} text-zinc-950`}>
                       {fmtUsdCompact(l.asking_price_usd)}
                       <p className="mt-1 text-[11px]">
@@ -1622,7 +1708,6 @@ function ActiveListings({
                       <td className={num}>{vsDistrict}</td>
                     ) : (
                       <>
-                        <td className={num}>{l.category === "Property" ? fmtUsd(l.sequence_adr_usd) : DASH}</td>
                         <td className={`${td} ${MONO} text-right`}>
                           {l.category === "Property" ? (
                             <>
@@ -1640,6 +1725,9 @@ function ActiveListings({
                         </td>
                       </>
                     )}
+                    <td className={`${td} text-right`}>
+                      <StatusBadge l={l} align="end" />
+                    </td>
                     <td className={`${td} text-right`}>
                       <SignalBadge signal={l.signal} />
                     </td>
@@ -2562,12 +2650,14 @@ const fmtRunDay = (run: ScrapeRun, i: number) =>
 type BoardMessage =
   | { kind: "run"; run: ScrapeRun }
   | { kind: "new"; l: Listing }
-  | { kind: "price"; l: Listing; from: number; e: PriceEvent };
+  | { kind: "price"; l: Listing; from: number; e: PriceEvent }
+  | { kind: "status"; l: Listing };
 
 function runMessages(run: ScrapeRun): BoardMessage[] {
   return [
     { kind: "run", run },
     ...run.new_listings.map((l): BoardMessage => ({ kind: "new", l })),
+    ...run.status_changes.map((l): BoardMessage => ({ kind: "status", l })),
     ...run.price_changes.map((c): BoardMessage => ({ kind: "price", l: c.listing, from: c.previous_price_usd, e: c.change })),
   ];
 }
@@ -2634,6 +2724,11 @@ function TerminalUpdates({
             <ArrowUp size={12} strokeWidth={2.5} style={{ color: PRICE_UP }} />
             <b className={MONO}>{ups}</b>
           </span>
+          {latest.status_changes.length > 0 && (
+            <span>
+              <b className={`${MONO} text-zinc-950`}>{latest.status_changes.length}</b> under contract / sold
+            </span>
+          )}
         </span>
         <span className="ml-auto inline-flex items-center gap-1 font-medium text-zinc-700">
           {open ? "Close" : "View updates"}
@@ -2654,13 +2749,13 @@ function TerminalUpdates({
                   </span>
                 </p>
                 <ul>
-                  {!run.new_listings.length && !run.price_changes.length && (
+                  {!run.new_listings.length && !run.price_changes.length && !run.status_changes.length && (
                     <li className="px-4 py-2 text-[12px] text-zinc-400">Terminal updated, no changes</li>
                   )}
                   {runMessages(run).map((m) => {
                       if (m.kind === "run") return null;
                       return (
-                        <li key={`${m.kind}-${m.l.listing_id}-${m.kind === "price" ? m.e.date : ""}`}>
+                        <li key={`${m.kind}-${m.l.listing_id}-${m.kind === "price" ? m.e.date : ""}`} className={m.l.status === "Sold" && m.kind === "status" ? "opacity-90" : ""}>
                           <button
                             type="button"
                             onClick={() => {
@@ -2672,6 +2767,13 @@ function TerminalUpdates({
                             <span className="w-[52px] shrink-0">
                               {m.kind === "new" ? (
                                 <span className="rounded bg-zinc-950 px-1.5 py-0.5 text-[9px] font-semibold tracking-wide text-mint">NEW</span>
+                              ) : m.kind === "status" ? (
+                                <span
+                                  className="rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide"
+                                  style={{ color: STATUS_STYLE[m.l.status].color, background: STATUS_STYLE[m.l.status].bg }}
+                                >
+                                  {m.l.status === "Sold" ? "SOLD" : "CONTRACT"}
+                                </span>
                               ) : (
                                 <PriceMove pct={m.e.change_pct ?? 0} label={false} />
                               )}
@@ -2683,7 +2785,7 @@ function TerminalUpdates({
                               </span>
                             </span>
                             <span className={`${MONO} shrink-0 text-right`}>
-                              {m.kind === "new" ? (
+                              {m.kind === "new" || m.kind === "status" ? (
                                 <span className="font-semibold text-zinc-950">{fmtUsdCompact(m.l.asking_price_usd)}</span>
                               ) : (
                                 <>
@@ -2737,7 +2839,7 @@ function Dashboard() {
   });
   const [boardOpen, setBoardOpen] = useState(false);
   const toggleBoard = useCallback(() => setBoardOpen((o) => !o), []);
-  const updatesToday = SCRAPE_RUNS[0].new_listings.length + SCRAPE_RUNS[0].price_changes.length;
+  const updatesToday = SCRAPE_RUNS[0].new_listings.length + SCRAPE_RUNS[0].price_changes.length + SCRAPE_RUNS[0].status_changes.length;
   const [marketView, setMarketViewState] = useState<"sale" | "rentals">(params.get("view") === "rentals" ? "rentals" : "sale");
   const [prefill, setPrefill] = useState<{ key: number; value: EstimatorPrefill | null }>({ key: 0, value: null });
   const { data, error } = useDashboardData(MARKET_ID);

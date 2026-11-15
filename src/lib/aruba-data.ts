@@ -54,6 +54,13 @@ export const TENURE_HINT: Record<Tenure, string> = {
   Erfpacht: "Leasehold: land leased from the government, building owned",
 };
 
+/** Where the listing is in the sale process, read from the listing site on every scrape. */
+export type ListingStatus = "Available" | "Under contract" | "Sold";
+export const LISTING_STATUSES: ListingStatus[] = ["Available", "Under contract", "Sold"];
+
+export type Pool = "Private pool" | "Shared pool" | "No pool";
+export const POOLS: Pool[] = ["Private pool", "Shared pool", "No pool"];
+
 /** One change seen between two scrapes (table: listing_price_history). */
 export interface PriceEvent {
   date: string; // ISO date of the scrape that saw it
@@ -69,6 +76,9 @@ export interface ListingBase {
   is_new: boolean; // first found in the latest scrape
   price_history: PriceEvent[]; // oldest first; last entry = current price
   last_price_change: PriceEvent | null;
+  status: ListingStatus;
+  status_changed: string | null; // ISO date the scrape saw the current status (null = available since listed)
+  pool: Pool | null; // null for land
   listing_id: string;
   market_id: string;
   asset_name: string;
@@ -334,6 +344,30 @@ const roundPrice = (n: number) => Math.round(n / (n >= 1_000_000 ? 5_000 : 1_000
 /** Price changes the latest scrape picked up (mock; prod reads listing_price_history). */
 const CHANGED_IN_LATEST_SCRAPE = new Set(["AW-0388", "AW-0291", "AW-C712", "AW-0372"]);
 
+/** Listings no longer simply available: status and how many days ago the scrape saw it (mock). */
+const STATUS_CHANGES: Record<string, [ListingStatus, number]> = {
+  "AW-0637": ["Under contract", 0],
+  "AW-L611": ["Under contract", 0],
+  "AW-0457": ["Under contract", 2],
+  "AW-0359": ["Under contract", 5],
+  "AW-C725": ["Under contract", 3],
+  "AW-0265": ["Sold", 1],
+  "AW-0249": ["Sold", 4],
+  "AW-L624": ["Sold", 6],
+};
+
+/** Pool from the listing text (mock): houses mostly private, units mostly shared, land none. */
+function poolFor(kind: string, h: number): Pool | null {
+  const r = (h >> 3) % 100;
+  if (kind === "Land") return null;
+  if (["Villa", "Estate", "Beach House"].includes(kind)) return r < 88 ? "Private pool" : "No pool";
+  if (kind === "Townhouse") return r < 40 ? "Private pool" : r < 85 ? "Shared pool" : "No pool";
+  if (kind === "Condo" || kind === "Penthouse") return kind === "Penthouse" && r < 45 ? "Private pool" : r < 85 ? "Shared pool" : "No pool";
+  if (kind === "Apartment") return r < 45 ? "Shared pool" : "No pool";
+  if (kind === "Hospitality") return "Private pool";
+  return "No pool";
+}
+
 /** Share of listings on erfpacht land, by category (mock assignment). */
 const ERFPACHT_SHARE = { Property: 0.35, Land: 0.6, Commercial: 0.5 } as const;
 
@@ -347,8 +381,10 @@ function scrapeMeta(
   price: number,
   changePct: number,
   dom: number,
-): Pick<ListingBase, "tenure" | "lease_years_left" | "is_new" | "price_history" | "last_price_change"> {
+  kind: string, // property type, "Land", or commercial use
+): Pick<ListingBase, "tenure" | "lease_years_left" | "is_new" | "price_history" | "last_price_change" | "status" | "status_changed" | "pool"> {
   const h = hashId(id);
+  const status = STATUS_CHANGES[id];
   const tenure: Tenure = (h % 100) / 100 < ERFPACHT_SHARE[category] ? "Erfpacht" : "Eigendom";
   const history: PriceEvent[] = [];
   const original = changePct ? roundPrice(price / (1 + changePct / 100)) : price;
@@ -374,6 +410,9 @@ function scrapeMeta(
     is_new: dom === 0,
     price_history: history,
     last_price_change: history.length > 1 ? history[history.length - 1] : null,
+    status: status ? status[0] : "Available",
+    status_changed: status ? isoDaysAgo(status[1]) : null,
+    pool: poolFor(kind, h),
   };
 }
 
@@ -387,7 +426,7 @@ export function deriveSignal(r: RawRow, marketYieldPct: number): ListingSignal {
   const firstSeen = new Date(Date.parse(SCRAPED_AT) - dom * 86_400_000).toISOString().slice(0, 10);
   return {
     category: "Property",
-    ...scrapeMeta(id, "Property", price, chg, dom),
+    ...scrapeMeta(id, "Property", price, chg, dom, type),
     listing_id: id,
     market_id: MARKET_ID,
     asset_name: name,
@@ -453,7 +492,7 @@ export function deriveLand(r: RawLandRow): LandListing {
   const signal: Signal = diff <= -10 ? "UNDERVALUED" : diff >= 10 ? "OVERPRICED" : "AT_MARKET";
   return {
     category: "Land",
-    ...scrapeMeta(id, "Land", price, chg, dom),
+    ...scrapeMeta(id, "Land", price, chg, dom, "Land"),
     listing_id: id,
     market_id: MARKET_ID,
     asset_name: name,
@@ -508,7 +547,7 @@ export function deriveCommercial(r: RawCommercialRow): CommercialListing {
   const photos = COMMERCIAL_PHOTOS[use];
   return {
     category: "Commercial",
-    ...scrapeMeta(id, "Commercial", price, chg, dom),
+    ...scrapeMeta(id, "Commercial", price, chg, dom, use),
     listing_id: id,
     market_id: MARKET_ID,
     asset_name: name,
@@ -917,6 +956,7 @@ export interface ScrapeRun {
   rentals_checked: number;
   new_listings: Listing[];
   price_changes: ScrapePriceChange[];
+  status_changes: Listing[]; // went under contract or sold in this scrape
 }
 
 export function buildScrapeRuns(listings: Listing[], rentals: VacationRental[], days = 7): ScrapeRun[] {
@@ -935,6 +975,7 @@ export function buildScrapeRuns(listings: Listing[], rentals: VacationRental[], 
       listings_checked: listings.filter((l) => l.price_history[0].date <= date).length,
       rentals_checked: rentals.filter((r) => r.first_seen <= date).length,
       new_listings: listings.filter((l) => l.price_history[0].date === date),
+      status_changes: listings.filter((l) => l.status_changed === date),
       price_changes,
     };
   });
