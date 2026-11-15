@@ -46,7 +46,7 @@ import {
   type Tenure,
   type VacationRental,
 } from "@/lib/aruba-data";
-import { PLATFORM_COLOR } from "@/components/dashboard/map-shared";
+import { AgencyLogo, PLATFORM_COLOR } from "@/components/dashboard/map-shared";
 import { Inter } from "next/font/google";
 import {
   ArrowDownRight,
@@ -741,6 +741,8 @@ function downloadCsv(rows: Listing[]) {
     ["Commercial use", (l) => c(l)?.commercial_use],
     ["Zoning", (l) => d(l)?.zoning],
     ["District", (l) => l.district],
+    ["Listed by", (l) => l.agency.name],
+    ["Listing URL", (l) => l.source_url],
     ["Status", (l) => l.status],
     ["Status since", (l) => l.status_changed],
     ["Pool", (l) => l.pool],
@@ -766,7 +768,6 @@ function downloadCsv(rows: Listing[]) {
     ["Days on market", (l) => l.days_on_market],
     ["First seen", (l) => l.first_seen],
     ["Last scraped", (l) => l.last_scraped],
-    ["Source", (l) => l.source],
     ["Source URL", (l) => l.source_url],
     ["Latitude", (l) => l.lat],
     ["Longitude", (l) => l.lng],
@@ -854,19 +855,40 @@ function DetailItem({ label, value, color }: { label: string; value: React.React
   );
 }
 
-function SourceValue({ l }: { l: Listing }) {
-  return l.source_url ? (
-    <a
-      href={l.source_url}
-      target="_blank"
-      rel="noopener noreferrer"
-      onClick={(e) => e.stopPropagation()}
-      className="inline-flex items-center gap-1 underline underline-offset-4"
-    >
-      {l.source} <ExternalLink size={11} strokeWidth={1.5} />
-    </a>
-  ) : (
-    <>{l.source}</>
+/** Who is listing it: agency logo + name, linking to the listing on the agency's own site. */
+function ListedBy({ l }: { l: Listing }) {
+  const href = l.source_url ?? l.agency.website;
+  const body = (
+    <>
+      <AgencyLogo agency={l.agency} size={36} rounded={8} />
+      <span className="min-w-0">
+        <span className="block text-[10px] uppercase tracking-[0.14em] text-zinc-500">Listed by</span>
+        <span className="block truncate font-display text-[14px] font-bold text-zinc-950">{l.agency.name}</span>
+      </span>
+    </>
+  );
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-white px-3 py-2.5">
+      <div className="flex min-w-0 items-center gap-3">{body}</div>
+      {href ? (
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="inline-flex items-center gap-1.5 rounded-md border border-zinc-950 px-3 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-zinc-950 hover:text-mint"
+        >
+          View on their site <ExternalLink size={12} strokeWidth={1.75} />
+        </a>
+      ) : (
+        <span
+          className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-md border border-zinc-200 px-3 py-1.5 text-[12px] text-zinc-400"
+          title="The link to the original listing is stored once the scraper runs on this site"
+        >
+          View on their site <ExternalLink size={12} strokeWidth={1.75} />
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -1132,7 +1154,6 @@ function ListingDetails({
       />
       <DetailItem label="First seen" value={fmtDate(l.first_seen)} />
       <DetailItem label="Last scraped" value={fmtTimestamp(l.last_scraped)} />
-      <DetailItem label="Source" value={<SourceValue l={l} />} />
     </>
   );
 
@@ -1198,16 +1219,19 @@ function ListingDetails({
 
   return (
     <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
-      {l.photo_url && (
-        <Image
-          src={`${l.photo_url}?auto=format&fit=crop&w=720&h=460&q=70`}
-          alt={l.asset_name}
-          width={320}
-          height={205}
-          unoptimized
-          className="h-[205px] w-full rounded-xl bg-zinc-100 object-cover"
-        />
-      )}
+      <div className="space-y-3">
+        {l.photo_url && (
+          <Image
+            src={`${l.photo_url}?auto=format&fit=crop&w=720&h=460&q=70`}
+            alt={l.asset_name}
+            width={320}
+            height={205}
+            unoptimized
+            className="h-[205px] w-full rounded-xl bg-zinc-100 object-cover"
+          />
+        )}
+        <ListedBy l={l} />
+      </div>
       <div>
         <dl className="grid grid-cols-2 gap-x-8 gap-y-5 sm:grid-cols-3 xl:grid-cols-4">
           {facts}
@@ -1670,7 +1694,12 @@ function ActiveListings({
                   >
                     <td className={`${td} min-w-[300px] pl-0`}>
                       <div className="flex items-start gap-3">
-                        <Thumb src={l.photo_url} alt={l.asset_name} />
+                        <span className="relative shrink-0" title={`Listed by ${l.agency.name}`}>
+                          <Thumb src={l.photo_url} alt={l.asset_name} />
+                          <span className="absolute -bottom-1.5 -right-1.5 rounded-[5px] ring-2 ring-white">
+                            <AgencyLogo agency={l.agency} size={20} rounded={4} />
+                          </span>
+                        </span>
                         <div>
                           <p className="flex flex-wrap items-center gap-1.5 text-[13px] font-medium text-zinc-950">
                             {l.asset_name}

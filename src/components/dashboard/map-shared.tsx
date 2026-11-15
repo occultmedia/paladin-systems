@@ -2,7 +2,7 @@
 
 /* Shared pieces for the Aruba map (Mapbox and Leaflet versions). */
 
-import { PLATFORM_LABEL, type DistrictStats, type Listing, type RentalPlatform, type Signal, type VacationRental } from "@/lib/aruba-data";
+import { PLATFORM_LABEL, type Agency, type DistrictStats, type Listing, type RentalPlatform, type Signal, type VacationRental } from "@/lib/aruba-data";
 
 export const SIGNAL_COLOR: Record<Signal, string> = {
   UNDERVALUED: "#3F7A55",
@@ -17,6 +17,54 @@ export const SIGNAL_LABEL: Record<Signal, string> = {
 
 /** Asking-price moves: up = green, down = red, no change = orange. */
 export const priceColor = (n: number) => (n > 0 ? "#2E9E5B" : n < 0 ? "#D64545" : "#E08A1E");
+
+/**
+ * Listing agency logo. Uses the logo scraped from the agency's site; until we
+ * have it, a monogram in the agency colour.
+ */
+export function AgencyLogo({ agency, size = 24, rounded = 6 }: { agency: Agency; size?: number; rounded?: number }) {
+  if (agency.logo_url) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={agency.logo_url}
+        alt={`${agency.name} logo`}
+        width={size}
+        height={size}
+        style={{ width: size, height: size, objectFit: "contain", borderRadius: rounded, background: "#fff", flexShrink: 0 }}
+      />
+    );
+  }
+  const initials = agency.name
+    .split(/\s+/)
+    .filter((w) => /^[A-Za-z]/.test(w))
+    .slice(0, 2)
+    .map((w) => w[0].toUpperCase())
+    .join("");
+  return (
+    <span
+      role="img"
+      aria-label={`${agency.name} logo`}
+      style={{
+        width: size,
+        height: size,
+        borderRadius: rounded,
+        background: agency.color,
+        color: "#fff",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontWeight: 800,
+        fontSize: Math.max(8, Math.round(size * 0.4)),
+        letterSpacing: "-0.02em",
+        flexShrink: 0,
+        fontFamily: "var(--font-archivo), var(--font-inter), system-ui, sans-serif",
+      }}
+    >
+      {initials}
+    </span>
+  );
+}
 
 export const usd = (n: number) =>
   n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(2)}M` : `$${Math.round(n).toLocaleString("en-US")}`;
@@ -90,6 +138,12 @@ export function HoverCard({ l }: { l: Listing }) {
               {l.price_change_pct > 0 ? "↑" : l.price_change_pct < 0 ? "↓" : "→"}{" "}
               {l.price_change_pct ? `${Math.abs(l.price_change_pct).toFixed(1)}%` : "no change"}
             </span>
+          </span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, paddingTop: 8, borderTop: "1px solid #F4F4F5" }}>
+          <AgencyLogo agency={l.agency} size={18} rounded={4} />
+          <span style={{ fontSize: 11, color: "#52525B" }}>
+            Listed by <b style={{ color: "#09090B" }}>{l.agency.name}</b>
           </span>
         </div>
         <div style={{ color: "#A1A1AA", fontSize: 10, marginTop: 6 }}>Click the pin for full details</div>

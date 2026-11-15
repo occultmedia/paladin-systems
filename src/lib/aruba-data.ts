@@ -58,6 +58,39 @@ export const TENURE_HINT: Record<Tenure, string> = {
 export type ListingStatus = "Available" | "Under contract" | "Sold";
 export const LISTING_STATUSES: ListingStatus[] = ["Available", "Under contract", "Sold"];
 
+/** The real-estate company whose site the listing was scraped from. */
+export interface Agency {
+  id: string;
+  name: string;
+  website: string | null;
+  logo_url: string | null; // scraped from the agency site; null = show a monogram
+  color: string; // monogram background until the real logo is stored
+}
+
+/*
+ * Placeholder agencies for the mock data (fictional names, no websites).
+ * The scraper fills this table (table: agencies) with each real site's name,
+ * logo and URL, and stores every listing's own page in source_url.
+ */
+export const AGENCIES: Record<string, Agency> = {
+  tradewind: { id: "tradewind", name: "Trade Wind Estates", website: null, logo_url: null, color: "#0F4C5C" },
+  seagrape: { id: "seagrape", name: "Seagrape Realty", website: null, logo_url: null, color: "#3D6B35" },
+  islaazul: { id: "islaazul", name: "Isla Azul Properties", website: null, logo_url: null, color: "#1F5AA6" },
+  coralridge: { id: "coralridge", name: "Coral Ridge Developments", website: null, logo_url: null, color: "#B5523B" },
+  northshore: { id: "northshore", name: "Northshore Land Co.", website: null, logo_url: null, color: "#8A6A2E" },
+  harbourpoint: { id: "harbourpoint", name: "Harbour Point Commercial", website: null, logo_url: null, color: "#2B2B2B" },
+};
+
+/** Which placeholder agency a mock listing came from, by listing channel and category. */
+function agencyFor(channel: string, category: "Property" | "Land" | "Commercial", id: string): Agency {
+  const h = hashId(id);
+  if (channel === "Developer") return AGENCIES.coralridge;
+  if (category === "Commercial") return h % 3 ? AGENCIES.harbourpoint : AGENCIES.tradewind;
+  if (category === "Land") return h % 3 ? AGENCIES.northshore : AGENCIES.islaazul;
+  const pool = [AGENCIES.tradewind, AGENCIES.seagrape, AGENCIES.islaazul];
+  return pool[h % pool.length];
+}
+
 export type Pool = "Private pool" | "Shared pool" | "No pool";
 export const POOLS: Pool[] = ["Private pool", "Shared pool", "No pool"];
 
@@ -89,8 +122,9 @@ export interface ListingBase {
   days_on_market: number;
   first_seen: string; // ISO date
   last_scraped: string; // ISO timestamp
-  source: string;
-  source_url: string | null;
+  source: string; // listing agency name (= agency.name)
+  source_url: string | null; // the listing's own page on the agency's site
+  agency: Agency;
   signal: Signal;
   lat: number;
   lng: number;
@@ -442,8 +476,9 @@ export function deriveSignal(r: RawRow, marketYieldPct: number): ListingSignal {
     days_on_market: dom,
     first_seen: firstSeen,
     last_scraped: SCRAPED_AT,
-    source,
+    source: agencyFor(source, "Property", id).name,
     source_url: null,
+    agency: agencyFor(source, "Property", id),
     ...locate(district, id),
     photo_url: COMPACT_TYPES.includes(type)
       ? CONDO_PHOTOS[RAW_LISTINGS.filter((x) => COMPACT_TYPES.includes(x[2])).indexOf(r) % CONDO_PHOTOS.length]
@@ -508,8 +543,9 @@ export function deriveLand(r: RawLandRow): LandListing {
     days_on_market: dom,
     first_seen: new Date(Date.parse(SCRAPED_AT) - dom * 86_400_000).toISOString().slice(0, 10),
     last_scraped: SCRAPED_AT,
-    source,
+    source: agencyFor(source, "Land", id).name,
     source_url: null,
+    agency: agencyFor(source, "Land", id),
     signal,
     ...locate(district, id),
     photo_url: LAND_PHOTOS[RAW_LAND.indexOf(r) % LAND_PHOTOS.length],
@@ -564,8 +600,9 @@ export function deriveCommercial(r: RawCommercialRow): CommercialListing {
     days_on_market: dom,
     first_seen: new Date(Date.parse(SCRAPED_AT) - dom * 86_400_000).toISOString().slice(0, 10),
     last_scraped: SCRAPED_AT,
-    source,
+    source: agencyFor(source, "Commercial", id).name,
     source_url: null,
+    agency: agencyFor(source, "Commercial", id),
     signal,
     ...locate(district, id),
     photo_url: photos[RAW_COMMERCIAL.filter((x) => x[3] === use).indexOf(r) % photos.length],
