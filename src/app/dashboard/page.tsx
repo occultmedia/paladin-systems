@@ -897,23 +897,95 @@ const relDay = (iso: string) => {
   return days === 0 ? "today" : days === 1 ? "yesterday" : `${days} days ago`;
 };
 
-function PriceHistory({ history }: { history: PriceEvent[] }) {
-  const series = [
-    ...history.map((e) => ({ t: Date.parse(`${e.date}T00:00:00Z`), price: e.price_usd })),
-    { t: Date.parse(`${SCRAPE_RUNS[0].date}T00:00:00Z`), price: history[history.length - 1].price_usd },
-  ];
+const DAY_MS = 86_400_000;
+const dayTs = (iso: string) => Date.parse(`${iso}T00:00:00Z`);
+
+/** Monthly appreciation used to walk the market estimate back in time (mock; prod reads district_value_index). */
+const MONTHLY_GROWTH: Record<Listing["category"], number> = { Property: 0.006, Land: 0.005, Commercial: 0.003 };
+
+/**
+ * What the listing should be worth today:
+ * residential = projected rental revenue capitalised at the market yield,
+ * land / commercial = district average price per sq ft × size.
+ */
+function estMarketValue(l: Listing, marketYield?: number) {
+  if (l.category === "Property") return marketYield ? l.projected_annual_revenue_usd / (marketYield / 100) : l.asking_price_usd;
+  if (l.category === "Land") return l.district_land_psf_usd * l.lot_sqft;
+  return l.district_commercial_psf_usd * l.built_sqft;
+}
+
+/** Asking price (step line, from the day we found it) and estimated market value over time. */
+function valueSeries(l: Listing, marketYield?: number) {
+  const today = dayTs(SCRAPE_RUNS[0].date);
+  const listed = dayTs(l.price_history[0].date);
+  const start = Math.min(listed - 45 * DAY_MS, today - 270 * DAY_MS);
+  const fair = estMarketValue(l, marketYield);
+  const g = MONTHLY_GROWTH[l.category];
+  let h = 0;
+  for (const c of l.listing_id) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  const stamps = new Set<number>([today]);
+  for (let t = start; t < today; t += 14 * DAY_MS) stamps.add(t);
+  for (const e of l.price_history) stamps.add(dayTs(e.date));
+  return [...stamps]
+    .sort((a, b) => a - b)
+    .map((t) => {
+      const monthsBack = (today - t) / (30.4 * DAY_MS);
+      const wiggle = 1 + Math.sin(t / (40 * DAY_MS) + (h % 7)) * 0.006;
+      const ask = [...l.price_history].reverse().find((e) => dayTs(e.date) <= t);
+      return {
+        t,
+        asking: ask ? ask.price_usd : null,
+        market: Math.round((fair / Math.pow(1 + g, monthsBack)) * (t === today ? 1 : wiggle)),
+      };
+    });
+}
+
+function ValueChartTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ dataKey?: string | number; value?: number | null }>; label?: number }) {
+  if (!active || !payload?.length || label === undefined) return null;
+  const get = (k: string) => payload.find((p) => p.dataKey === k)?.value;
+  const asking = get("asking");
+  const market = get("market");
+  return (
+    <div className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-[11px] shadow-md">
+      <p className="text-zinc-500">{fmtDate(new Date(label).toISOString().slice(0, 10))}</p>
+      {asking != null && (
+        <p className={`${MONO} mt-1 text-zinc-950`}>
+          Asking <b>{fmtUsdCompact(asking)}</b>
+        </p>
+      )}
+      {market != null && (
+        <p className={`${MONO} mt-0.5`} style={{ color: MARKET_LINE }}>
+          Est. market <b>{fmtUsdCompact(market)}</b>
+        </p>
+      )}
+    </div>
+  );
+}
+
+const MARKET_LINE = "#2E9E5B";
+
+function PriceHistory({ l, marketYield }: { l: Listing; marketYield?: number }) {
+  const history = l.price_history;
+  const series = valueSeries(l, marketYield);
+  const fair = estMarketValue(l, marketYield);
+  const gap = ((l.asking_price_usd - fair) / fair) * 100;
   const changed = history.length > 1;
   return (
     <div className="mt-8 border-t border-zinc-300/70 pt-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500">Price history</p>
-        <p className="text-[11px] text-zinc-500">
-          {changed ? `${history.length - 1} change${history.length > 2 ? "s" : ""} since we first scraped it` : "No price changes since we first scraped it"}
+        <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500">Price history vs. est. market value</p>
+        <p className="flex flex-wrap items-center gap-4 text-[11px] text-zinc-500">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-0.5 w-4 bg-zinc-950" /> Asking price
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-0 w-4 border-t-2 border-dashed" style={{ borderColor: MARKET_LINE }} /> Est. market value
+          </span>
         </p>
       </div>
-      <div className={`mt-3 grid gap-6 ${changed ? "lg:grid-cols-[1fr_340px]" : ""}`}>
-        {changed && (
-          <div className="h-[150px] rounded-lg border border-zinc-200 bg-white p-2">
+      <div className="mt-3 grid gap-6 xl:grid-cols-[1fr_400px]">
+        <div className="rounded-lg border border-zinc-200 bg-white p-2">
+          <div className="h-[170px]">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={series} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
                 <CartesianGrid stroke="#F4F4F5" vertical={false} />
@@ -922,47 +994,76 @@ function PriceHistory({ history }: { history: PriceEvent[] }) {
                   type="number"
                   scale="time"
                   domain={["dataMin", "dataMax"]}
-                  tickFormatter={(t: number) => new Date(t).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}
+                  tickFormatter={(t: number) => new Date(t).toLocaleDateString("en-US", { month: "short", year: "2-digit", timeZone: "UTC" })}
                   tick={{ fontSize: 10, fill: "#71717A" }}
                   axisLine={false}
                   tickLine={false}
+                  minTickGap={24}
                 />
                 <YAxis
-                  domain={["auto", "auto"]}
+                  domain={[(min: number) => min * 0.95, (max: number) => max * 1.03]}
                   tickFormatter={(v: number) => fmtUsdCompact(v)}
                   tick={{ fontSize: 10, fill: "#71717A" }}
                   axisLine={false}
                   tickLine={false}
-                  width={58}
+                  width={62}
                 />
-                <Tooltip
-                  formatter={(v) => fmtUsd(Number(v))}
-                  labelFormatter={(t) => fmtDate(new Date(Number(t)).toISOString().slice(0, 10))}
-                  contentStyle={{ fontSize: 12, borderRadius: 8, borderColor: "#E4E4E7" }}
+                <Tooltip content={<ValueChartTooltip />} />
+                <Line type="monotone" dataKey="market" stroke={MARKET_LINE} strokeWidth={1.75} strokeDasharray="5 4" dot={false} isAnimationActive={false} />
+                <Line
+                  type="stepAfter"
+                  dataKey="asking"
+                  stroke="#0A0A0A"
+                  strokeWidth={2}
+                  dot={(p: { cx?: number; cy?: number; payload?: { t: number }; index?: number }) =>
+                    p.payload && history.some((e) => dayTs(e.date) === p.payload!.t) && p.cx != null && p.cy != null ? (
+                      <circle key={p.index} cx={p.cx} cy={p.cy} r={3} fill="#0A0A0A" />
+                    ) : (
+                      <g key={p.index} />
+                    )
+                  }
+                  connectNulls={false}
+                  isAnimationActive={false}
                 />
-                <Line type="stepAfter" dataKey="price" stroke="#0A0A0A" strokeWidth={1.75} dot={{ r: 3, fill: "#0A0A0A" }} isAnimationActive={false} />
               </LineChart>
             </ResponsiveContainer>
           </div>
-        )}
-        <ol className="space-y-0">
-          {[...history].reverse().map((e, i) => (
-            <li key={`${e.date}-${i}`} className="flex items-baseline justify-between gap-4 border-b border-zinc-200 py-2 text-[12px] last:border-0">
-              <span className="text-zinc-500">
-                {fmtDate(e.date)} <span className="text-zinc-400">· {relDay(e.date)}</span>
-              </span>
-              <span className="flex items-baseline gap-3">
-                <span className="text-zinc-700">{e.event}</span>
-                <span className={`${MONO} font-semibold text-zinc-950`}>{fmtUsd(e.price_usd)}</span>
-                {e.change_pct !== null && (
-                  <span className="w-14 text-right">
-                    <PriceMove pct={e.change_pct} />
-                  </span>
-                )}
-              </span>
-            </li>
-          ))}
-        </ol>
+          <p className="px-2 pb-1 pt-2 text-[12px] text-zinc-600">
+            Asking <b className={`${MONO} text-zinc-950`}>{fmtUsdCompact(l.asking_price_usd)}</b> vs est. market value{" "}
+            <b className={MONO} style={{ color: MARKET_LINE }}>
+              {fmtUsdCompact(fair)}
+            </b>
+            {" · "}
+            <span className="font-semibold" style={{ color: SIGNAL_STYLE[l.signal].color }}>
+              {l.signal === "AT_MARKET"
+                ? `priced about right (${gap < 0 ? "−" : "+"}${Math.abs(gap).toFixed(0)}%)`
+                : `${Math.abs(gap).toFixed(0)}% ${gap < 0 ? "below" : "above"} market`}
+            </span>
+          </p>
+        </div>
+        <div>
+          <p className="text-[11px] text-zinc-500">
+            {changed ? `${history.length - 1} price change${history.length > 2 ? "s" : ""} since we first scraped it` : "No price changes since we first scraped it"}
+          </p>
+          <ol className="mt-1">
+            {[...history].reverse().map((e, i) => (
+              <li key={`${e.date}-${i}`} className="flex items-baseline justify-between gap-4 whitespace-nowrap border-b border-zinc-200 py-2 text-[12px] last:border-0">
+                <span className="text-zinc-500">
+                  {fmtDate(e.date)} <span className="text-zinc-400">· {relDay(e.date)}</span>
+                </span>
+                <span className="flex items-baseline gap-3">
+                  <span className="text-zinc-700">{e.event}</span>
+                  <span className={`${MONO} font-semibold text-zinc-950`}>{fmtUsd(e.price_usd)}</span>
+                  {e.change_pct !== null && (
+                    <span className="w-14 text-right">
+                      <PriceMove pct={e.change_pct} />
+                    </span>
+                  )}
+                </span>
+              </li>
+            ))}
+          </ol>
+        </div>
       </div>
     </div>
   );
@@ -1079,7 +1180,7 @@ function ListingDetails({
             Open in Revenue Estimator
           </button>
         )}
-        <PriceHistory history={l.price_history} />
+        <PriceHistory l={l} marketYield={marketYield} />
       </div>
     </div>
   );
