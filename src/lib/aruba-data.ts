@@ -42,8 +42,33 @@ export const COMMERCIAL_USES: CommercialUse[] = ["Retail", "Office", "Hospitalit
 export type Zoning = "Residential" | "Tourism" | "Commercial" | "Agricultural";
 export const ZONINGS: Zoning[] = ["Residential", "Tourism", "Commercial", "Agricultural"];
 
+/**
+ * Land title in Aruba. Eigendom = freehold (you own the land outright).
+ * Erfpacht = long lease on government land: you own the building, the land is
+ * leased from the Land Aruba for a set term (usually 60 years) with yearly canon.
+ */
+export type Tenure = "Eigendom" | "Erfpacht";
+export const TENURES: Tenure[] = ["Eigendom", "Erfpacht"];
+export const TENURE_HINT: Record<Tenure, string> = {
+  Eigendom: "Freehold: land and building owned outright",
+  Erfpacht: "Leasehold: land leased from the government, building owned",
+};
+
+/** One change seen between two scrapes (table: listing_price_history). */
+export interface PriceEvent {
+  date: string; // ISO date of the scrape that saw it
+  event: "Listed" | "Price drop" | "Price increase";
+  price_usd: number;
+  change_pct: number | null; // vs the previous price, null for "Listed"
+}
+
 /** Columns shared by every scraped listing. */
 export interface ListingBase {
+  tenure: Tenure;
+  lease_years_left: number | null; // erfpacht only
+  is_new: boolean; // first found in the latest scrape
+  price_history: PriceEvent[]; // oldest first; last entry = current price
+  last_price_change: PriceEvent | null;
   listing_id: string;
   market_id: string;
   asset_name: string;
@@ -192,7 +217,7 @@ export const MOCK_MONTHLY: MonthlyPerformance[] = (
   revpar_usd: Math.round((adr_usd * occupancy_pct) / 100),
 }));
 
-export const SCRAPED_AT = "2026-11-13T10:00:00Z";
+export const SCRAPED_AT = "2026-11-15T06:00:00Z";
 
 /* id, name, type, district, beds, baths, built sqft, lot sqft, asking, ADR, occ %, days listed, price change %, source */
 type RawRow = readonly [string, string, PropertyType, string, number, number, number, number | null, number, number, number, number, number, string];
@@ -202,7 +227,7 @@ export const RAW_LISTINGS: readonly RawRow[] = [
   ["AW-0388", "Noord Luxury Retreat", "Villa", "Noord", 6, 6.5, 6400, 14500, 7_950_000, 5200, 58, 73, -4.2, "Agency portal"],
   ["AW-0457", "Villa Serena, Eagle Beach", "Villa", "Eagle Beach", 5, 6, 5800, 9800, 9_800_000, 5400, 57, 22, 0, "Broker site"],
   ["AW-0291", "Palm Beach Ocean Pavilion", "Estate", "Palm Beach", 8, 9, 11200, 26000, 14_250_000, 7400, 49, 118, -6.5, "Agency portal"],
-  ["AW-0503", "Savaneta Cove House", "Beach House", "Savaneta", 5, 5, 5100, 12000, 6_100_000, 5050, 51, 9, 0, "Private listing"],
+  ["AW-0503", "Savaneta Cove House", "Beach House", "Savaneta", 5, 5, 5100, 12000, 6_100_000, 5050, 51, 2, 0, "Private listing"],
   ["AW-0517", "Tierra del Sol Fairway Villa", "Villa", "Tierra del Sol", 5, 5.5, 5600, 11000, 5_400_000, 5000, 44, 15, 0, "Broker site"],
   ["AW-0322", "Arashi Dunes Residence", "Villa", "Arashi", 6, 7, 7000, 16000, 10_900_000, 6200, 52, 96, -3.1, "Agency portal"],
   ["AW-0466", "Gold Coast Ridge Villa", "Villa", "Gold Coast", 6, 6, 6600, 15500, 8_600_000, 5600, 53, 34, 0, "Broker site"],
@@ -211,22 +236,26 @@ export const RAW_LISTINGS: readonly RawRow[] = [
   ["AW-0533", "Eagle Beach Sky Penthouse", "Penthouse", "Eagle Beach", 4, 4.5, 4800, null, 7_200_000, 5800, 50, 6, 0, "Developer"],
   ["AW-0187", "Palm Beach Grand Penthouse", "Penthouse", "Palm Beach", 5, 5.5, 6100, null, 11_400_000, 6900, 47, 204, -5.0, "Developer"],
   ["AW-0441", "Malmok Reef Villa", "Villa", "Malmok", 6, 6, 6900, 15800, 9_300_000, 6100, 55, 28, 0, "Broker site"],
-  ["AW-0372", "Noord Hillcrest Estate", "Estate", "Noord", 7, 8, 10400, 32000, 16_800_000, 8200, 46, 87, 0, "Broker site"],
-  ["AW-0549", "Santa Cruz Hacienda", "Estate", "Santa Cruz", 6, 6, 7800, 40000, 4_900_000, 5000, 38, 3, 0, "Private listing"],
+  ["AW-0372", "Noord Hillcrest Estate", "Estate", "Noord", 7, 8, 10400, 32000, 16_800_000, 8200, 46, 87, 3.5, "Broker site"],
+  ["AW-0549", "Santa Cruz Hacienda", "Estate", "Santa Cruz", 6, 6, 7800, 40000, 4_900_000, 5000, 38, 0, 0, "Private listing"],
   ["AW-0265", "Oranjestad Harbour Residence", "Penthouse", "Oranjestad", 4, 4, 4200, null, 4_600_000, 5000, 33, 152, -4.0, "Agency portal"],
   ["AW-0418", "Tierra del Sol Ocean Villa", "Villa", "Tierra del Sol", 7, 7.5, 8300, 18500, 11_900_000, 7100, 50, 47, 0, "Broker site"],
   ["AW-0306", "Arashi Beachfront Compound", "Estate", "Arashi", 9, 10, 13500, 34000, 18_500_000, 9500, 54, 176, -7.5, "Broker site"],
   ["AW-0492", "Savaneta Lagoon Villa", "Villa", "Savaneta", 5, 5, 5400, 13000, 5_750_000, 5100, 42, 19, 0, "Agency portal"],
   ["AW-0359", "Malmok Sunset House", "Beach House", "Malmok", 5, 5.5, 5700, 11800, 8_250_000, 5900, 48, 58, -1.8, "Private listing"],
-  ["AW-0521", "Gold Coast Signature Villa", "Villa", "Gold Coast", 5, 6, 6200, 13400, 7_600_000, 5500, 47, 12, 0, "Developer"],
+  ["AW-0521", "Gold Coast Signature Villa", "Villa", "Gold Coast", 5, 6, 6200, 13400, 7_600_000, 5500, 47, 1, 0, "Developer"],
   ["AW-0233", "Eagle Beach Casa Blanca", "Villa", "Eagle Beach", 6, 6.5, 6500, 12500, 10_200_000, 5700, 49, 133, -3.5, "Broker site"],
   ["AW-0611", "Palm Beach Ocean Tower 1204", "Condo", "Palm Beach", 2, 2, 1450, null, 1_250_000, 680, 62, 14, 0, "Agency portal"],
   ["AW-0624", "Eagle Beach Residences 3B", "Condo", "Eagle Beach", 3, 3, 1900, null, 1_650_000, 820, 60, 31, -3.0, "Broker site"],
   ["AW-0637", "Oranjestad Harbourview 502", "Apartment", "Oranjestad", 2, 2, 1250, null, 690_000, 420, 58, 52, 0, "Agency portal"],
-  ["AW-0642", "Noord Garden Apartment", "Apartment", "Noord", 2, 1.5, 1100, null, 520_000, 380, 61, 8, 0, "Private listing"],
+  ["AW-0642", "Noord Garden Apartment", "Apartment", "Noord", 2, 1.5, 1100, null, 520_000, 380, 61, 0, 0, "Private listing"],
   ["AW-0655", "Malmok Townhouse 7", "Townhouse", "Malmok", 3, 3.5, 2400, 3200, 1_480_000, 890, 57, 26, 0, "Broker site"],
-  ["AW-0668", "Gold Coast Golf Townhouse", "Townhouse", "Gold Coast", 4, 4, 3100, 4200, 1_950_000, 1150, 52, 3, 0, "Developer"],
+  ["AW-0668", "Gold Coast Golf Townhouse", "Townhouse", "Gold Coast", 4, 4, 3100, 4200, 1_950_000, 1150, 52, 0, 0, "Developer"],
   ["AW-0673", "Savaneta Waterfront Condo", "Condo", "Savaneta", 2, 2, 1350, null, 780_000, 520, 55, 61, -5.0, "Agency portal"],
+  ["AW-0681", "Eagle Beach Bungalow Suite 12", "Condo", "Eagle Beach", 1, 1, 820, null, 465_000, 260, 63, 0, 0, "Agency portal"],
+  ["AW-0686", "Palm Beach Lagoon Villa", "Villa", "Palm Beach", 4, 4.5, 3900, 7600, 3_250_000, 1700, 56, 0, 0, "Broker site"],
+  ["AW-0692", "Noord Family Townhouse", "Townhouse", "Noord", 3, 2.5, 1850, 2600, 640_000, 400, 54, 0, 0, "Private listing"],
+  ["AW-0697", "Oranjestad Seaport Loft", "Apartment", "Oranjestad", 1, 1, 760, null, 395_000, 230, 60, 0, 0, "Agency portal"],
 ];
 
 /** Mirrors the SQL in v_active_listing_signals so mock and prod agree. */
@@ -293,6 +322,61 @@ function locate(district: string, id: string): { lat: number; lng: number } {
   return { lat: lat + Math.sin(a) * r, lng: lng + Math.cos(a) * r * 0.6 };
 }
 
+const DAY = 86_400_000;
+const isoDaysAgo = (days: number) => new Date(Date.parse(SCRAPED_AT) - days * DAY).toISOString().slice(0, 10);
+const hashId = (id: string) => {
+  let h = 7;
+  for (const c of id) h = (h * 131 + c.charCodeAt(0)) >>> 0;
+  return h;
+};
+const roundPrice = (n: number) => Math.round(n / (n >= 1_000_000 ? 5_000 : 1_000)) * (n >= 1_000_000 ? 5_000 : 1_000);
+
+/** Price changes the latest scrape picked up (mock; prod reads listing_price_history). */
+const CHANGED_IN_LATEST_SCRAPE = new Set(["AW-0388", "AW-0291", "AW-C712", "AW-0372"]);
+
+/** Share of listings on erfpacht land, by category (mock assignment). */
+const ERFPACHT_SHARE = { Property: 0.35, Land: 0.6, Commercial: 0.5 } as const;
+
+/**
+ * Columns that come from comparing scrapes: tenure, the "new" flag and the
+ * price history rebuilt from the current price and the change since first seen.
+ */
+function scrapeMeta(
+  id: string,
+  category: keyof typeof ERFPACHT_SHARE,
+  price: number,
+  changePct: number,
+  dom: number,
+): Pick<ListingBase, "tenure" | "lease_years_left" | "is_new" | "price_history" | "last_price_change"> {
+  const h = hashId(id);
+  const tenure: Tenure = (h % 100) / 100 < ERFPACHT_SHARE[category] ? "Erfpacht" : "Eigendom";
+  const history: PriceEvent[] = [];
+  const original = changePct ? roundPrice(price / (1 + changePct / 100)) : price;
+  history.push({ date: isoDaysAgo(dom), event: "Listed", price_usd: original, change_pct: null });
+  if (changePct) {
+    const lastAgo = CHANGED_IN_LATEST_SCRAPE.has(id) ? 0 : 1 + (h % Math.max(1, Math.min(dom - 1, 21)));
+    const steps: Array<[number, number]> = [];
+    if (Math.abs(changePct) >= 5 && dom >= 60) steps.push([Math.round(dom * 0.55), roundPrice(original * (1 + changePct / 200))]);
+    steps.push([lastAgo, price]);
+    for (const [ago, p] of steps) {
+      const prev = history[history.length - 1].price_usd;
+      history.push({
+        date: isoDaysAgo(ago),
+        event: p < prev ? "Price drop" : "Price increase",
+        price_usd: p,
+        change_pct: Math.round(((p - prev) / prev) * 1000) / 10,
+      });
+    }
+  }
+  return {
+    tenure,
+    lease_years_left: tenure === "Erfpacht" ? 22 + (h % 37) : null,
+    is_new: dom === 0,
+    price_history: history,
+    last_price_change: history.length > 1 ? history[history.length - 1] : null,
+  };
+}
+
 export function deriveSignal(r: RawRow, marketYieldPct: number): ListingSignal {
   const [id, name, type, district, beds, baths, built, lot, price, adr, occ, dom, chg, source] = r;
   const revenue = Math.round(adr * 365 * (occ / 100));
@@ -303,6 +387,7 @@ export function deriveSignal(r: RawRow, marketYieldPct: number): ListingSignal {
   const firstSeen = new Date(Date.parse(SCRAPED_AT) - dom * 86_400_000).toISOString().slice(0, 10);
   return {
     category: "Property",
+    ...scrapeMeta(id, "Property", price, chg, dom),
     listing_id: id,
     market_id: MARKET_ID,
     asset_name: name,
@@ -339,12 +424,12 @@ type RawLandRow = readonly [string, string, string, number, number, Zoning, numb
 export const RAW_LAND: readonly RawLandRow[] = [
   ["AW-L602", "Malmok Oceanview Lot", "Malmok", 21_500, 2_400_000, "Residential", 18, 0, "Broker site"],
   ["AW-L611", "Tierra del Sol Golf Parcel", "Tierra del Sol", 16_000, 1_150_000, "Residential", 44, -4.0, "Agency portal"],
-  ["AW-L587", "Palm Beach Development Site", "Palm Beach", 64_000, 9_800_000, "Tourism", 162, 0, "Broker site"],
+  ["AW-L587", "Palm Beach Development Site", "Palm Beach", 64_000, 9_800_000, "Tourism", 162, 4.0, "Broker site"],
   ["AW-L624", "Noord Hilltop Acreage", "Noord", 87_000, 3_900_000, "Residential", 71, -2.5, "Private listing"],
   ["AW-L595", "Arashi Bluff Lot", "Arashi", 19_800, 2_050_000, "Residential", 5, 0, "Broker site"],
   ["AW-L633", "Savaneta Waterfront Parcel", "Savaneta", 42_000, 2_600_000, "Residential", 29, 0, "Agency portal"],
   ["AW-L578", "Eagle Beach Commercial Corner", "Eagle Beach", 23_000, 4_600_000, "Commercial", 118, -3.0, "Developer"],
-  ["AW-L640", "Santa Cruz Ranch Land", "Santa Cruz", 215_000, 2_200_000, "Agricultural", 2, 0, "Private listing"],
+  ["AW-L640", "Santa Cruz Ranch Land", "Santa Cruz", 215_000, 2_200_000, "Agricultural", 0, 0, "Private listing"],
 ];
 
 /** Average land price per sq ft by district (table: district_land_benchmarks). */
@@ -368,6 +453,7 @@ export function deriveLand(r: RawLandRow): LandListing {
   const signal: Signal = diff <= -10 ? "UNDERVALUED" : diff >= 10 ? "OVERPRICED" : "AT_MARKET";
   return {
     category: "Land",
+    ...scrapeMeta(id, "Land", price, chg, dom),
     listing_id: id,
     market_id: MARKET_ID,
     asset_name: name,
@@ -395,12 +481,12 @@ export function deriveLand(r: RawLandRow): LandListing {
 type RawCommercialRow = readonly [string, string, string, CommercialUse, number, number | null, number, number, number, string];
 
 export const RAW_COMMERCIAL: readonly RawCommercialRow[] = [
-  ["AW-C701", "Palm Beach Retail Strip", "Palm Beach", "Retail", 8200, 14000, 6_400_000, 33, 0, "Broker site"],
+  ["AW-C701", "Palm Beach Retail Strip", "Palm Beach", "Retail", 8200, 14000, 6_400_000, 33, 2.5, "Broker site"],
   ["AW-C712", "Oranjestad Main Street Offices", "Oranjestad", "Office", 6400, null, 2_900_000, 88, -6.0, "Agency portal"],
   ["AW-C718", "Eagle Beach Boutique Hotel", "Eagle Beach", "Hospitality", 18500, 26000, 14_800_000, 140, -4.0, "Broker site"],
   ["AW-C725", "Noord Mixed-Use Plaza", "Noord", "Mixed-use", 11200, 20000, 4_100_000, 12, 0, "Developer"],
   ["AW-C731", "Savaneta Marina Warehouse", "Savaneta", "Warehouse", 15000, 30000, 2_250_000, 47, 0, "Private listing"],
-  ["AW-C744", "Malmok Beach Restaurant", "Malmok", "Hospitality", 4200, 9000, 3_350_000, 5, 0, "Broker site"],
+  ["AW-C744", "Malmok Beach Restaurant", "Malmok", "Hospitality", 4200, 9000, 3_350_000, 0, 0, "Broker site"],
 ];
 
 /** Average commercial price per sq ft (built) by district (table: district_commercial_benchmarks). */
@@ -422,6 +508,7 @@ export function deriveCommercial(r: RawCommercialRow): CommercialListing {
   const photos = COMMERCIAL_PHOTOS[use];
   return {
     category: "Commercial",
+    ...scrapeMeta(id, "Commercial", price, chg, dom),
     listing_id: id,
     market_id: MARKET_ID,
     asset_name: name,
@@ -811,3 +898,47 @@ export function estimateRevenue(input: EstimateInput): Estimate {
     signal,
   };
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * Terminal updates (table: scrape_runs) — one entry per daily scrape:
+ * what was checked, what is new, which prices moved.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+export interface ScrapePriceChange {
+  listing: Listing;
+  change: PriceEvent;
+  previous_price_usd: number;
+}
+
+export interface ScrapeRun {
+  run_at: string; // ISO timestamp
+  date: string; // ISO date
+  listings_checked: number;
+  rentals_checked: number;
+  new_listings: Listing[];
+  price_changes: ScrapePriceChange[];
+}
+
+export function buildScrapeRuns(listings: Listing[], rentals: VacationRental[], days = 7): ScrapeRun[] {
+  return Array.from({ length: days }, (_, ago) => {
+    const runAt = new Date(Date.parse(SCRAPED_AT) - ago * DAY).toISOString();
+    const date = runAt.slice(0, 10);
+    const price_changes: ScrapePriceChange[] = [];
+    for (const l of listings) {
+      l.price_history.forEach((e, i) => {
+        if (i > 0 && e.date === date) price_changes.push({ listing: l, change: e, previous_price_usd: l.price_history[i - 1].price_usd });
+      });
+    }
+    return {
+      run_at: runAt,
+      date,
+      listings_checked: listings.filter((l) => l.price_history[0].date <= date).length,
+      rentals_checked: rentals.filter((r) => r.first_seen <= date).length,
+      new_listings: listings.filter((l) => l.price_history[0].date === date),
+      price_changes,
+    };
+  });
+}
+
+/** Newest first. */
+export const SCRAPE_RUNS: ScrapeRun[] = buildScrapeRuns(ALL_LISTINGS, VACATION_RENTALS);

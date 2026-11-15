@@ -47,9 +47,12 @@ export function HoverCard({ l }: { l: Listing }) {
       <div style={{ padding: "10px 12px 12px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "baseline" }}>
           <span style={{ fontWeight: 600, fontSize: 13, color: "#09090B", whiteSpace: "normal", lineHeight: 1.25 }}>{l.asset_name}</span>
+          {l.is_new && (
+            <span style={{ background: "#0A0A0A", color: "#DDE5DC", fontSize: 9, fontWeight: 700, borderRadius: 4, padding: "2px 6px", flexShrink: 0 }}>NEW</span>
+          )}
         </div>
         <div style={{ color: "#71717A", fontSize: 11, marginTop: 2 }}>
-          {l.category === "Commercial" ? "Commercial" : l.property_type} · {l.district} · {l.listing_id}
+          {l.category === "Commercial" ? "Commercial" : l.property_type} · {l.district} · {l.tenure}
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 8 }}>
           <span style={{ fontWeight: 700, fontSize: 16, color: "#09090B", fontVariantNumeric: "tabular-nums" }}>{usd(l.asking_price_usd)}</span>
@@ -61,7 +64,8 @@ export function HoverCard({ l }: { l: Listing }) {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8, paddingTop: 8, borderTop: "1px solid #F4F4F5" }}>
           <span style={{ color, fontSize: 11, fontWeight: 600 }}>● {SIGNAL_LABEL[l.signal]}</span>
           <span style={{ color: "#A1A1AA", fontSize: 11 }}>
-            {l.days_on_market} days listed{l.price_change_pct < 0 ? ` · price ${pct(l.price_change_pct)}` : ""}
+            {l.is_new ? "Found today" : `${l.days_on_market} days listed`}
+            {l.last_price_change ? ` · price ${pct(l.last_price_change.change_pct ?? 0)} ${l.last_price_change.date.slice(5).replace("-", "/")}` : ""}
           </span>
         </div>
         <div style={{ color: "#A1A1AA", fontSize: 10, marginTop: 6 }}>Click the pin for full details</div>

@@ -24,6 +24,9 @@ import {
   PLATFORM_LABEL,
   RENTAL_PLATFORMS,
   RESIDENTIAL_TYPES,
+  SCRAPE_RUNS,
+  TENURES,
+  TENURE_HINT,
   ZONINGS,
   estimateRevenue,
   repository,
@@ -33,8 +36,11 @@ import {
   type ListingSignal,
   type MarketSnapshot,
   type MonthlyPerformance,
+  type PriceEvent,
   type PropertyType,
+  type ScrapeRun,
   type Signal,
+  type Tenure,
   type VacationRental,
 } from "@/lib/aruba-data";
 import { PLATFORM_COLOR } from "@/components/dashboard/map-shared";
@@ -44,6 +50,7 @@ import {
   ArrowRight,
   Calculator,
   ArrowUpRight,
+  Bell,
   ChevronDown,
   CreditCard,
   Download,
@@ -244,7 +251,7 @@ function AccountMenu() {
   );
 }
 
-function Header({ tab, onTab }: { tab: Tab; onTab: (t: Tab) => void }) {
+function Header({ tab, onTab, updates, onUpdates }: { tab: Tab; onTab: (t: Tab) => void; updates: number; onUpdates: () => void }) {
   return (
     <header className="border-b border-mint-deep bg-mint">
       <div className="mx-auto flex max-w-[1400px] flex-col gap-4 px-6 py-4 lg:h-16 lg:flex-row lg:items-center lg:justify-between lg:gap-0 lg:py-0">
@@ -277,6 +284,19 @@ function Header({ tab, onTab }: { tab: Tab; onTab: (t: Tab) => void }) {
               LIVE DATA: <span className="text-zinc-800">ARUBA NODE CONNECTED</span>
             </span>
           </div>
+          <button
+            type="button"
+            onClick={onUpdates}
+            aria-label={`Terminal updates: ${updates} today`}
+            className="relative flex h-9 w-9 items-center justify-center rounded-full border border-zinc-950/15 bg-white/60 text-zinc-800 transition-colors hover:bg-white"
+          >
+            <Bell size={15} strokeWidth={1.75} />
+            {updates > 0 && (
+              <span className={`${MONO} absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-zinc-950 px-1 text-[10px] font-semibold text-mint`}>
+                {updates}
+              </span>
+            )}
+          </button>
           <AccountMenu />
         </div>
 
@@ -695,6 +715,10 @@ function downloadCsv(rows: Listing[]) {
     ["Commercial use", (l) => c(l)?.commercial_use],
     ["Zoning", (l) => d(l)?.zoning],
     ["District", (l) => l.district],
+    ["Land title", (l) => l.tenure],
+    ["Erfpacht years left", (l) => l.lease_years_left],
+    ["New today", (l) => (l.is_new ? "Yes" : "")],
+    ["Last price change", (l) => l.last_price_change?.date],
     ["Bedrooms", (l) => p(l)?.bedrooms],
     ["Bathrooms", (l) => p(l)?.bathrooms],
     ["Built sq ft", (l) => (l.category === "Land" ? null : l.built_sqft)],
@@ -817,6 +841,114 @@ function SourceValue({ l }: { l: Listing }) {
   );
 }
 
+const TENURE_COLOR: Record<Tenure, string> = { Eigendom: "#0A0A0A", Erfpacht: "#8A6A2E" };
+
+function TenureTag({ l }: { l: Listing }) {
+  return (
+    <span
+      title={TENURE_HINT[l.tenure]}
+      className="inline-flex items-center rounded border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide"
+      style={{ color: TENURE_COLOR[l.tenure], borderColor: `${TENURE_COLOR[l.tenure]}55` }}
+    >
+      {l.tenure}
+    </span>
+  );
+}
+
+/** "NEW" for listings found in the latest scrape, "PRICE ↓/↑" for prices that moved in it. */
+function ScrapeTags({ l }: { l: Listing }) {
+  const moved = l.last_price_change && l.last_price_change.date === SCRAPE_RUNS[0].date ? l.last_price_change : null;
+  return (
+    <>
+      {l.is_new && <span className="rounded bg-zinc-950 px-1.5 py-0.5 text-[9px] font-semibold tracking-wide text-mint">NEW</span>}
+      {moved && (
+        <span
+          className="rounded px-1.5 py-0.5 text-[9px] font-semibold tracking-wide text-white"
+          style={{ background: moved.event === "Price drop" ? C.up : C.down }}
+        >
+          PRICE {moved.event === "Price drop" ? "↓" : "↑"} TODAY
+        </span>
+      )}
+    </>
+  );
+}
+
+const relDay = (iso: string) => {
+  const days = Math.round((Date.parse(`${SCRAPE_RUNS[0].date}T00:00:00Z`) - Date.parse(`${iso}T00:00:00Z`)) / 86_400_000);
+  return days === 0 ? "today" : days === 1 ? "yesterday" : `${days} days ago`;
+};
+
+function PriceHistory({ history }: { history: PriceEvent[] }) {
+  const series = [
+    ...history.map((e) => ({ t: Date.parse(`${e.date}T00:00:00Z`), price: e.price_usd })),
+    { t: Date.parse(`${SCRAPE_RUNS[0].date}T00:00:00Z`), price: history[history.length - 1].price_usd },
+  ];
+  const changed = history.length > 1;
+  return (
+    <div className="mt-8 border-t border-zinc-300/70 pt-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500">Price history</p>
+        <p className="text-[11px] text-zinc-500">
+          {changed ? `${history.length - 1} change${history.length > 2 ? "s" : ""} since we first scraped it` : "No price changes since we first scraped it"}
+        </p>
+      </div>
+      <div className={`mt-3 grid gap-6 ${changed ? "lg:grid-cols-[1fr_340px]" : ""}`}>
+        {changed && (
+          <div className="h-[150px] rounded-lg border border-zinc-200 bg-white p-2">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={series} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
+                <CartesianGrid stroke="#F4F4F5" vertical={false} />
+                <XAxis
+                  dataKey="t"
+                  type="number"
+                  scale="time"
+                  domain={["dataMin", "dataMax"]}
+                  tickFormatter={(t: number) => new Date(t).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}
+                  tick={{ fontSize: 10, fill: "#71717A" }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  domain={["auto", "auto"]}
+                  tickFormatter={(v: number) => fmtUsdCompact(v)}
+                  tick={{ fontSize: 10, fill: "#71717A" }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={58}
+                />
+                <Tooltip
+                  formatter={(v) => fmtUsd(Number(v))}
+                  labelFormatter={(t) => fmtDate(new Date(Number(t)).toISOString().slice(0, 10))}
+                  contentStyle={{ fontSize: 12, borderRadius: 8, borderColor: "#E4E4E7" }}
+                />
+                <Line type="stepAfter" dataKey="price" stroke="#0A0A0A" strokeWidth={1.75} dot={{ r: 3, fill: "#0A0A0A" }} isAnimationActive={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+        <ol className="space-y-0">
+          {[...history].reverse().map((e, i) => (
+            <li key={`${e.date}-${i}`} className="flex items-baseline justify-between gap-4 border-b border-zinc-200 py-2 text-[12px] last:border-0">
+              <span className="text-zinc-500">
+                {fmtDate(e.date)} <span className="text-zinc-400">· {relDay(e.date)}</span>
+              </span>
+              <span className="flex items-baseline gap-3">
+                <span className="text-zinc-700">{e.event}</span>
+                <span className={`${MONO} font-semibold text-zinc-950`}>{fmtUsd(e.price_usd)}</span>
+                {e.change_pct !== null && (
+                  <span className={`${MONO} w-12 text-right`} style={{ color: deltaColor(e.change_pct) }}>
+                    {fmtDelta(e.change_pct)}
+                  </span>
+                )}
+              </span>
+            </li>
+          ))}
+        </ol>
+      </div>
+    </div>
+  );
+}
+
 function ListingDetails({
   l,
   marketYield,
@@ -833,6 +965,11 @@ function ListingDetails({
         label="Price change"
         value={l.price_change_pct === 0 ? "No change" : fmtDelta(l.price_change_pct)}
         color={l.price_change_pct ? deltaColor(l.price_change_pct) : undefined}
+      />
+      <DetailItem
+        label="Land title"
+        value={l.tenure === "Erfpacht" ? `Erfpacht · ${l.lease_years_left} yrs left` : "Eigendom (freehold)"}
+        color={TENURE_COLOR[l.tenure]}
       />
       <DetailItem label="First seen" value={fmtDate(l.first_seen)} />
       <DetailItem label="Last scraped" value={fmtTimestamp(l.last_scraped)} />
@@ -924,6 +1061,7 @@ function ListingDetails({
             Open in Revenue Estimator
           </button>
         )}
+        <PriceHistory history={l.price_history} />
       </div>
     </div>
   );
@@ -934,15 +1072,21 @@ function ActiveListings({
   marketYield,
   initialDistrict,
   initialQuery,
+  initialOpenId,
+  initialNewToday,
   onEstimate,
 }: {
   listings?: Listing[];
   marketYield?: number;
   initialDistrict?: string;
   initialQuery?: string;
+  initialOpenId?: string;
+  initialNewToday?: boolean;
   onEstimate: (l: ListingSignal) => void;
 }) {
   const [query, setQuery] = useState(initialQuery ?? "");
+  const [tenure, setTenure] = useState<Tenure | "All">("All");
+  const [newToday, setNewToday] = useState(Boolean(initialNewToday));
   const [category, setCategory] = useState<Category>("All");
   const [subtypes, setSubtypes] = useState<string[]>([]);
   const [district, setDistrict] = useState(initialDistrict ?? "All");
@@ -955,8 +1099,17 @@ function ActiveListings({
   const [dropsOnly, setDropsOnly] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "listed", dir: "asc" });
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(initialOpenId ?? null);
   const [hoverId, setHoverId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!initialOpenId || !listings) return;
+    const t = window.setTimeout(
+      () => document.getElementById(`row-${initialOpenId}`)?.scrollIntoView({ behavior: "smooth", block: "center" }),
+      150,
+    );
+    return () => window.clearTimeout(t);
+  }, [initialOpenId, listings]);
 
   const landOnly = category === "Land";
   const commercialOnly = category === "Commercial";
@@ -977,13 +1130,15 @@ function ActiveListings({
         (!subtypes.length || subtypes.includes(subtypeOf(l, category))) &&
         (district === "All" || l.district === district) &&
         (signal === "ALL" || l.signal === signal) &&
+        (tenure === "All" || l.tenure === tenure) &&
+        (!newToday || l.is_new) &&
         (!priceMin || l.asking_price_usd >= priceMin) &&
         (!priceMax || l.asking_price_usd <= priceMax) &&
         (!bedsMin || (l.category === "Property" && l.bedrooms >= bedsMin)) &&
         (!sizeMin || size >= sizeMin) &&
         (!newOnly || l.days_on_market <= 7) &&
         (!dropsOnly || l.price_change_pct < 0) &&
-        (!q || `${l.asset_name} ${l.district} ${l.listing_id} ${l.source} ${typeLine(l)}`.toLowerCase().includes(q))
+        (!q || `${l.asset_name} ${l.district} ${l.listing_id} ${l.source} ${typeLine(l)} ${l.tenure}`.toLowerCase().includes(q))
       );
     });
     const dir = sort.dir === "asc" ? 1 : -1;
@@ -996,7 +1151,7 @@ function ActiveListings({
       if (y === null) return -1;
       return (typeof x === "string" ? x.localeCompare(y as string) : x - (y as number)) * dir;
     });
-  }, [listings, query, category, subtypes, district, signal, priceMin, priceMax, bedsMin, sizeMin, newOnly, dropsOnly, sort]);
+  }, [listings, query, category, subtypes, district, signal, priceMin, priceMax, bedsMin, sizeMin, newOnly, dropsOnly, sort, tenure, newToday]);
 
   const stats = useMemo(() => {
     const props = rows.filter((r): r is ListingSignal => r.category === "Property");
@@ -1028,9 +1183,11 @@ function ActiveListings({
   const toggleSubtype = (t: string) => setSubtypes((xs) => (xs.includes(t) ? xs.filter((x) => x !== t) : [...xs, t]));
 
   const moreCount = [priceMin, priceMax, bedsMin, sizeMin].filter(Boolean).length + (newOnly ? 1 : 0) + (dropsOnly ? 1 : 0);
-  const filtersActive = Boolean(query) || category !== "All" || subtypes.length > 0 || district !== "All" || signal !== "ALL" || moreCount > 0;
+  const filtersActive = Boolean(query) || tenure !== "All" || newToday || category !== "All" || subtypes.length > 0 || district !== "All" || signal !== "ALL" || moreCount > 0;
   const clearAll = () => {
     setQuery("");
+    setTenure("All");
+    setNewToday(false);
     pickCategory("All");
     setDistrict("All");
     setSignal("ALL");
@@ -1136,6 +1293,28 @@ function ActiveListings({
               </button>
             ))}
           </div>
+          <div className="flex overflow-hidden rounded-md border border-zinc-300" role="group" aria-label="Land title">
+            {(["All", ...TENURES] as const).map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setTenure(t)}
+                aria-pressed={tenure === t}
+                title={t === "All" ? "Eigendom and erfpacht" : TENURE_HINT[t]}
+                className={segBtn(tenure === t)}
+              >
+                {t === "All" ? "Any title" : t}
+              </button>
+            ))}
+          </div>
+          <button type="button" onClick={() => setNewToday((v) => !v)} aria-pressed={newToday} className={toggleCls(newToday)}>
+            New today
+            {listings && (
+              <span className={`${MONO} rounded-full px-1.5 text-[10px] ${newToday ? "bg-mint text-zinc-950" : "bg-zinc-950 text-mint"}`}>
+                {listings.filter((l) => l.is_new).length}
+              </span>
+            )}
+          </button>
           <button type="button" onClick={() => setMoreOpen((v) => !v)} aria-expanded={moreOpen} className={toggleCls(moreOpen || moreCount > 0)}>
             <SlidersHorizontal size={13} strokeWidth={1.75} />
             More filters{moreCount > 0 ? ` (${moreCount})` : ""}
@@ -1296,12 +1475,13 @@ function ActiveListings({
                       <div className="flex items-start gap-3">
                         <Thumb src={l.photo_url} alt={l.asset_name} />
                         <div>
-                          <p className="text-[13px] font-medium text-zinc-950">{l.asset_name}</p>
-                          <p className="mt-1 text-[11px] text-zinc-500">
+                          <p className="flex flex-wrap items-center gap-1.5 text-[13px] font-medium text-zinc-950">
+                            {l.asset_name}
+                            <ScrapeTags l={l} />
+                          </p>
+                          <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-500">
                             {l.listing_id} · {typeLine(l)}
-                            {l.days_on_market <= 7 && (
-                              <span className="ml-2 rounded bg-zinc-950 px-1.5 py-0.5 text-[9px] font-semibold text-mint">NEW</span>
-                            )}
+                            <TenureTag l={l} />
                           </p>
                         </div>
                       </div>
@@ -1352,7 +1532,7 @@ function ActiveListings({
                     <td className={`${td} text-right`}>
                       <SignalBadge signal={l.signal} />
                     </td>
-                    <td className={num}>{l.days_on_market}d</td>
+                    <td className={num}>{l.is_new ? <span className="font-semibold text-zinc-950">Today</span> : `${l.days_on_market}d`}</td>
                     <td className={`${td} pr-0 text-right`}>
                       <ChevronDown size={14} strokeWidth={1.5} className={`ml-auto text-zinc-400 transition-transform ${open ? "rotate-180" : ""}`} />
                     </td>
@@ -2259,16 +2439,195 @@ function RevenueEstimator({ prefill, districts }: { prefill?: EstimatorPrefill |
  * Page
  * ──────────────────────────────────────────────────────────────────────── */
 
+/* ─────────────────────────────────────────────────────────────────────────
+ * Terminal updates — message board fed by every daily scrape
+ * ──────────────────────────────────────────────────────────────────────── */
+
+const fmtRunTime = (iso: string) =>
+  new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/Aruba" });
+const fmtRunDay = (run: ScrapeRun, i: number) =>
+  i === 0 ? "Today" : i === 1 ? "Yesterday" : new Date(run.run_at).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: "America/Aruba" });
+
+type BoardMessage =
+  | { kind: "run"; run: ScrapeRun }
+  | { kind: "new"; l: Listing }
+  | { kind: "price"; l: Listing; from: number; e: PriceEvent };
+
+function runMessages(run: ScrapeRun): BoardMessage[] {
+  return [
+    { kind: "run", run },
+    ...run.new_listings.map((l): BoardMessage => ({ kind: "new", l })),
+    ...run.price_changes.map((c): BoardMessage => ({ kind: "price", l: c.listing, from: c.previous_price_usd, e: c.change })),
+  ];
+}
+
+function TerminalUpdates({
+  runs,
+  open,
+  onToggle,
+  onOpenListing,
+  onShowNew,
+}: {
+  runs: ScrapeRun[];
+  open: boolean;
+  onToggle: () => void;
+  onOpenListing: (id: string) => void;
+  onShowNew: () => void;
+}) {
+  const latest = runs[0];
+  const drops = latest.price_changes.filter((c) => c.change.event === "Price drop").length;
+  const ups = latest.price_changes.length - drops;
+  return (
+    <section id="terminal-updates" className="mt-6 scroll-mt-6 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-mint-deep bg-mint px-5 py-3">
+        <div className="flex items-center gap-3">
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-60" style={{ background: C.up }} />
+            <span className="relative inline-flex h-2 w-2 rounded-full" style={{ background: C.up }} />
+          </span>
+          <p className="font-display text-[15px] font-bold text-zinc-950">Terminal updated</p>
+          <p className="text-[12px] text-zinc-600">
+            Today {fmtRunTime(latest.run_at)} AST · {latest.new_listings.length} new · {latest.price_changes.length} price change
+            {latest.price_changes.length === 1 ? "" : "s"}
+          </p>
+        </div>
+        <button type="button" onClick={onToggle} aria-expanded={open} className="inline-flex items-center gap-1 text-[12px] font-medium text-zinc-700 hover:text-zinc-950">
+          {open ? "Hide updates" : "Show updates"}
+          <ChevronDown size={14} strokeWidth={1.75} className={`transition-transform ${open ? "rotate-180" : ""}`} />
+        </button>
+      </div>
+
+      {open && (
+        <div className="grid lg:grid-cols-[280px_1fr]">
+          {/* latest scrape summary */}
+          <div className="border-b border-zinc-200 p-5 lg:border-b-0 lg:border-r">
+            <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-500">Latest scrape</p>
+            <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-4">
+              {(
+                [
+                  ["New listings", latest.new_listings.length, undefined],
+                  ["Price drops", drops, C.up],
+                  ["Price increases", ups, C.down],
+                  ["Listings checked", latest.listings_checked, undefined],
+                ] as const
+              ).map(([label, value, color]) => (
+                <div key={label}>
+                  <dt className="text-[11px] text-zinc-500">{label}</dt>
+                  <dd className={`${MONO} mt-0.5 font-display text-[22px] font-bold text-zinc-950`} style={color && value ? { color } : undefined}>
+                    {value}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+            <p className="mt-4 text-[11px] leading-relaxed text-zinc-500">
+              Plus {int.format(latest.rentals_checked)} vacation rentals re-checked. We scrape every listing site once a day; anything
+              new or changed shows up here.
+            </p>
+            {latest.new_listings.length > 0 && (
+              <button
+                type="button"
+                onClick={onShowNew}
+                className="mt-4 inline-flex w-full items-center justify-center gap-2 bg-zinc-950 px-3 py-2 text-[12px] font-medium text-mint transition-colors hover:bg-zinc-800"
+              >
+                Show the {latest.new_listings.length} new listings
+                <ArrowRight size={13} strokeWidth={1.75} />
+              </button>
+            )}
+          </div>
+
+          {/* message board */}
+          <div className="max-h-[380px] overflow-y-auto" role="log" aria-label="Terminal updates">
+            {runs.map((run, i) => (
+              <div key={run.run_at}>
+                <p className="sticky top-0 z-10 border-b border-zinc-100 bg-white/95 px-5 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500 backdrop-blur">
+                  {fmtRunDay(run, i)}
+                </p>
+                <ul>
+                  {runMessages(run).map((m) => {
+                    if (m.kind === "run") {
+                      return (
+                        <li key="run" className="flex items-start gap-3 px-5 py-2.5 text-[12px] text-zinc-500">
+                          <span className={`${MONO} w-16 shrink-0 text-zinc-400`}>{fmtRunTime(run.run_at)}</span>
+                          <span>
+                            <span className="font-semibold text-zinc-800">Terminal updated.</span> {run.listings_checked} listings and{" "}
+                            {int.format(run.rentals_checked)} rentals checked
+                            {run.new_listings.length || run.price_changes.length
+                              ? ` · ${run.new_listings.length} new · ${run.price_changes.length} price change${run.price_changes.length === 1 ? "" : "s"}`
+                              : " · no changes"}
+                          </span>
+                        </li>
+                      );
+                    }
+                    const isNew = m.kind === "new";
+                    const drop = m.kind === "price" && m.e.event === "Price drop";
+                    return (
+                      <li key={`${m.kind}-${m.l.listing_id}-${isNew ? "" : m.e.date}`}>
+                        <button
+                          type="button"
+                          onClick={() => onOpenListing(m.l.listing_id)}
+                          className="flex w-full items-center gap-3 px-5 py-2.5 text-left text-[12px] transition-colors hover:bg-mint-soft"
+                        >
+                          <span className="w-16 shrink-0">
+                            {isNew ? (
+                              <span className="rounded bg-zinc-950 px-1.5 py-0.5 text-[9px] font-semibold tracking-wide text-mint">NEW</span>
+                            ) : (
+                              <span className="rounded px-1.5 py-0.5 text-[9px] font-semibold tracking-wide text-white" style={{ background: drop ? C.up : C.down }}>
+                                {drop ? "PRICE ↓" : "PRICE ↑"}
+                              </span>
+                            )}
+                          </span>
+                          <Thumb src={m.l.photo_url} alt="" w={44} h={30} />
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate font-medium text-zinc-950">{m.l.asset_name}</span>
+                            <span className="block truncate text-[11px] text-zinc-500">
+                              {typeLine(m.l)} · {m.l.district} · {m.l.tenure}
+                            </span>
+                          </span>
+                          <span className={`${MONO} shrink-0 text-right`}>
+                            {m.kind === "new" ? (
+                              <span className="font-semibold text-zinc-950">{fmtUsdCompact(m.l.asking_price_usd)}</span>
+                            ) : (
+                              <>
+                                <span className="text-zinc-400 line-through">{fmtUsdCompact(m.from)}</span>{" "}
+                                <span className="font-semibold text-zinc-950">{fmtUsdCompact(m.e.price_usd)}</span>
+                                <span className="ml-2" style={{ color: deltaColor(m.e.change_pct ?? 0) }}>
+                                  {fmtDelta(m.e.change_pct ?? 0)}
+                                </span>
+                              </>
+                            )}
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
 const SLUG_TAB = Object.fromEntries(Object.entries(TAB_SLUG).map(([t, s]) => [s, t])) as Record<string, Tab>;
 
 function Dashboard() {
   const params = useSearchParams();
   const [tab, setTabState] = useState<Tab>(SLUG_TAB[params.get("tab") ?? ""] ?? "Listings & Rentals");
-  const [listingsView, setListingsView] = useState({
+  const [listingsView, setListingsView] = useState<{
+    key: number;
+    district?: string;
+    query?: string;
+    openId?: string;
+    newToday?: boolean;
+  }>({
     key: 0,
     district: params.get("district") ?? undefined,
     query: params.get("q") ?? undefined,
   });
+  const [boardOpen, setBoardOpen] = useState(true);
+  const updatesToday = SCRAPE_RUNS[0].new_listings.length + SCRAPE_RUNS[0].price_changes.length;
   const [marketView, setMarketViewState] = useState<"sale" | "rentals">(params.get("view") === "rentals" ? "rentals" : "sale");
   const [prefill, setPrefill] = useState<{ key: number; value: EstimatorPrefill | null }>({ key: 0, value: null });
   const { data, error } = useDashboardData(MARKET_ID);
@@ -2289,6 +2648,22 @@ function Dashboard() {
     setTab("Listings & Rentals", "sale");
   };
   const openDistrict = (district: string) => showForSale(district);
+  const openListing = (id: string) => {
+    setListingsView((v) => ({ key: v.key + 1, openId: id }));
+    setMarketViewState("sale");
+    setTabState("Listings & Rentals");
+    window.history.replaceState(null, "", "?tab=listings");
+  };
+  const showNewToday = () => {
+    setListingsView((v) => ({ key: v.key + 1, newToday: true }));
+    setMarketViewState("sale");
+    window.history.replaceState(null, "", "?tab=listings");
+  };
+  const openUpdates = () => {
+    setBoardOpen(true);
+    setTabState("Listings & Rentals");
+    requestAnimationFrame(() => document.getElementById("terminal-updates")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  };
   const openEstimator = (l: ListingSignal) => {
     setPrefill((p) => ({
       key: p.key + 1,
@@ -2307,7 +2682,7 @@ function Dashboard() {
 
   return (
     <div className={`${inter.className} min-h-screen bg-white text-zinc-800 antialiased selection:bg-mint selection:text-zinc-950`}>
-      <Header tab={tab} onTab={setTab} />
+      <Header tab={tab} onTab={setTab} updates={updatesToday} onUpdates={openUpdates} />
 
       <main className="mx-auto max-w-[1400px] px-6 pb-20">
         {error ? (
@@ -2316,6 +2691,13 @@ function Dashboard() {
           </div>
         ) : tab === "Listings & Rentals" ? (
           <>
+          <TerminalUpdates
+            runs={SCRAPE_RUNS}
+            open={boardOpen}
+            onToggle={() => setBoardOpen((o) => !o)}
+            onOpenListing={openListing}
+            onShowNew={showNewToday}
+          />
           <div className="flex flex-wrap items-center justify-between gap-4 pt-6">
             <div className="inline-flex rounded-xl border border-zinc-300 bg-white p-1 shadow-sm" role="tablist" aria-label="Market view">
               {(
@@ -2354,6 +2736,8 @@ function Dashboard() {
             marketYield={data?.snapshot.est_gross_yield_pct}
             initialDistrict={listingsView.district}
             initialQuery={listingsView.query}
+            initialOpenId={listingsView.openId}
+            initialNewToday={listingsView.newToday}
             onEstimate={openEstimator}
           />
           )}

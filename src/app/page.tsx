@@ -170,7 +170,7 @@ function ListingCard({ l }: { l: Listing }) {
         {l.photo_url && <Photo src={l.photo_url} alt={l.asset_name} w={400} h={250} className="h-[170px] w-full" />}
         <div className="absolute left-3 top-3 flex gap-1.5">
           <span className="rounded-full bg-white/95 px-2.5 py-1 text-[11px] font-semibold text-zinc-900">{l.property_type}</span>
-          {l.days_on_market <= 7 && <span className="rounded-full bg-zinc-950 px-2.5 py-1 text-[11px] font-semibold text-white">New</span>}
+          {l.is_new && <span className="rounded-full bg-zinc-950 px-2.5 py-1 text-[11px] font-semibold text-white">New</span>}
         </div>
       </div>
       <div className="p-4">
