@@ -91,6 +91,66 @@ function agencyFor(channel: string, category: "Property" | "Land" | "Commercial"
   return pool[h % pool.length];
 }
 
+/** The agent at the agency who handles the listing (scraped from the listing page). */
+export interface ListingAgent {
+  id: string;
+  name: string;
+  title: string;
+  phone: string | null; // as shown on the listing, international format
+  whatsapp: boolean; // phone also reachable on WhatsApp
+  email: string | null;
+  photo_url: string | null; // null = initials avatar
+  agency_id: string;
+}
+
+/*
+ * Placeholder agents (fictional people, reserved .example e-mail domain and
+ * 555 test numbers). The scraper replaces these with the agent named on each
+ * listing page.
+ */
+const mkAgent = (agency: string, slug: string, name: string, title: string, n: number): ListingAgent => ({
+  id: `${agency}-${slug}`,
+  name,
+  title,
+  phone: `+297 555 01${String(n).padStart(2, "0")}`,
+  whatsapp: n % 3 !== 0,
+  email: `${slug}@${agency}.example`,
+  photo_url: null,
+  agency_id: agency,
+});
+
+export const AGENTS: Record<string, ListingAgent[]> = {
+  tradewind: [
+    mkAgent("tradewind", "m.croes", "Marisol Croes", "Senior broker", 11),
+    mkAgent("tradewind", "d.vanderlinde", "Daan van der Linde", "Luxury property advisor", 12),
+    mkAgent("tradewind", "r.tromp", "Rafael Tromp", "Sales agent", 13),
+  ],
+  seagrape: [
+    mkAgent("seagrape", "a.kock", "Anouk Kock", "Broker / owner", 21),
+    mkAgent("seagrape", "j.werleman", "Jayden Werleman", "Sales agent", 22),
+  ],
+  islaazul: [
+    mkAgent("islaazul", "l.geerman", "Lucia Geerman", "Managing broker", 31),
+    mkAgent("islaazul", "t.boekhoudt", "Thomas Boekhoudt", "Sales agent", 32),
+    mkAgent("islaazul", "s.maduro", "Sofia Maduro", "Investment property advisor", 33),
+  ],
+  coralridge: [mkAgent("coralridge", "sales", "Nadia Arends", "Developer sales manager", 41)],
+  northshore: [
+    mkAgent("northshore", "p.henriquez", "Pedro Henriquez", "Land specialist", 51),
+    mkAgent("northshore", "e.ras", "Emma Ras", "Sales agent", 52),
+  ],
+  harbourpoint: [
+    mkAgent("harbourpoint", "k.dekker", "Kevin Dekker", "Commercial broker", 61),
+    mkAgent("harbourpoint", "i.lacle", "Isabel Lacle", "Leasing & sales agent", 62),
+  ],
+};
+
+function agentFor(agency: Agency, id: string): ListingAgent | null {
+  const list = AGENTS[agency.id];
+  if (!list?.length) return null;
+  return list[(hashId(id) >>> 5) % list.length];
+}
+
 export type Pool = "Private pool" | "Shared pool" | "No pool";
 export const POOLS: Pool[] = ["Private pool", "Shared pool", "No pool"];
 
@@ -125,6 +185,7 @@ export interface ListingBase {
   source: string; // listing agency name (= agency.name)
   source_url: string | null; // the listing's own page on the agency's site
   agency: Agency;
+  agent: ListingAgent | null; // the agent handling it; null when the site names none
   signal: Signal;
   lat: number;
   lng: number;
@@ -479,6 +540,7 @@ export function deriveSignal(r: RawRow, marketYieldPct: number): ListingSignal {
     source: agencyFor(source, "Property", id).name,
     source_url: null,
     agency: agencyFor(source, "Property", id),
+    agent: agentFor(agencyFor(source, "Property", id), id),
     ...locate(district, id),
     photo_url: COMPACT_TYPES.includes(type)
       ? CONDO_PHOTOS[RAW_LISTINGS.filter((x) => COMPACT_TYPES.includes(x[2])).indexOf(r) % CONDO_PHOTOS.length]
@@ -546,6 +608,7 @@ export function deriveLand(r: RawLandRow): LandListing {
     source: agencyFor(source, "Land", id).name,
     source_url: null,
     agency: agencyFor(source, "Land", id),
+    agent: agentFor(agencyFor(source, "Land", id), id),
     signal,
     ...locate(district, id),
     photo_url: LAND_PHOTOS[RAW_LAND.indexOf(r) % LAND_PHOTOS.length],
@@ -603,6 +666,7 @@ export function deriveCommercial(r: RawCommercialRow): CommercialListing {
     source: agencyFor(source, "Commercial", id).name,
     source_url: null,
     agency: agencyFor(source, "Commercial", id),
+    agent: agentFor(agencyFor(source, "Commercial", id), id),
     signal,
     ...locate(district, id),
     photo_url: photos[RAW_COMMERCIAL.filter((x) => x[3] === use).indexOf(r) % photos.length],

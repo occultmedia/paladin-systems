@@ -144,6 +144,7 @@ export function HoverCard({ l }: { l: Listing }) {
           <AgencyLogo agency={l.agency} size={18} rounded={4} />
           <span style={{ fontSize: 11, color: "#52525B" }}>
             Listed by <b style={{ color: "#09090B" }}>{l.agency.name}</b>
+            {l.agent && <> · {l.agent.name}</>}
           </span>
         </div>
         <div style={{ color: "#A1A1AA", fontSize: 10, marginTop: 6 }}>Click the pin for full details</div>

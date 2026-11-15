@@ -47,6 +47,8 @@ import {
   type VacationRental,
 } from "@/lib/aruba-data";
 import { AgencyLogo, PLATFORM_COLOR } from "@/components/dashboard/map-shared";
+import DistrictMap, { HAS_DISTRICT_MAP } from "@/components/dashboard/district-map";
+import { DISTRICT_METRICS, ROPV_ZONES, ZONE_ORDER, type DistrictMetric } from "@/components/dashboard/district-map-shared";
 import { Inter } from "next/font/google";
 import {
   ArrowDownRight,
@@ -61,6 +63,9 @@ import {
   CreditCard,
   Download,
   ExternalLink,
+  Mail,
+  MessageCircle,
+  Phone,
   KeyRound,
   LogOut,
   Search,
@@ -742,6 +747,9 @@ function downloadCsv(rows: Listing[]) {
     ["Zoning", (l) => d(l)?.zoning],
     ["District", (l) => l.district],
     ["Listed by", (l) => l.agency.name],
+    ["Agent", (l) => l.agent?.name],
+    ["Agent phone", (l) => l.agent?.phone],
+    ["Agent e-mail", (l) => l.agent?.email],
     ["Listing URL", (l) => l.source_url],
     ["Status", (l) => l.status],
     ["Status since", (l) => l.status_changed],
@@ -868,7 +876,8 @@ function ListedBy({ l }: { l: Listing }) {
     </>
   );
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-white px-3 py-2.5">
+    <div className="rounded-xl border border-zinc-200 bg-white">
+    <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2.5">
       <div className="flex min-w-0 items-center gap-3">{body}</div>
       {href ? (
         <a
@@ -888,6 +897,74 @@ function ListedBy({ l }: { l: Listing }) {
           View on their site <ExternalLink size={12} strokeWidth={1.75} />
         </span>
       )}
+    </div>
+    <ListingAgentRow l={l} />
+    </div>
+  );
+}
+
+const initialsOf = (name: string) =>
+  name
+    .split(/\s+/)
+    .filter((w) => /^[A-Z]/.test(w))
+    .map((w) => w[0])
+    .slice(0, 2)
+    .join("");
+
+/** The agent handling the listing, with call / WhatsApp / e-mail buttons. */
+function ListingAgentRow({ l }: { l: Listing }) {
+  const a = l.agent;
+  const btn =
+    "inline-flex items-center gap-1.5 rounded-md border border-zinc-300 px-2.5 py-1.5 text-[12px] text-zinc-800 transition-colors hover:border-zinc-950 hover:bg-zinc-950 hover:text-mint";
+  if (!a)
+    return (
+      <div className="border-t border-zinc-100 px-3 py-2.5 text-[12px] text-zinc-500">
+        No agent named on this listing. Contact the agency directly.
+      </div>
+    );
+  const digits = a.phone?.replace(/[^\d]/g, "") ?? "";
+  const subject = encodeURIComponent(`${l.asset_name} (${l.listing_id})`);
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-zinc-100 px-3 py-2.5">
+      <div className="flex min-w-0 items-center gap-3">
+        {a.photo_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={a.photo_url} alt={a.name} className="size-9 shrink-0 rounded-full object-cover" />
+        ) : (
+          <span
+            className="flex size-9 shrink-0 items-center justify-center rounded-full text-[12px] font-semibold text-white"
+            style={{ background: l.agency.color }}
+            aria-hidden
+          >
+            {initialsOf(a.name)}
+          </span>
+        )}
+        <span className="min-w-0">
+          <span className="block text-[10px] uppercase tracking-[0.14em] text-zinc-500">Listing agent</span>
+          <span className="block truncate text-[14px] font-semibold text-zinc-950">{a.name}</span>
+          <span className="block truncate text-[11px] text-zinc-500">
+            {a.title}
+            {a.phone && <> · <span className="tabular-nums">{a.phone}</span></>}
+          </span>
+        </span>
+      </div>
+      <div className="flex flex-wrap gap-1.5" onClick={(e) => e.stopPropagation()}>
+        {a.phone && (
+          <a href={`tel:+${digits}`} className={btn}>
+            <Phone size={12} strokeWidth={1.75} /> Call
+          </a>
+        )}
+        {a.phone && a.whatsapp && (
+          <a href={`https://wa.me/${digits}`} target="_blank" rel="noopener noreferrer" className={btn}>
+            <MessageCircle size={12} strokeWidth={1.75} /> WhatsApp
+          </a>
+        )}
+        {a.email && (
+          <a href={`mailto:${a.email}?subject=${subject}`} className={btn}>
+            <Mail size={12} strokeWidth={1.75} /> E-mail
+          </a>
+        )}
+      </div>
     </div>
   );
 }
@@ -1710,6 +1787,10 @@ function ActiveListings({
                             <TenureTag l={l} />
                             <PoolTag pool={l.pool} />
                           </p>
+                          <p className="mt-1 truncate text-[11px] text-zinc-500">
+                            {l.agency.name}
+                            {l.agent && <> · Agent <span className="text-zinc-800">{l.agent.name}</span></>}
+                          </p>
                         </div>
                       </div>
                     </td>
@@ -2338,6 +2419,7 @@ function ScoreBar({ score }: { score: number }) {
 
 function Districts({ districts, onOpenDistrict }: { districts: DistrictStats[]; onOpenDistrict: (d: string) => void }) {
   const [sort, setSort] = useState<{ key: DistrictSortKey; dir: "asc" | "desc" }>({ key: "score", dir: "desc" });
+  const [metric, setMetric] = useState<DistrictMetric>("median_asking_usd");
 
   const value = (d: DistrictStats, k: DistrictSortKey): number | null =>
     k === "forSale" ? d.properties_for_sale + d.land_for_sale + d.commercial_for_sale : d[k];
@@ -2418,7 +2500,34 @@ function Districts({ districts, onOpenDistrict }: { districts: DistrictStats[]; 
       </div>
 
       <div className="py-8">
-        <ArubaMap mode="districts" districts={districts} onSelect={onOpenDistrict} height={440} />
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="font-display text-[17px] font-semibold tracking-tight text-zinc-950">Value map</h2>
+            <p className="mt-1 text-[12px] text-zinc-500">Each district shaded by value. Darker = higher. Click an area to see its listings.</p>
+          </div>
+          <div className="flex flex-wrap rounded-md border border-zinc-300 p-0.5" role="tablist" aria-label="Map value">
+            {(Object.keys(DISTRICT_METRICS) as DistrictMetric[]).map((k) => (
+              <button
+                key={k}
+                type="button"
+                role="tab"
+                aria-selected={metric === k}
+                onClick={() => setMetric(k)}
+                className={`rounded px-3 py-1.5 text-[12px] transition-colors ${metric === k ? "bg-zinc-950 text-mint" : "text-zinc-600 hover:text-zinc-950"}`}
+              >
+                {DISTRICT_METRICS[k].short}
+              </button>
+            ))}
+          </div>
+        </div>
+        {HAS_DISTRICT_MAP ? (
+          <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
+            <DistrictMap layer="value" metric={metric} districts={districts} onSelect={onOpenDistrict} height={540} />
+            <MetricRanking districts={districts} metric={metric} onOpenDistrict={onOpenDistrict} />
+          </div>
+        ) : (
+          <ArubaMap mode="districts" districts={districts} onSelect={onOpenDistrict} height={440} />
+        )}
       </div>
 
       <div className="overflow-x-auto border-t border-zinc-950">
@@ -2468,7 +2577,95 @@ function Districts({ districts, onOpenDistrict }: { districts: DistrictStats[]; 
         year over year), value for buyers (average yield of homes for sale) and competition (new rental supply). Higher
         is better. ADR, occupancy and RevPAR are for luxury vacation rentals in the district over the last 12 months.
       </p>
+
+      {HAS_DISTRICT_MAP && <ZoningMap districts={districts} />}
     </>
+  );
+}
+
+/** Districts ranked by the value shown on the map. */
+function MetricRanking({ districts, metric, onOpenDistrict }: { districts: DistrictStats[]; metric: DistrictMetric; onOpenDistrict: (d: string) => void }) {
+  const rows = [...districts].sort((a, b) => (b[metric] ?? -Infinity) - (a[metric] ?? -Infinity));
+  const max = Math.max(...districts.map((d) => d[metric] ?? 0));
+  const m = DISTRICT_METRICS[metric];
+  return (
+    <div>
+      <p className="text-[10px] uppercase tracking-[0.16em] text-zinc-500">{m.label} · ranked</p>
+      <ol className="mt-3 space-y-0.5">
+        {rows.map((d, i) => {
+          const v = d[metric];
+          return (
+            <li key={d.district}>
+              <button
+                type="button"
+                onClick={() => onOpenDistrict(d.district)}
+                className="group w-full rounded-md px-2 py-1.5 text-left transition-colors hover:bg-zinc-50"
+              >
+                <span className="flex items-baseline justify-between gap-2 text-[12px]">
+                  <span className="text-zinc-950">
+                    <span className={`${MONO} mr-1.5 text-[10px] text-zinc-400`}>{i + 1}</span>
+                    {d.district}
+                  </span>
+                  <span className={`${MONO} text-zinc-800`}>{v === null ? DASH : m.fmt(v)}</span>
+                </span>
+                <span className="mt-1 block h-1 w-full bg-zinc-100">
+                  <span className="block h-full bg-[#3F7A55] group-hover:bg-zinc-950" style={{ width: `${v && max ? (v / max) * 100 : 0}%` }} />
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
+  );
+}
+
+/** Official ROPV zoning (what may be built where), with the districts outlined on top. */
+function ZoningMap({ districts }: { districts: DistrictStats[] }) {
+  const [hidden, setHidden] = useState<string[]>(["Marinegebied", "Marinezones"]);
+  const toggle = (z: string) => setHidden((h) => (h.includes(z) ? h.filter((x) => x !== z) : [...h, z]));
+  return (
+    <section className="mt-12 border-t border-zinc-200 py-10">
+      <p className={`${MONO} text-[11px] tracking-wider text-zinc-500`}>DATASET / ROPV / DEELGEBIEDEN 2021</p>
+      <h2 className="font-display mt-3 text-[22px] font-semibold tracking-tight text-zinc-950">Zoning (ROPV)</h2>
+      <p className="mt-2 max-w-[80ch] text-[13px] leading-relaxed text-zinc-600">
+        The ROPV (Ruimtelijk Ontwikkelingsplan met Voorschriften) is Aruba&apos;s legal zoning plan. It sets what may be built
+        in each area, for example whether holiday rentals and hotels are allowed or the land is protected nature. Dashed lines
+        are the Sequence Data districts. Hover an area for its zone.
+      </p>
+      <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_280px]">
+        <DistrictMap layer="zoning" districts={districts} hiddenZones={hidden} height={560} />
+        <div>
+          <p className="text-[10px] uppercase tracking-[0.16em] text-zinc-500">Zones · click to show / hide</p>
+          <p className="mt-1 text-[11px] text-zinc-500">Hover a zone on the map for what it allows.</p>
+          <ul className="mt-3 space-y-0.5">
+            {ZONE_ORDER.map((z) => {
+              const info = ROPV_ZONES[z];
+              const off = hidden.includes(z);
+              return (
+                <li key={z}>
+                  <button
+                    type="button"
+                    onClick={() => toggle(z)}
+                    aria-pressed={!off}
+                    title={info.hint}
+                    className={`flex w-full items-start gap-2.5 rounded-md px-2 py-1 text-left transition-colors hover:bg-zinc-50 ${off ? "opacity-40" : ""}`}
+                  >
+                    <span className="mt-0.5 size-3 shrink-0 rounded-sm ring-1 ring-black/10" style={{ background: info.color }} />
+                    <span className="min-w-0 text-[12px] text-zinc-950">{info.en}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      </div>
+      <p className="mt-4 max-w-[90ch] text-[11px] leading-relaxed text-zinc-500">
+        Source: ROPV deelgebieden, version 5 Feb 2021, Government of Aruba (published on ArcGIS Online by the plan&apos;s
+        consultant). For information only, not legal advice. Check the current ROPV and its regulations with DIP (Departamento
+        di Infrastructura y Planificacion) before you buy or build. District outlines are approximate market areas.
+      </p>
+    </section>
   );
 }
 
