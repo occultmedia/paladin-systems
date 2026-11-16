@@ -18,6 +18,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Wordmark } from "@/components/logo";
 import { useWatchlist, type WatchEntry } from "@/lib/watchlist";
+import { useInterestedClients, type ClientInput, type InterestedClient } from "@/lib/clients";
 import {
   COMMERCIAL_USES,
   DISTRICTS,
@@ -53,7 +54,11 @@ import {
   ArrowUp,
   Bell,
   ChevronDown,
+  Pencil,
   Pin,
+  Plus,
+  Trash2,
+  Users,
   Waves,
   CreditCard,
   Download,
@@ -565,7 +570,7 @@ function SortHeader({
   return (
     <th
       aria-sort={active ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}
-      className={`border-b border-zinc-300 px-3 py-3 text-[10px] font-medium uppercase tracking-[0.14em] ${align === "right" ? "text-right" : "text-left"}`}
+      className={`border-b border-zinc-300 px-3 py-3 text-[10px] font-medium uppercase tracking-[0.14em] first:pl-4 ${align === "right" ? "text-right" : "text-left"}`}
     >
       <button
         type="button"
@@ -960,6 +965,252 @@ function PriceHistory({ l, marketYield }: { l: Listing; marketYield?: number }) 
   );
 }
 
+/* ── Interested clients (per listing, agent CRM) ─────────────────────── */
+
+const fieldCls =
+  "w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-[13px] text-zinc-900 outline-none transition-colors placeholder:text-zinc-400 hover:border-zinc-400 focus:border-zinc-950 focus:ring-2 focus:ring-mint";
+
+function ClientForm({
+  initial,
+  submitLabel,
+  onSubmit,
+  onCancel,
+}: {
+  initial?: ClientInput;
+  submitLabel: string;
+  onSubmit: (c: ClientInput) => void;
+  onCancel: () => void;
+}) {
+  const [name, setName] = useState(initial?.name ?? "");
+  const [phone, setPhone] = useState(initial?.phone ?? "");
+  const [comment, setComment] = useState(initial?.comment ?? "");
+  const [touched, setTouched] = useState(false);
+  const nameRef = useRef<HTMLInputElement>(null);
+  useEffect(() => nameRef.current?.focus(), []);
+  const missing = !name.trim();
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        setTouched(true);
+        if (missing) return nameRef.current?.focus();
+        onSubmit({ name, phone, comment });
+      }}
+      onKeyDown={(e) => e.key === "Escape" && onCancel()}
+      className="space-y-2.5 rounded-xl border border-zinc-200 bg-zinc-50 p-3"
+    >
+      <label className="block">
+        <span className="mb-1 block text-[11px] font-medium text-zinc-600">
+          Name <span className="text-zinc-400">(required)</span>
+        </span>
+        <input
+          ref={nameRef}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="e.g. Maria Croes"
+          autoComplete="off"
+          aria-invalid={touched && missing}
+          className={`${fieldCls} ${touched && missing ? "border-[#D64545]" : ""}`}
+        />
+        {touched && missing && <span className="mt-1 block text-[11px] text-[#D64545]">Add a name to save this client.</span>}
+      </label>
+      <label className="block">
+        <span className="mb-1 block text-[11px] font-medium text-zinc-600">Phone</span>
+        <input
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          type="tel"
+          inputMode="tel"
+          placeholder="+297 …"
+          autoComplete="off"
+          className={`${fieldCls} tabular-nums`}
+        />
+      </label>
+      <label className="block">
+        <span className="mb-1 block text-[11px] font-medium text-zinc-600">Comments</span>
+        <textarea
+          value={comment}
+          onChange={(e) => setComment(e.target.value)}
+          rows={3}
+          placeholder="Budget, timing, what they asked about…"
+          className={`${fieldCls} resize-y leading-relaxed`}
+        />
+      </label>
+      <div className="flex items-center justify-end gap-2 pt-0.5">
+        <button type="button" onClick={onCancel} className="rounded-lg px-3 py-2 text-[12px] font-medium text-zinc-600 transition-colors hover:bg-zinc-200/60 hover:text-zinc-950">
+          Cancel
+        </button>
+        <button type="submit" className="rounded-lg bg-zinc-950 px-4 py-2 text-[12px] font-semibold text-mint transition-all hover:bg-zinc-800 active:scale-95">
+          {submitLabel}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function InterestedClients({ l }: { l: Listing }) {
+  const { forListing, add, update, remove, restore } = useInterestedClients();
+  const clients = forListing(l.listing_id);
+  const [mode, setMode] = useState<{ kind: "idle" } | { kind: "add" } | { kind: "edit"; id: string }>({ kind: "idle" });
+  const [removed, setRemoved] = useState<InterestedClient | null>(null);
+
+  useEffect(() => {
+    if (!removed) return;
+    const t = window.setTimeout(() => setRemoved(null), 6000);
+    return () => window.clearTimeout(t);
+  }, [removed]);
+
+  const btn =
+    "inline-flex size-7 items-center justify-center rounded-md text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-950";
+
+  return (
+    <section className="rounded-xl border border-zinc-200 bg-white" aria-label={`Interested clients for ${l.asset_name}`}>
+      <div className="flex items-center justify-between gap-3 px-3 py-2.5">
+        <div className="flex items-center gap-2">
+          <span className="flex size-7 items-center justify-center rounded-lg bg-mint text-zinc-950">
+            <Users size={14} strokeWidth={1.75} />
+          </span>
+          <span>
+            <span className="block text-[10px] uppercase tracking-[0.14em] text-zinc-500">Interested clients</span>
+            <span className="block text-[13px] font-semibold text-zinc-950">
+              {clients.length === 0 ? "None yet" : `${clients.length} ${clients.length === 1 ? "person" : "people"}`}
+            </span>
+          </span>
+        </div>
+        {mode.kind !== "add" && (
+          <button
+            type="button"
+            onClick={() => setMode({ kind: "add" })}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-950 px-3 py-1.5 text-[12px] font-semibold text-mint transition-all hover:bg-zinc-800 active:scale-95"
+          >
+            <Plus size={13} strokeWidth={2} /> Add
+          </button>
+        )}
+      </div>
+
+      <div className="space-y-2 border-t border-zinc-100 p-3">
+        {mode.kind === "add" && (
+          <ClientForm
+            submitLabel="Save client"
+            onCancel={() => setMode({ kind: "idle" })}
+            onSubmit={(c) => {
+              add(l.listing_id, c);
+              setMode({ kind: "idle" });
+            }}
+          />
+        )}
+
+        {clients.length === 0 && mode.kind !== "add" && (
+          <p className="px-1 py-1 text-[12px] leading-relaxed text-zinc-500">
+            Keep track of who asked about this property: their name, number and what they are looking for.
+          </p>
+        )}
+
+        {clients.length > 0 && (
+          <ul className="space-y-2">
+            {clients.map((c) =>
+              mode.kind === "edit" && mode.id === c.id ? (
+                <li key={c.id}>
+                  <ClientForm
+                    initial={c}
+                    submitLabel="Save changes"
+                    onCancel={() => setMode({ kind: "idle" })}
+                    onSubmit={(input) => {
+                      update(c.id, input);
+                      setMode({ kind: "idle" });
+                    }}
+                  />
+                </li>
+              ) : (
+                <li key={c.id} className="group rounded-xl border border-zinc-100 bg-zinc-50/70 p-3 transition-colors hover:border-zinc-200">
+                  <div className="flex items-start gap-2.5">
+                    <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-zinc-950 text-[11px] font-semibold text-mint" aria-hidden>
+                      {initialsOf(c.name) || "?"}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[13px] font-semibold text-zinc-950">{c.name}</p>
+                      {c.phone ? (
+                        <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[12px]">
+                          <a href={`tel:${c.phone.replace(/[^\d+]/g, "")}`} className="tabular-nums text-zinc-700 underline-offset-2 hover:text-zinc-950 hover:underline">
+                            {c.phone}
+                          </a>
+                          {c.phone.replace(/\D/g, "").length >= 7 && (
+                            <a
+                              href={`https://wa.me/${c.phone.replace(/\D/g, "")}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-[11px] font-medium text-[#2E9E5B] hover:underline"
+                            >
+                              <MessageCircle size={11} strokeWidth={2} /> WhatsApp
+                            </a>
+                          )}
+                        </p>
+                      ) : (
+                        <p className="mt-0.5 text-[12px] text-zinc-400">No phone</p>
+                      )}
+                    </div>
+                    <div className="flex shrink-0 gap-0.5 opacity-100 sm:opacity-60 sm:transition-opacity sm:group-hover:opacity-100">
+                      <button type="button" onClick={() => setMode({ kind: "edit", id: c.id })} className={btn} aria-label={`Edit ${c.name}`} title="Edit">
+                        <Pencil size={13} strokeWidth={1.75} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          remove(c.id);
+                          setRemoved(c);
+                        }}
+                        className={`${btn} hover:text-[#D64545]`}
+                        aria-label={`Remove ${c.name}`}
+                        title="Remove"
+                      >
+                        <Trash2 size={13} strokeWidth={1.75} />
+                      </button>
+                    </div>
+                  </div>
+                  {c.comment && <p className="mt-2 whitespace-pre-line text-[12px] leading-relaxed text-zinc-700">{c.comment}</p>}
+                  <p className="mt-2 text-[10px] text-zinc-400">
+                    Added {fmtDate(c.added_at.slice(0, 10))}
+                    {c.updated_at && <> · edited {fmtDate(c.updated_at.slice(0, 10))}</>}
+                  </p>
+                </li>
+              ),
+            )}
+          </ul>
+        )}
+
+        {removed && (
+          <div role="status" className="flex items-center justify-between gap-3 rounded-lg bg-zinc-950 px-3 py-2 text-[12px] text-white">
+            <span className="truncate">Removed {removed.name}</span>
+            <button
+              type="button"
+              onClick={() => {
+                restore(removed);
+                setRemoved(null);
+              }}
+              className="shrink-0 font-semibold text-mint hover:underline"
+            >
+              Undo
+            </button>
+          </div>
+        )}
+      </div>
+      <p className="border-t border-zinc-100 px-3 py-2 text-[10px] text-zinc-400">Private to you · saved on this device</p>
+    </section>
+  );
+}
+
+/** Small "2 interested" chip for rows and cards. */
+function ClientCount({ id }: { id: string }) {
+  const n = useInterestedClients().countFor(id);
+  if (!n) return null;
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-mint px-1.5 py-px text-[10px] font-semibold text-zinc-950" title={`${n} interested ${n === 1 ? "client" : "clients"}`}>
+      <Users size={10} strokeWidth={2} />
+      {n} interested
+    </span>
+  );
+}
+
 /** Pin / unpin a listing on the watchlist. "icon" is the compact row/card version. */
 function WatchButton({ l, variant = "full" }: { l: Listing; variant?: "full" | "icon" }) {
   const { isPinned, toggle } = useWatchlist();
@@ -1080,29 +1331,39 @@ function ListingDetails({ l, marketYield }: { l: Listing; marketYield?: number }
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
-      <div className="space-y-3">
-        {l.photo_url && (
-          <Image
-            src={`${l.photo_url}?auto=format&fit=crop&w=720&h=460&q=70`}
-            alt={l.asset_name}
-            width={320}
-            height={205}
-            unoptimized
-            className="h-[205px] w-full rounded-xl bg-zinc-100 object-cover"
-          />
-        )}
-        <ListedBy l={l} />
-      </div>
-      <div>
-        <div className="mb-5">
-          <WatchButton l={l} />
+    <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white text-left shadow-sm shadow-zinc-900/5">
+      <div className="grid grid-cols-[minmax(0,1fr)] lg:grid-cols-[320px_minmax(0,1fr)]">
+        <aside className="space-y-3 border-b border-zinc-200 bg-zinc-50/70 p-4 sm:p-5 lg:border-b-0 lg:border-r">
+          {l.photo_url && (
+            <Image
+              src={`${l.photo_url}?auto=format&fit=crop&w=720&h=460&q=70`}
+              alt={l.asset_name}
+              width={320}
+              height={205}
+              unoptimized
+              className="aspect-[16/10] h-auto w-full rounded-xl bg-zinc-100 object-cover"
+            />
+          )}
+          <ListedBy l={l} />
+          <InterestedClients l={l} />
+        </aside>
+        <div className="min-w-0 p-4 sm:p-6">
+          <div className="mb-6 flex flex-wrap items-start justify-between gap-3 border-b border-zinc-100 pb-5">
+            <div className="min-w-0">
+              <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-zinc-500">Property details</p>
+              <p className="mt-1 font-display text-[18px] font-bold leading-tight tracking-tight text-zinc-950 sm:text-[20px]">{l.asset_name}</p>
+              <p className="mt-1 text-[12px] text-zinc-500">
+                {l.district} · {l.listing_id}
+              </p>
+            </div>
+            <WatchButton l={l} />
+          </div>
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-3 xl:grid-cols-4">
+            {facts}
+            {shared}
+          </dl>
+          <PriceHistory l={l} marketYield={marketYield} />
         </div>
-        <dl className="grid grid-cols-2 gap-x-8 gap-y-5 sm:grid-cols-3 xl:grid-cols-4">
-          {facts}
-          {shared}
-        </dl>
-        <PriceHistory l={l} marketYield={marketYield} />
       </div>
     </div>
   );
@@ -1539,6 +1800,7 @@ function ActiveListings({
                     <ScrapeTags l={l} />
                     <TenureTag l={l} />
                     <PoolTag pool={l.pool} />
+                    <ClientCount id={l.listing_id} />
                   </span>
                   <span className="mt-2.5 flex items-end justify-between gap-2">
                     <span>
@@ -1598,7 +1860,7 @@ function ActiveListings({
               <SortHeader label="Status" k="status" sort={sort} onSort={onSort} />
               <PlainHeader label="Signal" />
               <SortHeader label="Listed" k="listed" sort={sort} onSort={onSort} />
-              <th className="w-8 border-b border-zinc-300" aria-label="Details" />
+              <th className="w-20 border-b border-zinc-300 pr-4" aria-label="Watch and details" />
             </tr>
           </thead>
           <tbody>
@@ -1637,7 +1899,7 @@ function ActiveListings({
                     onMouseLeave={() => setHoverId(null)}
                     className={`cursor-pointer scroll-mt-24 transition-colors hover:bg-mint-soft ${open || hot ? "bg-mint-soft" : ""}`}
                   >
-                    <td className={`${td} min-w-[300px] pl-0`}>
+                    <td className={`${td} min-w-[300px] pl-4`}>
                       <div className="flex items-start gap-3">
                         <span className="relative shrink-0" title={`Listed by ${l.agency.name}`}>
                           <Thumb src={l.photo_url} alt={l.asset_name} />
@@ -1655,9 +1917,12 @@ function ActiveListings({
                             <TenureTag l={l} />
                             <PoolTag pool={l.pool} />
                           </p>
-                          <p className="mt-1 truncate text-[11px] text-zinc-500">
-                            {l.agency.name}
-                            {l.agent && <> · Agent <span className="text-zinc-800">{l.agent.name}</span></>}
+                          <p className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-zinc-500">
+                            <span className="truncate">
+                              {l.agency.name}
+                              {l.agent && <> · Agent <span className="text-zinc-800">{l.agent.name}</span></>}
+                            </span>
+                            <ClientCount id={l.listing_id} />
                           </p>
                         </div>
                       </div>
@@ -1710,7 +1975,7 @@ function ActiveListings({
                       <SignalBadge signal={l.signal} />
                     </td>
                     <td className={num}>{l.is_new ? <span className="font-semibold text-zinc-950">Today</span> : `${l.days_on_market}d`}</td>
-                    <td className={`${td} pr-0 text-right`}>
+                    <td className={`${td} pr-4 text-right`}>
                       <span className="flex items-center justify-end gap-1">
                         <WatchButton l={l} variant="icon" />
                         <ChevronDown size={14} strokeWidth={1.5} className={`text-zinc-400 transition-transform ${open ? "rotate-180" : ""}`} />
@@ -1719,7 +1984,7 @@ function ActiveListings({
                   </tr>
                   {open && (
                     <tr className="bg-mint-soft">
-                      <td colSpan={colCount} className="border-b border-zinc-300 px-0 pb-8 pt-3">
+                      <td colSpan={colCount} className="border-b border-zinc-300 px-4 pb-6 pt-1">
                         <ListingDetails l={l} marketYield={marketYield} />
                       </td>
                     </tr>
@@ -1929,6 +2194,7 @@ function Watchlist({ listings, marketYield, onOpenListing, onBrowse }: { listing
                           <ScrapeTags l={l} />
                           <TenureTag l={l} />
                           <SignalBadge signal={l.signal} />
+                          <ClientCount id={l.listing_id} />
                         </div>
                       </div>
                     </div>
