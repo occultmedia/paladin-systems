@@ -1,16 +1,13 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, ArrowUpRight, Building2, Download, Map as MapIcon, Pin, Search, TrendingDown } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Building2, MessageCircle, Phone, Pin, Search, Sparkles, TrendingDown, Users } from "lucide-react";
 import { SequenceLockup, Wordmark } from "@/components/logo";
-import { TerminalPreview, type PreviewData } from "@/components/landing/terminal-preview";
+import { ClientsPane, HistoryPane, TerminalPreview, type PreviewData } from "@/components/landing/terminal-preview";
 import { CountUp, MotionRoot, Reveal, Stagger, StaggerItem } from "@/components/motion/reveal";
-import { DISTRICT_METRICS, ROPV_ZONES, rampColor } from "@/components/dashboard/district-map-shared";
-import { DISTRICT_SHAPES, ZONING_SHAPES, SVG_H, project } from "@/lib/svg-geo";
 import { CONTACT_EMAIL, SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/site";
 import {
   ALL_LISTINGS,
   ARUBA_PHOTOS,
-  DISTRICTS,
   MOCK_SNAPSHOT,
   SCRAPE_RUNS,
   VILLA_PHOTOS,
@@ -51,7 +48,8 @@ const PROPERTIES = ALL_LISTINGS.filter((l) => l.category === "Property");
 const NEW_THIS_WEEK = ALL_LISTINGS.filter((l) => l.days_on_market <= 7).length;
 const UNDERVALUED = ALL_LISTINGS.filter((l) => l.signal === "UNDERVALUED").length;
 const NEWEST = [...ALL_LISTINGS].sort((a, b) => a.days_on_market - b.days_on_market).slice(0, 6);
-const TOP_DISTRICTS = DISTRICTS.slice(0, 6);
+const AGENCIES = new Set(ALL_LISTINGS.map((l) => l.agency.id)).size;
+const AGENTS = new Set(ALL_LISTINGS.map((l) => l.agent?.id).filter(Boolean)).size;
 const NEW_PICK = NEWEST.find((l) => l.category === "Property") ?? NEWEST[0];
 
 const TICKER: Array<[string, string, number | null]> = [
@@ -63,7 +61,7 @@ const TICKER: Array<[string, string, number | null]> = [
   ["Price changes today", String(SCRAPE_RUNS[0].price_changes.length), null],
   ["Under contract / sold today", String(SCRAPE_RUNS[0].status_changes.length), null],
   ["Median land price", `${usd(median(LAND.map((l) => l.price_per_sqft_usd)))}/sq ft`, null],
-  ...TOP_DISTRICTS.slice(0, 3).map((d): [string, string, number | null] => [`${d.district} score`, String(d.score), null]),
+  ["Agencies tracked", String(AGENCIES), null],
 ];
 
 /* ── Terminal preview (hero) ─────────────────────────────────────────── */
@@ -167,15 +165,6 @@ function previewData(): PreviewData {
   const verdict =
     gap <= -0.03 ? `${Math.abs(gap * 100).toFixed(0)}% below market` : gap >= 0.03 ? `${(gap * 100).toFixed(0)}% above market` : "In line with market";
 
-  // District value map (median asking price)
-  const metric = "median_asking_usd" as const;
-  const vals = DISTRICTS.map((d) => d[metric]).filter((v): v is number => v !== null);
-  const vlo = Math.min(...vals);
-  const vhi = Math.max(...vals);
-  const byName = Object.fromEntries(DISTRICTS.map((d) => [d.district, d]));
-  const ranked = DISTRICTS.filter((d) => d[metric] !== null).sort((a, b) => (b[metric] ?? 0) - (a[metric] ?? 0));
-  const labelled = new Set(["Palm Beach", "Eagle Beach", "Oranjestad", "Savaneta", "Santa Cruz", "Pos Chiquito", "Arashi"]);
-
   return {
     run: {
       time: `${new Date(RUN.run_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/Aruba" })} AST`,
@@ -206,36 +195,20 @@ function previewData(): PreviewData {
         .slice(0, 3)
         .map((e) => ({ date: shortDate(e.date), label: e.event, price: usdShort(e.price_usd), pct: e.change_pct })),
     },
-    districts: {
-      svgH: SVG_H,
-      shapes: DISTRICT_SHAPES.map((sh) => {
-        const v = byName[sh.key]?.[metric] ?? null;
-        return { ...sh, color: v === null ? "#E4E4E7" : rampColor(vhi === vlo ? 1 : (v - vlo) / (vhi - vlo)) };
-      }),
-      labels: DISTRICTS.filter((d) => labelled.has(d.district) && d[metric] !== null).map((d) => {
-        const [x, y] = project([d.lng, d.lat]);
-        return { key: d.district, x, y: y + 3, text: DISTRICT_METRICS[metric].fmt(d[metric] as number) };
-      }),
-      top: ranked.slice(0, 6).map((d) => ({
-        name: d.district,
-        value: DISTRICT_METRICS[metric].fmt(d[metric] as number),
-        pct: ((d[metric] as number) / vhi) * 100,
-      })),
-    },
-    zoning: {
-      svgH: SVG_H,
-      shapes: ZONING_SHAPES.map((sh) => ({ ...sh, color: ROPV_ZONES[sh.key]?.color ?? "#ccc" })),
-      outlines: ZONING_SHAPES.map((sh) => ({ key: sh.key, d: sh.d })),
-      legend: [
-        "Toeristisch gebied Westkust",
-        "Woongebied met waarden",
-        "Stedelijk woongebied",
-        "Centrum Oranjestad",
-        "Landelijk gebied",
-        "Natuur en landschap",
-        "Natuurgebied",
-        "Luchthaven",
-      ].map((z) => ({ en: ROPV_ZONES[z].en, color: ROPV_ZONES[z].color })),
+    clients: {
+      listing: {
+        name: f.asset_name,
+        district: f.district,
+        price: usdShort(f.asking_price_usd),
+        photo: f.photo_url,
+        agent: f.agent?.name ?? null,
+      },
+      // Fictional sample leads for the preview.
+      people: [
+        { name: "Sofia Ramirez", phone: "+297 555 0143", comment: "Budget up to $8M. Wants a viewing this Saturday, asks if the price is negotiable.", added: shortDate(RUN.date) },
+        { name: "Mark de Vries", phone: "+31 6 5550 1188", comment: "Buying from the Netherlands. Needs the erfpacht terms and HOA costs by e-mail.", added: shortDate(new Date(Date.parse(RUN.date) - 2 * 86_400_000).toISOString().slice(0, 10)) },
+        { name: "James Whitfield", phone: "+1 555 0177", comment: "Interested if it drops below $7.5M. Follow up after the next price change.", added: shortDate(new Date(Date.parse(RUN.date) - 6 * 86_400_000).toISOString().slice(0, 10)) },
+      ],
     },
     watchlist: watchPreview(),
   };
@@ -386,8 +359,9 @@ export default function Home() {
           <nav className="hidden items-center gap-8 md:flex">
             {[
               ["Listings", "#listings"],
-              ["Districts", "#districts"],
+              ["Price history", "#price-history"],
               ["Watchlist", "#watchlist"],
+              ["Clients", "#clients"],
               ["Pricing", "#pricing"],
             ].map(([label, href]) => (
               <a key={href} href={href} className="link-underline text-[14px] font-medium text-zinc-600 transition-colors hover:text-zinc-950">
@@ -425,8 +399,8 @@ export default function Home() {
                 Aruba Real Estate Market Intelligence
               </h1>
               <p className="mt-5 max-w-[46ch] text-[16px] leading-relaxed text-zinc-600 sm:text-[17px]">
-                Every property, land and commercial listing in Aruba, scraped daily, with price history, the agent
-                handling it, district values and ROPV zoning. Pin the ones you care about and Signal tracks every move.
+                Every home, land and commercial listing in Aruba in one place, checked every morning. See every price
+                change, who is selling it, pin the properties you are watching and keep track of the clients who asked.
               </p>
 
               <div className="mt-8 max-w-[540px] rounded-2xl border border-zinc-200 bg-white p-2 shadow-xl shadow-zinc-900/5">
@@ -449,10 +423,10 @@ export default function Home() {
                 </form>
                 <div className="no-scrollbar mt-2 flex gap-1 overflow-x-auto border-t border-zinc-100 px-1 pt-2">
                   {[
-                    { icon: Building2, label: "Listings", href: DASHBOARD },
-                    { icon: MapIcon, label: "Districts", href: `${DASHBOARD}?tab=districts` },
-                    { icon: Pin, label: "Watchlist", href: `${DASHBOARD}?tab=watchlist` },
+                    { icon: Building2, label: "All listings", href: DASHBOARD },
+                    { icon: Sparkles, label: "New today", href: `${DASHBOARD}?tab=listings` },
                     { icon: TrendingDown, label: "Price drops", href: `${DASHBOARD}?tab=listings` },
+                    { icon: Pin, label: "Watchlist", href: `${DASHBOARD}?tab=watchlist` },
                   ].map(({ icon: Icon, label, href }) => (
                     <Link
                       key={label}
@@ -469,7 +443,7 @@ export default function Home() {
                 {[
                   [ALL_LISTINGS.length, "Listings for sale"],
                   [PREVIEW.run.newCount, "New today"],
-                  [DISTRICTS.length, "Districts scored"],
+                  [AGENCIES, "Agencies tracked"],
                 ].map(([v, l]) => (
                   <div key={l}>
                     <dt className="font-display text-[26px] font-bold leading-none text-zinc-950 sm:text-[30px]">
@@ -494,7 +468,7 @@ export default function Home() {
               [PREVIEW.run.checked, "Listings checked today"],
               [LAND.length, "Land parcels"],
               [PREVIEW.run.newCount + PREVIEW.run.drops + PREVIEW.run.ups + PREVIEW.run.statusChanges, "Market moves today"],
-              [ZONING_SHAPES.length, "ROPV zone types mapped"],
+              [AGENTS, "Listing agents"],
             ].map(([v, l]) => (
               <div key={String(l)}>
                 <dt className="font-display text-[44px] font-bold leading-none text-mint sm:text-[60px]">
@@ -535,7 +509,7 @@ export default function Home() {
             </p>
           </Reveal>
 
-          <Stagger className="mt-10 grid gap-5 sm:mt-14 md:grid-cols-2" gap={0.1}>
+          <Stagger className="mt-10 grid grid-cols-[minmax(0,1fr)] gap-5 sm:mt-14 md:grid-cols-2" gap={0.1}>
             {/* Find */}
             <StaggerItem>
             <a href="#listings" className="lift group block h-full overflow-hidden rounded-3xl border border-zinc-200 bg-mint-soft hover:shadow-xl">
@@ -555,27 +529,33 @@ export default function Home() {
             </a>
             </StaggerItem>
 
-            {/* Research */}
+            {/* Check */}
             <StaggerItem>
-            <a href="#districts" className="lift group block h-full overflow-hidden rounded-3xl border border-zinc-200 bg-mint-soft hover:shadow-xl">
+            <a href="#price-history" className="lift group block h-full overflow-hidden rounded-3xl border border-zinc-200 bg-mint-soft hover:shadow-xl">
               <div className="h-[240px] bg-white p-6">
-                <p className="text-[12px] font-semibold text-zinc-500">District ranking</p>
-                <div className="mt-4 space-y-3.5">
-                  {DISTRICTS.slice(0, 5).map((d) => (
-                    <div key={d.district} className="flex items-center gap-3">
-                      <span className="w-28 truncate text-[13px] font-medium text-zinc-800">{d.district}</span>
-                      <span className="h-2.5 flex-1 overflow-hidden rounded-full bg-zinc-100">
-                        <span className="block h-full rounded-full bg-zinc-950" style={{ width: `${d.score}%` }} />
-                      </span>
-                      <span className="w-7 text-right font-display text-[14px] font-bold tabular-nums">{d.score}</span>
-                    </div>
-                  ))}
+                <div className="flex items-center justify-between">
+                  <p className="text-[12px] font-semibold text-zinc-500">{PREVIEW.featured.name}</p>
+                  <span className="rounded-full px-2.5 py-1 text-[11px] font-semibold text-white" style={{ background: PREVIEW.featured.verdictColor }}>
+                    {PREVIEW.featured.verdict}
+                  </span>
                 </div>
+                <ol className="mt-4 divide-y divide-zinc-100">
+                  {PREVIEW.featured.events.map((e) => (
+                    <li key={e.date + e.label} className="flex items-center justify-between gap-3 py-2.5 text-[13px]">
+                      <span className="text-zinc-500">{e.date}</span>
+                      <span className="flex-1 font-medium text-zinc-800">{e.label}</span>
+                      <span className="font-display font-bold tabular-nums text-zinc-950">{e.price}</span>
+                    </li>
+                  ))}
+                </ol>
+                <p className="mt-2 text-[12px] text-zinc-500">
+                  Est. market value <span className="font-semibold tabular-nums text-zinc-950">{PREVIEW.featured.marketLabel}</span>
+                </p>
               </div>
               <div className="p-7">
-                <span className="rounded-full bg-white px-3 py-1 text-[12px] font-semibold text-zinc-700 ring-1 ring-mint-deep">Research</span>
-                <p className="mt-4 font-display text-[22px] font-bold text-zinc-950">Know where to buy</p>
-                <p className="mt-1 text-[14px] text-zinc-600">Every district ranked on value, growth and new supply, with official zoning.</p>
+                <span className="rounded-full bg-white px-3 py-1 text-[12px] font-semibold text-zinc-700 ring-1 ring-mint-deep">Check</span>
+                <p className="mt-4 font-display text-[22px] font-bold text-zinc-950">Know the real price story</p>
+                <p className="mt-1 text-[14px] text-zinc-600">Every price change since it was listed, against estimated market value.</p>
               </div>
             </a>
             </StaggerItem>
@@ -615,32 +595,34 @@ export default function Home() {
             </a>
             </StaggerItem>
 
-            {/* Act */}
+            {/* Follow up */}
             <StaggerItem>
-            <a href="#pricing" className="lift group block h-full overflow-hidden rounded-3xl border border-zinc-200 bg-mint-soft hover:shadow-xl">
+            <a href="#clients" className="lift group block h-full overflow-hidden rounded-3xl border border-zinc-200 bg-mint-soft hover:shadow-xl">
               <div className="h-[240px] bg-white p-6">
                 <div className="flex items-center justify-between">
-                  <p className="text-[12px] font-semibold text-zinc-500">Undervalued in Aruba</p>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-zinc-950 px-3 py-1 text-[11px] font-semibold text-white">
-                    <Download size={12} strokeWidth={2} /> Export CSV
+                  <p className="text-[12px] font-semibold text-zinc-500">Interested clients</p>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-mint px-2.5 py-1 text-[11px] font-semibold text-zinc-950">
+                    <Users size={12} strokeWidth={2} /> {PREVIEW.clients.people.length} interested
                   </span>
                 </div>
                 <div className="mt-4 divide-y divide-zinc-100">
-                  {ALL_LISTINGS.filter((l) => l.signal === "UNDERVALUED")
-                    .slice(0, 3)
-                    .map((l) => (
-                      <div key={l.listing_id} className="flex items-center gap-3 py-2.5">
-                        {l.photo_url && <Photo src={l.photo_url} alt={l.asset_name} w={36} h={36} className="size-9 rounded-lg" />}
-                        <span className="flex-1 truncate text-[13px] font-medium text-zinc-800">{l.asset_name}</span>
-                        <span className="font-display text-[13px] font-bold tabular-nums">{usdM(l.asking_price_usd)}</span>
-                      </div>
-                    ))}
+                  {PREVIEW.clients.people.map((c) => (
+                    <div key={c.name} className="flex items-center gap-3 py-2.5">
+                      <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-zinc-950 text-[11px] font-semibold text-mint">
+                        {c.name.split(" ").filter((w) => /^[A-Z]/.test(w)).map((w) => w[0]).join("").slice(0, 2)}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[13px] font-medium text-zinc-800">{c.name}</span>
+                        <span className="block truncate text-[11px] text-zinc-500">{c.comment}</span>
+                      </span>
+                    </div>
+                  ))}
                 </div>
               </div>
               <div className="p-7">
-                <span className="rounded-full bg-white px-3 py-1 text-[12px] font-semibold text-zinc-700 ring-1 ring-mint-deep">Act</span>
-                <p className="mt-4 font-display text-[22px] font-bold text-zinc-950">Move before the market</p>
-                <p className="mt-1 text-[14px] text-zinc-600">Spot price drops and new deals first, and share them with clients.</p>
+                <span className="rounded-full bg-white px-3 py-1 text-[12px] font-semibold text-zinc-700 ring-1 ring-mint-deep">Follow up</span>
+                <p className="mt-4 font-display text-[22px] font-bold text-zinc-950">Never lose a lead</p>
+                <p className="mt-1 text-[14px] text-zinc-600">Keep the people who asked about each property, with phone and notes.</p>
               </div>
             </a>
             </StaggerItem>
@@ -654,7 +636,7 @@ export default function Home() {
               <SectionHeading
                 eyebrow="Step 01 · Find"
                 title="Every high-value listing in Aruba, in one place."
-                body="Our scrapers pull homes, condos, land and commercial property for sale from broker, agency, developer and private listings every day, so you see new listings and price drops before everyone else."
+                body="Every morning Signal checks the websites of Aruba's agencies, brokers and developers for homes, condos, land and commercial property. New listings, price changes and sales show up in one feed, so you see them first."
               />
               <PrimaryCta>Browse all listings</PrimaryCta>
             </div>
@@ -666,75 +648,70 @@ export default function Home() {
               ))}
             </Stagger>
             <p className="mt-6 text-[13px] text-zinc-500">
-              {PROPERTIES.length} homes and condos, {LAND.length} land parcels and {COMMERCIAL_COUNT} commercial properties for sale right now. Search, filter and sort the full list,
-              or see everything on a map.
+              {PROPERTIES.length} homes and condos, {LAND.length} land parcels and {COMMERCIAL_COUNT} commercial properties for sale right now. Search and filter by
+              type, price, bedrooms, pool, land title and status, see everything on a 3D map, and export any list to CSV.
             </p>
           </div>
         </section>
 
-        {/* 02 Research */}
-        <section id="districts" className="scroll-mt-16">
-          <div className="mx-auto grid max-w-[1240px] items-center gap-12 px-5 py-16 sm:px-6 sm:py-24 lg:grid-cols-2">
+        {/* 02 Check */}
+        <section id="price-history" className="scroll-mt-16">
+          <div className="mx-auto grid max-w-[1240px] grid-cols-[minmax(0,1fr)] items-center gap-12 px-5 py-16 sm:px-6 sm:py-24 lg:grid-cols-2">
             <div>
               <SectionHeading
-                eyebrow="Step 02 · Research"
-                title="Know which districts are worth it."
-                body="Compare Aruba's districts side by side on a value map: median asking prices, land prices, growth, new supply and what is for sale, with the official ROPV zoning on top."
+                eyebrow="Step 02 · Check"
+                title="See the full price story behind every listing."
+                body="Open any listing to see every price change since we first found it, an estimate of what it is really worth, and exactly who to call about it."
               />
               <Bullets
                 items={[
-                  ["Sequence Score", "One number from 0 to 100 that ranks each district on demand, growth, value for buyers and new supply."],
-                  ["ROPV zoning", "The official land-use plan on a map, so you know what may be built on a parcel before you buy."],
-                  ["Land prices", "Average price per sq ft of land in each district, so you can spot cheap parcels."],
+                  ["Price history", "Every drop and increase with the date, so you know how motivated the seller is."],
+                  ["Estimated market value", "Asking price against our estimate, with a clear Undervalued, At market or Overpriced signal."],
+                  ["Agency and listing agent", "The agency, the agent handling it, and one tap to call, WhatsApp or e-mail them, plus a link to the original listing."],
+                  ["Daily updates feed", "New listings, price changes and properties going under contract or sold, every morning."],
                 ]}
               />
               <div className="mt-10">
-                <PrimaryCta href={`${DASHBOARD}?tab=districts`}>Compare districts</PrimaryCta>
+                <PrimaryCta>Browse listings</PrimaryCta>
               </div>
             </div>
-            <Stagger className="grid gap-4 sm:grid-cols-2">
-              {TOP_DISTRICTS.map((d, i) => (
-                <StaggerItem key={d.district}>
-                <Link
-                  href={`${DASHBOARD}?tab=listings&district=${encodeURIComponent(d.district)}`}
-                  className="lift block rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm hover:shadow-lg"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="flex size-7 items-center justify-center rounded-full bg-zinc-100 text-[12px] font-bold">#{i + 1}</span>
-                    <span className="text-[12px] font-medium text-zinc-500">
-                      Score <span className="font-display text-[18px] font-bold tabular-nums text-zinc-950">{d.score}</span>
-                    </span>
-                  </div>
-                  <p className="mt-3 font-display text-[19px] font-bold tracking-tight text-zinc-950">{d.district}</p>
-                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-zinc-100">
-                    <div className="h-full rounded-full" style={{ width: `${d.score}%`, background: d.score >= 70 ? UP : d.score >= 50 ? "#52525B" : DOWN }} />
-                  </div>
-                  <div className="mt-4 grid grid-cols-3 gap-2 text-[11px] text-zinc-500">
-                    <span>
-                      <span className="block font-display text-[14px] font-bold tabular-nums text-zinc-950">
-                        {d.median_asking_usd ? usdM(d.median_asking_usd).replace(".00M", "M") : "—"}
-                      </span>
-                      Median ask
+            <Reveal className="space-y-4">
+              <div className="h-[330px] rounded-3xl border border-zinc-200 bg-mint-soft p-3 shadow-xl shadow-zinc-900/5 sm:h-[360px] sm:p-4">
+                <HistoryPane data={PREVIEW} />
+              </div>
+              {PREVIEW.featured.agent && (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+                  <div className="flex items-center gap-3">
+                    <span className="flex size-10 items-center justify-center rounded-full text-[13px] font-semibold text-white" style={{ background: PREVIEW.featured.agency.color }}>
+                      {PREVIEW.featured.agent.name.split(" ").filter((w) => /^[A-Z]/.test(w)).map((w) => w[0]).join("").slice(0, 2)}
                     </span>
                     <span>
-                      <span className="block font-display text-[14px] font-bold tabular-nums text-zinc-950">{d.properties_for_sale + d.land_for_sale + d.commercial_for_sale}</span>
-                      For sale
-                    </span>
-                    <span>
-                      <span className="block font-display text-[14px] font-bold tabular-nums text-zinc-950">{d.land_psf_usd ? `$${d.land_psf_usd}` : "—"}</span>
-                      Land / sq ft
+                      <span className="block text-[10px] uppercase tracking-[0.14em] text-zinc-500">Listing agent · {PREVIEW.featured.agency.name}</span>
+                      <span className="block text-[15px] font-semibold text-zinc-950">{PREVIEW.featured.agent.name}</span>
                     </span>
                   </div>
-                </Link>
-                </StaggerItem>
-              ))}
-            </Stagger>
+                  <div className="flex gap-1.5">
+                    {[
+                      [Phone, "Call"],
+                      [MessageCircle, "WhatsApp"],
+                    ].map(([Icon, label]) => {
+                      const I = Icon as typeof Phone;
+                      return (
+                        <span key={label as string} className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 px-3 py-1.5 text-[12px] font-medium text-zinc-800">
+                          <I size={13} strokeWidth={1.75} /> {label as string}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </Reveal>
           </div>
         </section>
 
         {/* 03 Track */}
         <section id="watchlist" className="scroll-mt-16 bg-mint-soft">
-          <div className="mx-auto grid max-w-[1240px] items-center gap-12 px-5 py-16 sm:px-6 sm:py-24 lg:grid-cols-2">
+          <div className="mx-auto grid max-w-[1240px] grid-cols-[minmax(0,1fr)] items-center gap-12 px-5 py-16 sm:px-6 sm:py-24 lg:grid-cols-2">
             <Reveal className="order-2 overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-xl shadow-zinc-900/5 lg:order-1">
               <div className="flex items-center justify-between border-b border-zinc-100 px-5 py-4">
                 <p className="inline-flex items-center gap-2 font-display text-[16px] font-bold text-zinc-950">
@@ -799,29 +776,56 @@ export default function Home() {
           </div>
         </section>
 
-        {/* 04 Who it's for */}
+        {/* 04 Follow up */}
+        <section id="clients" className="scroll-mt-16">
+          <div className="mx-auto grid max-w-[1240px] grid-cols-[minmax(0,1fr)] items-center gap-12 px-5 py-16 sm:px-6 sm:py-24 lg:grid-cols-2">
+            <div>
+              <SectionHeading
+                eyebrow="Step 04 · Follow up"
+                title="Remember everyone who asked."
+                body="Add the clients interested in a property right on the listing: name, phone and your notes. When the price drops, you know exactly who to call."
+              />
+              <Bullets
+                items={[
+                  ["Clients on every listing", "Add, edit or remove as many interested people as you need, with their phone number and comments."],
+                  ["One tap to reach them", "Call or WhatsApp a client straight from the listing."],
+                  ["See demand at a glance", "Listings with interested clients show how many people are waiting, in the list and on your watchlist."],
+                  ["Private to you", "Your clients and notes are only visible to you."],
+                ]}
+              />
+              <div className="mt-10">
+                <PrimaryCta>Start tracking clients</PrimaryCta>
+              </div>
+            </div>
+            <Reveal className="rounded-3xl border border-zinc-200 bg-mint-soft p-3 shadow-xl shadow-zinc-900/5 sm:p-4">
+              <ClientsPane data={PREVIEW} />
+            </Reveal>
+          </div>
+        </section>
+
+        {/* Who it's for */}
         <section className="relative overflow-hidden bg-zinc-950 text-white">
           <Image src={img(ARUBA_PHOTOS.aerial, 1800, 900)} alt="" fill unoptimized className="object-cover opacity-25" />
           <div className="relative mx-auto max-w-[1240px] px-5 py-16 sm:px-6 sm:py-24">
-            <SectionHeading eyebrow="Step 04 · Act" title="Built for the people who move Aruba's market." light />
+            <SectionHeading eyebrow="Who it's for" title="Built for the people who move Aruba's market." light />
             <Stagger className="mt-10 grid gap-5 sm:mt-14 md:grid-cols-2" gap={0.12}>
               {[
                 {
                   who: "Real estate agents",
                   points: [
-                    "Price new listings with data on what similar homes and land are asking",
-                    "Keep a watchlist for each client's shortlist",
-                    "Spot new listings and price drops the day they happen",
-                    "Export any list to CSV for your clients",
+                    "See every new listing and price drop on the island each morning",
+                    "Price your own listings against what similar homes and land are asking",
+                    "Keep every interested client on the property they asked about",
+                    "Call them back the day the price drops, and export lists to CSV",
                   ],
                 },
                 {
                   who: "Investors",
                   points: [
                     "Find undervalued homes and land before they are gone",
-                    "Compare districts on value, growth and ROPV zoning",
+                    "Check the full price history before you make an offer",
                     "Pin properties and catch every price cut on them",
-                    "Track how long listings sit and when sellers cut prices",
+                    "See how long listings sit and contact the agent in one tap",
                   ],
                 },
               ].map((c) => (
@@ -882,13 +886,13 @@ export default function Home() {
                 </p>
                 <ul className="mt-8 space-y-3">
                   {[
-                    "Every property, land and commercial listing, scraped daily",
-                    "New-listing, price-drop and status alerts (under contract / sold)",
-                    "Price history vs. estimated market value on every listing",
-                    "Listing agency and agent on every listing, with a link to the original",
-                    "District value map, Sequence Score and official ROPV zoning",
-                    "Watchlist that tracks price and status on the properties you pin",
-                    "Export to CSV · cancel anytime",
+                    "Every home, land and commercial listing in Aruba, checked daily",
+                    "Daily feed of new listings, price changes and sales",
+                    "Price history and estimated market value on every listing",
+                    "Agency and listing agent with call, WhatsApp and e-mail",
+                    "Watchlist for the properties you are tracking",
+                    "Interested clients with phone and notes on every listing",
+                    "List and 3D map view · export to CSV · cancel anytime",
                   ].map((f) => (
                     <li key={f} className="flex gap-3 text-[14px] text-zinc-700">
                       <span className="mt-[7px] size-1.5 shrink-0 rounded-full bg-zinc-950" />
@@ -933,7 +937,7 @@ export default function Home() {
                 {NEW_THIS_WEEK} new listings this week
               </p>
               <h2 className="mt-5 max-w-[18ch] font-display text-[34px] font-bold leading-[1.05] tracking-tight text-white sm:text-[52px]">
-                See the market before the market does.
+                See every move. Call the right client first.
               </h2>
             </Reveal>
             <PrimaryCta light>Open the Dashboard</PrimaryCta>

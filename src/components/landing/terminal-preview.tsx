@@ -2,13 +2,13 @@
 
 /**
  * Landing-page hero: a live-looking preview of the Terminal that cycles
- * through its real features (daily scrape, price history, district value
- * map, ROPV zoning, watchlist). All data comes from the same mock
+ * through its real features (daily scrape, price history, watchlist,
+ * interested clients). All data comes from the same mock
  * layer as the dashboard, prepared on the server and passed in as props.
  */
 
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowDown, ArrowUp, Bell, Minus, Pin } from "lucide-react";
+import { ArrowDown, ArrowUp, Bell, MessageCircle, Minus, Pin, Users } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
@@ -49,8 +49,10 @@ export interface PreviewData {
     verdictColor: string;
     events: Array<{ date: string; label: string; price: string; pct: number | null }>;
   };
-  districts: { svgH: number; shapes: Array<{ key: string; d: string; color: string }>; labels: Array<{ key: string; x: number; y: number; text: string }>; top: Array<{ name: string; value: string; pct: number }> };
-  zoning: { svgH: number; shapes: Array<{ key: string; d: string; color: string }>; legend: Array<{ en: string; color: string }>; outlines: Array<{ key: string; d: string }> };
+  clients: {
+    listing: { name: string; district: string; price: string; photo: string | null; agent: string | null };
+    people: Array<{ name: string; phone: string; comment: string; added: string }>;
+  };
   watchlist: {
     updatesToday: number;
     rows: Array<{ id: string; name: string; district: string; photo: string | null; price: string; sincePct: number; pinned: string; status: string; note: string | null }>;
@@ -66,8 +68,7 @@ const FEATURES = [
   { key: "scrape", label: "Daily scrape", sub: "New listings & price moves" },
   { key: "history", label: "Price history", sub: "Asking vs. market value" },
   { key: "watchlist", label: "Watchlist", sub: "Pin and track properties" },
-  { key: "value", label: "District value", sub: "Median ask by area" },
-  { key: "zoning", label: "ROPV zoning", sub: "What may be built where" },
+  { key: "clients", label: "Client leads", sub: "Who asked about what" },
 ] as const;
 type FeatureKey = (typeof FEATURES)[number]["key"];
 
@@ -75,14 +76,12 @@ const TAB_FOR: Record<FeatureKey, string> = {
   scrape: "Listings",
   history: "Listings",
   watchlist: "Watchlist",
-  value: "Districts",
-  zoning: "Districts",
+  clients: "Listings",
 };
 const HREF_FOR: Record<FeatureKey, string> = {
   scrape: "/dashboard?tab=listings",
   history: "/dashboard?tab=listings",
-  value: "/dashboard?tab=districts",
-  zoning: "/dashboard?tab=districts",
+  clients: "/dashboard?tab=listings",
   watchlist: "/dashboard?tab=watchlist",
 };
 
@@ -216,7 +215,7 @@ function linePath(pts: Array<[number, number]>, w: number, h: number, step: bool
     .join("");
 }
 
-function HistoryPane({ data }: { data: PreviewData }) {
+export function HistoryPane({ data }: { data: PreviewData }) {
   const f = data.featured;
   const W = 340;
   const H = 130;
@@ -309,104 +308,69 @@ function HistoryPane({ data }: { data: PreviewData }) {
   );
 }
 
-function ValuePane({ data }: { data: PreviewData }) {
-  const v = data.districts;
+const initials = (name: string) =>
+  name
+    .split(/\s+/)
+    .filter((w) => /^[A-Z]/.test(w))
+    .map((w) => w[0])
+    .join("")
+    .slice(0, 2);
+
+export function ClientsPane({ data }: { data: PreviewData }) {
+  const c = data.clients;
   return (
-    <div className="grid h-full gap-3 sm:grid-cols-[1fr_170px]">
-      <div className="relative overflow-hidden rounded-lg border border-zinc-200 bg-[#DCEFF7]">
-        <svg viewBox={`0 0 400 ${v.svgH}`} className="h-full w-full" aria-label="Aruba districts shaded by median asking price">
-          {data.zoning.outlines.map((o) => (
-            <path key={o.key} d={o.d} fill="#F7F7F5" stroke="#E4E4E7" strokeWidth={0.5} />
-          ))}
-          {v.shapes.map((s, i) => (
-            <motion.path
-              key={s.key}
-              d={s.d}
-              fill={s.color}
-              stroke="#fff"
-              strokeWidth={1}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 0.92 }}
-              transition={{ delay: 0.05 * i, duration: 0.5 }}
-            />
-          ))}
-          {v.labels.map((l) => (
-            <text key={l.key} x={l.x} y={l.y} textAnchor="middle" className="fill-zinc-950 font-display" style={{ fontSize: 9, fontWeight: 700, paintOrder: "stroke", stroke: "#fff", strokeWidth: 2.5 }}>
-              {l.text}
-            </text>
-          ))}
-        </svg>
-        <span className="absolute bottom-2 left-2 rounded bg-white/90 px-1.5 py-0.5 text-[9px] font-medium text-zinc-600">Median asking price</span>
+    <div className="flex h-full flex-col overflow-hidden rounded-lg border border-zinc-200 bg-white">
+      <div className="flex items-center gap-3 border-b border-zinc-100 px-3 py-2.5">
+        {c.listing.photo ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={`${c.listing.photo}?auto=format&fit=crop&w=96&h=72&q=60`} alt="" className="h-9 w-12 shrink-0 rounded-md bg-zinc-100 object-cover" />
+        ) : (
+          <span className="block h-9 w-12 shrink-0 rounded-md bg-zinc-100" />
+        )}
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[12px] font-semibold text-zinc-950">{c.listing.name}</span>
+          <span className="block truncate text-[10px] text-zinc-500">
+            {c.listing.district} · {c.listing.price}
+            {c.listing.agent && <> · Agent {c.listing.agent}</>}
+          </span>
+        </span>
+        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-mint px-2 py-0.5 text-[10px] font-semibold text-zinc-950">
+          <Users size={10} strokeWidth={2} /> {c.people.length} interested
+        </span>
       </div>
-      <div className="hidden rounded-lg border border-zinc-200 bg-white p-3 sm:block">
-        <p className="text-[9px] uppercase tracking-[0.14em] text-zinc-500">Ranked</p>
-        <ol className="mt-2 space-y-2">
-          {v.top.map((d, i) => (
-            <li key={d.name}>
-              <span className="flex justify-between text-[10px]">
-                <span className="text-zinc-950">
-                  <span className="mr-1 text-zinc-400">{i + 1}</span>
-                  {d.name}
+      <ul className="flex-1 space-y-2 overflow-hidden p-2.5">
+        {c.people.map((p, i) => (
+          <motion.li
+            key={p.name}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 + i * 0.12, duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+            className="rounded-lg border border-zinc-100 bg-zinc-50/80 p-2.5"
+          >
+            <div className="flex items-center gap-2.5">
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-zinc-950 text-[9px] font-semibold text-mint" aria-hidden>
+                {initials(p.name)}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[11px] font-semibold text-zinc-950">{p.name}</span>
+                <span className="flex items-center gap-2 text-[10px]">
+                  <span className="tabular-nums text-zinc-600">{p.phone}</span>
+                  <span className="inline-flex items-center gap-0.5 font-medium text-[#2E9E5B]">
+                    <MessageCircle size={9} strokeWidth={2.2} /> WhatsApp
+                  </span>
                 </span>
-                <span className="font-semibold tabular-nums text-zinc-950">{d.value}</span>
               </span>
-              <span className="mt-1 block h-1 bg-zinc-100">
-                <motion.span
-                  className="block h-full bg-[#3F7A55]"
-                  initial={{ width: 0 }}
-                  animate={{ width: `${d.pct}%` }}
-                  transition={{ delay: 0.1 + i * 0.06, duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-                />
-              </span>
-            </li>
-          ))}
-        </ol>
-      </div>
+              <span className="shrink-0 text-[9px] text-zinc-400">{p.added}</span>
+            </div>
+            <p className="mt-1.5 line-clamp-2 text-[10px] leading-snug text-zinc-700">{p.comment}</p>
+          </motion.li>
+        ))}
+      </ul>
     </div>
   );
 }
 
-function ZoningPane({ data }: { data: PreviewData }) {
-  const z = data.zoning;
-  return (
-    <div className="grid h-full gap-3 sm:grid-cols-[1fr_170px]">
-      <div className="relative overflow-hidden rounded-lg border border-zinc-200 bg-[#DCEFF7]">
-        <svg viewBox={`0 0 400 ${z.svgH}`} className="h-full w-full" aria-label="ROPV zoning map of Aruba">
-          {z.shapes.map((s, i) => (
-            <motion.path
-              key={s.key}
-              d={s.d}
-              fill={s.color}
-              fillOpacity={0.75}
-              stroke={s.color}
-              strokeWidth={0.4}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.04 * i, duration: 0.45 }}
-            />
-          ))}
-          {data.districts.shapes.map((s) => (
-            <path key={s.key} d={s.d} fill="none" stroke="#0A0A0A" strokeWidth={0.7} strokeDasharray="3 2" />
-          ))}
-        </svg>
-        <span className="absolute bottom-2 left-2 rounded bg-white/90 px-1.5 py-0.5 text-[9px] font-medium text-zinc-600">Official ROPV zones · districts dashed</span>
-      </div>
-      <div className="hidden rounded-lg border border-zinc-200 bg-white p-3 sm:block">
-        <p className="text-[9px] uppercase tracking-[0.14em] text-zinc-500">Zones</p>
-        <ul className="mt-2 space-y-1.5">
-          {z.legend.map((l) => (
-            <li key={l.en} className="flex items-center gap-1.5 text-[10px] text-zinc-800">
-              <span className="size-2.5 shrink-0 rounded-sm" style={{ background: l.color }} />
-              <span className="truncate">{l.en}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </div>
-  );
-}
-
-function WatchPane({ data }: { data: PreviewData }) {
+export function WatchPane({ data }: { data: PreviewData }) {
   const w = data.watchlist;
   return (
     <div className="grid h-full gap-2.5 sm:grid-cols-[minmax(0,1fr)_170px]">
@@ -511,7 +475,7 @@ export function TerminalPreview({ data }: { data: PreviewData }) {
             <span className="size-2.5 rounded-full bg-zinc-950/15" />
           </span>
           <span className="flex min-w-0 flex-1 items-center gap-4 overflow-hidden">
-            {["Listings", "Watchlist", "Districts"].map((t) => (
+            {["Listings", "Watchlist"].map((t) => (
               <span key={t} className={`relative whitespace-nowrap text-[10px] tracking-wide sm:text-[11px] ${TAB_FOR[active] === t ? "text-zinc-950" : "text-zinc-500"}`}>
                 {t}
                 {TAB_FOR[active] === t && <motion.span layoutId="tp-tab" className="absolute inset-x-0 -bottom-[11px] h-px bg-zinc-950" />}
@@ -539,8 +503,7 @@ export function TerminalPreview({ data }: { data: PreviewData }) {
             >
               {active === "scrape" && <ScrapePane data={data} />}
               {active === "history" && <HistoryPane data={data} />}
-              {active === "value" && <ValuePane data={data} />}
-              {active === "zoning" && <ZoningPane data={data} />}
+              {active === "clients" && <ClientsPane data={data} />}
               {active === "watchlist" && <WatchPane data={data} />}
             </motion.div>
           </AnimatePresence>
@@ -548,7 +511,7 @@ export function TerminalPreview({ data }: { data: PreviewData }) {
       </div>
 
       {/* feature tabs */}
-      <div className="no-scrollbar -mx-4 mt-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:grid sm:grid-cols-5 sm:px-0" role="tablist" aria-label="Terminal features">
+      <div className="no-scrollbar -mx-4 mt-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:grid sm:grid-cols-4 sm:px-0" role="tablist" aria-label="Terminal features">
         {FEATURES.map((f) => {
           const on = f.key === active;
           return (

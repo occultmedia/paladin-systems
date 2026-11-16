@@ -16,12 +16,12 @@ import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
+import { motion } from "framer-motion";
 import { Wordmark } from "@/components/logo";
 import { useWatchlist, type WatchEntry } from "@/lib/watchlist";
 import { useInterestedClients, type ClientInput, type InterestedClient } from "@/lib/clients";
 import {
   COMMERCIAL_USES,
-  DISTRICTS,
   MARKET_ID,
   RESIDENTIAL_TYPES,
   LISTING_STATUSES,
@@ -30,7 +30,6 @@ import {
   TENURE_HINT,
   ZONINGS,
   repository,
-  type DistrictStats,
   type Listing,
   type ListingSignal,
   type MarketSnapshot,
@@ -44,8 +43,6 @@ import {
   type VacationRental,
 } from "@/lib/aruba-data";
 import { AgencyLogo } from "@/components/dashboard/map-shared";
-import DistrictMap, { HAS_DISTRICT_MAP } from "@/components/dashboard/district-map";
-import { DISTRICT_METRICS, ROPV_ZONES, ZONE_ORDER, type DistrictMetric } from "@/components/dashboard/district-map-shared";
 import { Inter } from "next/font/google";
 import {
   ArrowRight,
@@ -54,6 +51,7 @@ import {
   ArrowUp,
   Bell,
   ChevronDown,
+  LayoutList,
   Pencil,
   Pin,
   Plus,
@@ -194,19 +192,51 @@ function Logo() {
   );
 }
 
-const TABS = ["Listings", "Watchlist", "Districts"] as const;
+const TABS = ["Listings", "Watchlist"] as const;
 type Tab = (typeof TABS)[number];
 const TAB_SLUG: Record<Tab, string> = {
   Listings: "listings",
   Watchlist: "watchlist",
-  Districts: "districts",
 };
 
-function TabCount({ n, active }: { n: number; active: boolean }) {
+const TAB_ICON: Record<Tab, typeof Pin> = { Listings: LayoutList, Watchlist: Pin };
+
+/** Pill switch between the dashboard tabs. */
+function TabSwitch({ tab, onTab, watchCount, full = false }: { tab: Tab; onTab: (t: Tab) => void; watchCount: number; full?: boolean }) {
   return (
-    <span className={`${MONO} ml-1.5 inline-flex h-[17px] min-w-[17px] items-center justify-center rounded-full px-1 text-[10px] font-semibold ${active ? "bg-zinc-950 text-mint" : "bg-zinc-950/10 text-zinc-700"}`}>
-      {n}
-    </span>
+    <div className={`${full ? "grid w-full grid-cols-2" : "inline-flex"} gap-1 rounded-full bg-white/60 p-1 ring-1 ring-zinc-950/10`} role="tablist">
+      {TABS.map((t) => {
+        const on = tab === t;
+        const Icon = TAB_ICON[t];
+        return (
+          <button
+            key={t}
+            type="button"
+            role="tab"
+            aria-selected={on}
+            onClick={() => onTab(t)}
+            className={`relative inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full px-4 py-1.5 text-[13px] font-medium transition-colors ${
+              on ? "text-mint" : "text-zinc-600 hover:text-zinc-950"
+            }`}
+          >
+            {on && <motion.span layoutId={full ? "tab-pill-mobile" : "tab-pill"} className="absolute inset-0 rounded-full bg-zinc-950" transition={{ type: "spring", stiffness: 500, damping: 40 }} />}
+            <span className="relative inline-flex items-center gap-2">
+              <Icon size={14} strokeWidth={1.75} fill={t === "Watchlist" && on ? "currentColor" : "none"} />
+              {t}
+              {t === "Watchlist" && watchCount > 0 && (
+                <span
+                  className={`${MONO} inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-semibold ${
+                    on ? "bg-mint text-zinc-950" : "bg-zinc-950/10 text-zinc-700"
+                  }`}
+                >
+                  {watchCount}
+                </span>
+              )}
+            </span>
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -308,21 +338,8 @@ function Header({ tab, onTab, updates, onUpdates, watchCount }: { tab: Tab; onTa
             </button>
             <AccountMenu compact />
           </div>
-          <nav className="hidden items-center gap-8 lg:flex" aria-label="Primary">
-            {TABS.map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => onTab(t)}
-                className={`relative whitespace-nowrap py-[22px] text-[12px] tracking-wide transition-colors ${
-                  tab === t ? "text-zinc-950" : "text-zinc-500 hover:text-zinc-800"
-                }`}
-              >
-                {t}
-                {t === "Watchlist" && watchCount > 0 && <TabCount n={watchCount} active={tab === t} />}
-                {tab === t && <span className="absolute inset-x-0 bottom-0 h-px bg-zinc-950" />}
-              </button>
-            ))}
+          <nav className="hidden lg:block" aria-label="Primary">
+            <TabSwitch tab={tab} onTab={onTab} watchCount={watchCount} />
           </nav>
         </div>
 
@@ -333,7 +350,7 @@ function Header({ tab, onTab, updates, onUpdates, watchCount }: { tab: Tab; onTa
               <span className="relative inline-flex h-1.5 w-1.5 rounded-full" style={{ background: C.up }} />
             </span>
             <span className={`${MONO} whitespace-nowrap text-[11px] tracking-wider text-zinc-600`}>
-              LIVE DATA: <span className="text-zinc-800">ARUBA NODE CONNECTED</span>
+              UPDATED TODAY <span className="text-zinc-800">{fmtRunTime(SCRAPE_RUNS[0].run_at)} AST</span>
             </span>
           </div>
           <button
@@ -353,19 +370,8 @@ function Header({ tab, onTab, updates, onUpdates, watchCount }: { tab: Tab; onTa
         </div>
 
         {/* mobile tabs */}
-        <nav className="no-scrollbar -mx-4 mt-2 flex gap-6 overflow-x-auto px-4 lg:hidden" aria-label="Primary mobile">
-          {TABS.map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => onTab(t)}
-              className={`relative shrink-0 whitespace-nowrap py-3 text-[13px] transition-colors ${tab === t ? "font-medium text-zinc-950" : "text-zinc-500"}`}
-            >
-              {t}
-              {t === "Watchlist" && watchCount > 0 && <TabCount n={watchCount} active={tab === t} />}
-              {tab === t && <span className="absolute inset-x-0 bottom-0 h-0.5 bg-zinc-950" />}
-            </button>
-          ))}
+        <nav className="pb-3 pt-3 lg:hidden" aria-label="Primary mobile">
+          <TabSwitch tab={tab} onTab={onTab} watchCount={watchCount} full />
         </nav>
       </div>
     </header>
@@ -2303,286 +2309,6 @@ function Watchlist({ listings, marketYield, onOpenListing, onBrowse }: { listing
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
- * Districts — rental performance and for-sale supply by area
- * ──────────────────────────────────────────────────────────────────────── */
-
-type DistrictSortKey =
-  | "score"
-  | "forSale"
-  | "median_asking_usd"
-  | "avg_property_yield_pct"
-  | "adr_usd"
-  | "occupancy_pct"
-  | "revpar_usd"
-  | "revpar_yoy_pct"
-  | "rental_supply_yoy_pct"
-  | "land_psf_usd";
-
-function ScoreBar({ score }: { score: number }) {
-  const color = score >= 70 ? C.up : score >= 50 ? C.slate500 : C.down;
-  return (
-    <span className="inline-flex items-center gap-2">
-      <span className={`${MONO} w-7 text-right text-[13px] text-zinc-950`}>{score}</span>
-      <span className="h-1 w-16 bg-zinc-100">
-        <span className="block h-1" style={{ width: `${score}%`, background: color }} />
-      </span>
-    </span>
-  );
-}
-
-function Districts({ districts, onOpenDistrict }: { districts: DistrictStats[]; onOpenDistrict: (d: string) => void }) {
-  const [sort, setSort] = useState<{ key: DistrictSortKey; dir: "asc" | "desc" }>({ key: "score", dir: "desc" });
-  const [metric, setMetric] = useState<DistrictMetric>("median_asking_usd");
-
-  const value = (d: DistrictStats, k: DistrictSortKey): number | null =>
-    k === "forSale" ? d.properties_for_sale + d.land_for_sale + d.commercial_for_sale : d[k];
-
-  const rows = useMemo(() => {
-    const dir = sort.dir === "asc" ? 1 : -1;
-    return [...districts].sort((a, b) => {
-      const x = value(a, sort.key);
-      const y = value(b, sort.key);
-      if (x === null) return 1;
-      if (y === null) return -1;
-      return (x - y) * dir;
-    });
-  }, [districts, sort]);
-
-  const top = districts.slice(0, 3);
-  const th = (label: string, k: DistrictSortKey) => {
-    const active = sort.key === k;
-    return (
-      <th className="border-b border-zinc-300 px-3 py-3 text-right text-[10px] font-medium uppercase tracking-[0.16em]">
-        <button
-          type="button"
-          onClick={() => setSort((s) => (s.key === k ? { key: k, dir: s.dir === "asc" ? "desc" : "asc" } : { key: k, dir: "desc" }))}
-          className={`inline-flex items-center gap-1 uppercase ${active ? "text-zinc-950" : "text-zinc-500 hover:text-zinc-800"}`}
-        >
-          {label}
-          <span className={`${MONO} text-[9px]`}>{active ? (sort.dir === "asc" ? "▲" : "▼") : ""}</span>
-        </button>
-      </th>
-    );
-  };
-  const td = `px-3 py-4 border-b border-zinc-200 ${MONO} text-right text-[13px] text-zinc-800`;
-
-  return (
-    <>
-      <div className="border-b border-zinc-200 py-10">
-        <p className={`${MONO} text-[11px] tracking-wider text-zinc-500`}>DATASET / AW-DISTRICTS / 12 AREAS</p>
-        <h1 className="font-display mt-3 text-[26px] font-semibold tracking-tight text-zinc-950">Districts</h1>
-        <p className="mt-2 max-w-[72ch] text-[13px] leading-relaxed text-zinc-600">
-          How each area of Aruba performs as a luxury rental market, and what is for sale there. Ranked by Sequence Score.
-          Click a district to see its listings.
-        </p>
-      </div>
-
-      {/* top 3 */}
-      <div className="grid gap-px border-b border-zinc-200 bg-zinc-200 sm:grid-cols-3">
-        {top.map((d, i) => (
-          <button
-            key={d.district}
-            type="button"
-            onClick={() => onOpenDistrict(d.district)}
-            className="group bg-white py-6 text-left transition-colors hover:bg-zinc-50 sm:px-6 sm:first:pl-0"
-          >
-            <div className="flex items-baseline justify-between">
-              <span className={`${MONO} text-[11px] text-zinc-500`}>#{i + 1}</span>
-              <span className={`${MONO} text-[11px] text-zinc-500`}>SCORE <span className="text-zinc-950">{d.score}</span></span>
-            </div>
-            <p className="mt-3 text-[20px] font-semibold tracking-tight text-zinc-950">{d.district}</p>
-            <div className={`${MONO} mt-4 grid grid-cols-3 gap-3 text-[11px] text-zinc-500`}>
-              <span>
-                <span className="block text-[13px]" style={{ color: deltaColor(d.revpar_yoy_pct) }}>{fmtDelta(d.revpar_yoy_pct)}</span>
-                RevPAR YoY
-              </span>
-              <span>
-                <span className="block text-[13px] text-zinc-950">{d.properties_for_sale + d.land_for_sale + d.commercial_for_sale}</span>
-                For sale
-              </span>
-              <span>
-                <span className="block text-[13px] text-zinc-950">{d.occupancy_pct}%</span>
-                Occupancy
-              </span>
-            </div>
-            <span className="mt-4 inline-flex items-center gap-1 text-[12px] text-zinc-500 group-hover:text-zinc-950">
-              View listings <ArrowRight size={12} strokeWidth={1.5} />
-            </span>
-          </button>
-        ))}
-      </div>
-
-      <div className="py-8">
-        <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h2 className="font-display text-[17px] font-semibold tracking-tight text-zinc-950">Value map</h2>
-            <p className="mt-1 text-[12px] text-zinc-500">Each district shaded by value. Darker = higher. Click an area to see its listings.</p>
-          </div>
-          <div className="flex flex-wrap rounded-md border border-zinc-300 p-0.5" role="tablist" aria-label="Map value">
-            {(Object.keys(DISTRICT_METRICS) as DistrictMetric[]).map((k) => (
-              <button
-                key={k}
-                type="button"
-                role="tab"
-                aria-selected={metric === k}
-                onClick={() => setMetric(k)}
-                className={`rounded px-3 py-1.5 text-[12px] transition-colors ${metric === k ? "bg-zinc-950 text-mint" : "text-zinc-600 hover:text-zinc-950"}`}
-              >
-                {DISTRICT_METRICS[k].short}
-              </button>
-            ))}
-          </div>
-        </div>
-        {HAS_DISTRICT_MAP ? (
-          <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
-            <DistrictMap layer="value" metric={metric} districts={districts} onSelect={onOpenDistrict} height={540} />
-            <MetricRanking districts={districts} metric={metric} onOpenDistrict={onOpenDistrict} />
-          </div>
-        ) : (
-          <ArubaMap mode="districts" districts={districts} onSelect={onOpenDistrict} height={440} />
-        )}
-      </div>
-
-      <div className="relative overflow-x-auto border-t border-zinc-950">
-        <table className="w-full min-w-[1180px] border-collapse text-left">
-          <thead>
-            <tr>
-              <th className="border-b border-zinc-300 py-3 pr-3 text-left text-[10px] font-medium uppercase tracking-[0.16em] text-zinc-500">District</th>
-              {th("Score", "score")}
-              {th("For sale", "forSale")}
-              {th("Median ask", "median_asking_usd")}
-              {th("Avg. yield", "avg_property_yield_pct")}
-              {th("ADR", "adr_usd")}
-              {th("Occ.", "occupancy_pct")}
-              {th("RevPAR", "revpar_usd")}
-              {th("RevPAR YoY", "revpar_yoy_pct")}
-              {th("New rentals YoY", "rental_supply_yoy_pct")}
-              {th("Land $/sq ft", "land_psf_usd")}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((d) => (
-              <tr key={d.district} onClick={() => onOpenDistrict(d.district)} className="cursor-pointer transition-colors hover:bg-zinc-50">
-                <td className="border-b border-zinc-200 py-4 pr-3">
-                  <p className="text-[13px] text-zinc-950">{d.district}</p>
-                  <p className={`${MONO} mt-1 text-[11px] text-zinc-500`}>{d.rentals_tracked} RENTALS TRACKED</p>
-                </td>
-                <td className={td}><ScoreBar score={d.score} /></td>
-                <td className={td}>
-                  {d.properties_for_sale + d.land_for_sale + d.commercial_for_sale}
-                  <p className="mt-1 text-[10px] text-zinc-400">{d.properties_for_sale} HOMES · {d.land_for_sale} LAND · {d.commercial_for_sale} COMM.</p>
-                </td>
-                <td className={td}>{d.median_asking_usd ? fmtUsdCompact(d.median_asking_usd) : DASH}</td>
-                <td className={td}>{d.avg_property_yield_pct !== null ? fmtPct(d.avg_property_yield_pct) : DASH}</td>
-                <td className={td}>{fmtUsd(d.adr_usd)}</td>
-                <td className={td}>{d.occupancy_pct}%</td>
-                <td className={td}>{fmtUsd(d.revpar_usd)}</td>
-                <td className={td} style={{ color: deltaColor(d.revpar_yoy_pct) }}>{fmtDelta(d.revpar_yoy_pct)}</td>
-                <td className={td}>{fmtDelta(d.rental_supply_yoy_pct)}</td>
-                <td className={td}>{d.land_psf_usd ? fmtUsd(d.land_psf_usd) : DASH}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <p className="mt-4 max-w-[90ch] text-[11px] leading-relaxed text-zinc-500">
-        <span className="text-zinc-700">Sequence Score</span> (0–100) combines rental demand (occupancy), growth (RevPAR
-        year over year), value for buyers (average yield of homes for sale) and competition (new rental supply). Higher
-        is better. ADR, occupancy and RevPAR are for luxury vacation rentals in the district over the last 12 months.
-      </p>
-
-      {HAS_DISTRICT_MAP && <ZoningMap districts={districts} />}
-    </>
-  );
-}
-
-/** Districts ranked by the value shown on the map. */
-function MetricRanking({ districts, metric, onOpenDistrict }: { districts: DistrictStats[]; metric: DistrictMetric; onOpenDistrict: (d: string) => void }) {
-  const rows = [...districts].sort((a, b) => (b[metric] ?? -Infinity) - (a[metric] ?? -Infinity));
-  const max = Math.max(...districts.map((d) => d[metric] ?? 0));
-  const m = DISTRICT_METRICS[metric];
-  return (
-    <div>
-      <p className="text-[10px] uppercase tracking-[0.16em] text-zinc-500">{m.label} · ranked</p>
-      <ol className="mt-3 space-y-0.5">
-        {rows.map((d, i) => {
-          const v = d[metric];
-          return (
-            <li key={d.district}>
-              <button
-                type="button"
-                onClick={() => onOpenDistrict(d.district)}
-                className="group w-full rounded-md px-2 py-1.5 text-left transition-colors hover:bg-zinc-50"
-              >
-                <span className="flex items-baseline justify-between gap-2 text-[12px]">
-                  <span className="text-zinc-950">
-                    <span className={`${MONO} mr-1.5 text-[10px] text-zinc-400`}>{i + 1}</span>
-                    {d.district}
-                  </span>
-                  <span className={`${MONO} text-zinc-800`}>{v === null ? DASH : m.fmt(v)}</span>
-                </span>
-                <span className="mt-1 block h-1 w-full bg-zinc-100">
-                  <span className="block h-full bg-[#3F7A55] group-hover:bg-zinc-950" style={{ width: `${v && max ? (v / max) * 100 : 0}%` }} />
-                </span>
-              </button>
-            </li>
-          );
-        })}
-      </ol>
-    </div>
-  );
-}
-
-/** Official ROPV zoning (what may be built where), with the districts outlined on top. */
-function ZoningMap({ districts }: { districts: DistrictStats[] }) {
-  const [hidden, setHidden] = useState<string[]>(["Marinegebied", "Marinezones"]);
-  const toggle = (z: string) => setHidden((h) => (h.includes(z) ? h.filter((x) => x !== z) : [...h, z]));
-  return (
-    <section className="mt-12 border-t border-zinc-200 py-10">
-      <p className={`${MONO} text-[11px] tracking-wider text-zinc-500`}>DATASET / ROPV / DEELGEBIEDEN 2021</p>
-      <h2 className="font-display mt-3 text-[22px] font-semibold tracking-tight text-zinc-950">Zoning (ROPV)</h2>
-      <p className="mt-2 max-w-[80ch] text-[13px] leading-relaxed text-zinc-600">
-        The ROPV (Ruimtelijk Ontwikkelingsplan met Voorschriften) is Aruba&apos;s legal zoning plan. It sets what may be built
-        in each area, for example whether holiday rentals and hotels are allowed or the land is protected nature. Dashed lines
-        are the Sequence Data districts. Hover an area for its zone.
-      </p>
-      <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_280px]">
-        <DistrictMap layer="zoning" districts={districts} hiddenZones={hidden} height={560} />
-        <div>
-          <p className="text-[10px] uppercase tracking-[0.16em] text-zinc-500">Zones · click to show / hide</p>
-          <p className="mt-1 text-[11px] text-zinc-500">Hover a zone on the map for what it allows.</p>
-          <ul className="mt-3 space-y-0.5">
-            {ZONE_ORDER.map((z) => {
-              const info = ROPV_ZONES[z];
-              const off = hidden.includes(z);
-              return (
-                <li key={z}>
-                  <button
-                    type="button"
-                    onClick={() => toggle(z)}
-                    aria-pressed={!off}
-                    title={info.hint}
-                    className={`flex w-full items-start gap-2.5 rounded-md px-2 py-1 text-left transition-colors hover:bg-zinc-50 ${off ? "opacity-40" : ""}`}
-                  >
-                    <span className="mt-0.5 size-3 shrink-0 rounded-sm ring-1 ring-black/10" style={{ background: info.color }} />
-                    <span className="min-w-0 text-[12px] text-zinc-950">{info.en}</span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      </div>
-      <p className="mt-4 max-w-[90ch] text-[11px] leading-relaxed text-zinc-500">
-        Source: ROPV deelgebieden, version 5 Feb 2021, Government of Aruba (published on ArcGIS Online by the plan&apos;s
-        consultant). For information only, not legal advice. Check the current ROPV and its regulations with DIP (Departamento
-        di Infrastructura y Planificacion) before you buy or build. District outlines are approximate market areas.
-      </p>
-    </section>
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────────────────
  * Terminal updates — message board fed by every daily scrape
  * ──────────────────────────────────────────────────────────────────────── */
 
@@ -2792,11 +2518,6 @@ function Dashboard() {
     window.history.replaceState(null, "", `?tab=${TAB_SLUG[t]}`);
     window.scrollTo({ top: 0 });
   };
-  const showForSale = (district: string) => {
-    setListingsView((v) => ({ key: v.key + 1, district, query: undefined }));
-    setTab("Listings");
-  };
-  const openDistrict = (district: string) => showForSale(district);
   const openListing = (id: string) => {
     setListingsView((v) => ({ key: v.key + 1, openId: id }));
     setTabState("Listings");
@@ -2834,10 +2555,8 @@ function Dashboard() {
               initialNewToday={listingsView.newToday}
             />
           </>
-        ) : tab === "Watchlist" ? (
-          <Watchlist listings={data?.allListings} marketYield={data?.snapshot.est_gross_yield_pct} onOpenListing={openListing} onBrowse={() => setTab("Listings")} />
         ) : (
-          <Districts districts={DISTRICTS} onOpenDistrict={openDistrict} />
+          <Watchlist listings={data?.allListings} marketYield={data?.snapshot.est_gross_yield_pct} onOpenListing={openListing} onBrowse={() => setTab("Listings")} />
         )}
       </main>
 
