@@ -3,12 +3,12 @@
 /**
  * Landing-page hero: a live-looking preview of the Terminal that cycles
  * through its real features (daily scrape, price history, district value
- * map, ROPV zoning, revenue estimator). All data comes from the same mock
+ * map, ROPV zoning, watchlist). All data comes from the same mock
  * layer as the dashboard, prepared on the server and passed in as props.
  */
 
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowDown, ArrowUp, Bell, Minus } from "lucide-react";
+import { ArrowDown, ArrowUp, Bell, Minus, Pin } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
@@ -51,7 +51,11 @@ export interface PreviewData {
   };
   districts: { svgH: number; shapes: Array<{ key: string; d: string; color: string }>; labels: Array<{ key: string; x: number; y: number; text: string }>; top: Array<{ name: string; value: string; pct: number }> };
   zoning: { svgH: number; shapes: Array<{ key: string; d: string; color: string }>; legend: Array<{ en: string; color: string }>; outlines: Array<{ key: string; d: string }> };
-  estimator: { title: string; annual: string; adr: string; occ: string; yieldPct: string; months: Array<{ m: string; v: number }> };
+  watchlist: {
+    updatesToday: number;
+    rows: Array<{ id: string; name: string; district: string; photo: string | null; price: string; sincePct: number; pinned: string; status: string; note: string | null }>;
+    activity: Array<{ text: string; color: string; when: string }>;
+  };
 }
 
 const UP = "#2E9E5B";
@@ -61,25 +65,25 @@ const FLAT = "#E08A1E";
 const FEATURES = [
   { key: "scrape", label: "Daily scrape", sub: "New listings & price moves" },
   { key: "history", label: "Price history", sub: "Asking vs. market value" },
+  { key: "watchlist", label: "Watchlist", sub: "Pin and track properties" },
   { key: "value", label: "District value", sub: "Median ask by area" },
   { key: "zoning", label: "ROPV zoning", sub: "What may be built where" },
-  { key: "estimator", label: "Estimator", sub: "What a villa would earn" },
 ] as const;
 type FeatureKey = (typeof FEATURES)[number]["key"];
 
 const TAB_FOR: Record<FeatureKey, string> = {
-  scrape: "Listings & Rentals",
-  history: "Listings & Rentals",
+  scrape: "Listings",
+  history: "Listings",
+  watchlist: "Watchlist",
   value: "Districts",
   zoning: "Districts",
-  estimator: "Revenue Estimator",
 };
 const HREF_FOR: Record<FeatureKey, string> = {
   scrape: "/dashboard?tab=listings",
   history: "/dashboard?tab=listings",
   value: "/dashboard?tab=districts",
   zoning: "/dashboard?tab=districts",
-  estimator: "/dashboard?tab=estimator",
+  watchlist: "/dashboard?tab=watchlist",
 };
 
 const DURATION = 5600;
@@ -402,37 +406,69 @@ function ZoningPane({ data }: { data: PreviewData }) {
   );
 }
 
-function EstimatorPane({ data }: { data: PreviewData }) {
-  const e = data.estimator;
-  const max = Math.max(...e.months.map((m) => m.v));
+function WatchPane({ data }: { data: PreviewData }) {
+  const w = data.watchlist;
   return (
-    <div className="flex h-full flex-col rounded-lg border border-zinc-200 bg-white p-3">
-      <p className="text-[11px] font-semibold text-zinc-950">{e.title}</p>
-      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {[
-          ["Yearly revenue", e.annual],
-          ["Nightly rate", e.adr],
-          ["Occupancy", e.occ],
-          ["Gross yield", e.yieldPct],
-        ].map(([k, v]) => (
-          <div key={k} className="rounded-md bg-mint-soft px-2.5 py-2">
-            <p className="text-[9px] text-zinc-500">{k}</p>
-            <p className="font-display text-[14px] font-bold tabular-nums text-zinc-950">{v}</p>
-          </div>
-        ))}
+    <div className="grid h-full gap-2.5 sm:grid-cols-[minmax(0,1fr)_170px]">
+      <div className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-zinc-200 bg-white">
+        <div className="flex items-center justify-between border-b border-zinc-100 px-3 py-2 text-[11px]">
+          <span className="inline-flex items-center gap-1.5 font-semibold text-zinc-950">
+            <Pin size={11} strokeWidth={2} fill="currentColor" /> Your watchlist
+          </span>
+          <span className="tabular-nums text-zinc-500">{w.rows.length} pinned · {w.updatesToday} updates today</span>
+        </div>
+        <ul className="flex-1 divide-y divide-zinc-100 overflow-hidden">
+          {w.rows.map((r, i) => (
+            <motion.li
+              key={r.id}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.08 + i * 0.08, duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+              className="flex items-center gap-3 px-3 py-2"
+            >
+              {r.photo ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={`${r.photo}?auto=format&fit=crop&w=96&h=72&q=60`} alt="" className="h-9 w-12 shrink-0 rounded-md bg-zinc-100 object-cover" />
+              ) : (
+                <span className="block h-9 w-12 shrink-0 rounded-md bg-zinc-100" />
+              )}
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[12px] font-semibold text-zinc-950">{r.name}</span>
+                <span className="block truncate text-[10px] text-zinc-500">
+                  {r.note ? <span className="italic">“{r.note}”</span> : <>{r.district} · pinned {r.pinned}</>}
+                </span>
+              </span>
+              <span className="shrink-0 text-right">
+                <span className="block font-display text-[12px] font-bold tabular-nums text-zinc-950">{r.price}</span>
+                {r.status !== "Available" ? (
+                  <span className="text-[10px] font-semibold" style={{ color: STATUS_COLOR[r.status] }}>{r.status}</span>
+                ) : (
+                  <Move pct={r.sincePct} />
+                )}
+              </span>
+            </motion.li>
+          ))}
+        </ul>
       </div>
-      <div className="mt-3 flex flex-1 items-end gap-1">
-        {e.months.map((m, i) => (
-          <div key={m.m + i} className="flex h-full flex-1 flex-col items-center justify-end gap-1">
-            <motion.div
-              className="w-full rounded-t-[3px] bg-zinc-950"
-              initial={{ height: 0 }}
-              animate={{ height: `${(m.v / max) * 82}%` }}
-              transition={{ delay: 0.05 * i, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-            />
-            <span className="text-[8px] text-zinc-400">{m.m}</span>
-          </div>
-        ))}
+      <div className="hidden min-h-0 flex-col overflow-hidden rounded-lg border border-zinc-200 bg-white sm:flex">
+        <p className="border-b border-zinc-100 px-3 py-2 text-[11px] font-semibold text-zinc-950">Activity</p>
+        <ul className="flex-1 space-y-2.5 overflow-hidden px-3 py-2.5">
+          {w.activity.map((a, i) => (
+            <motion.li
+              key={i}
+              initial={{ opacity: 0, x: 6 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.3 + i * 0.1, duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+              className="flex gap-2"
+            >
+              <span className="mt-1 size-1.5 shrink-0 rounded-full" style={{ background: a.color }} />
+              <span className="text-[10px] leading-snug text-zinc-700">
+                {a.text}
+                <span className="block text-zinc-400">{a.when}</span>
+              </span>
+            </motion.li>
+          ))}
+        </ul>
       </div>
     </div>
   );
@@ -475,7 +511,7 @@ export function TerminalPreview({ data }: { data: PreviewData }) {
             <span className="size-2.5 rounded-full bg-zinc-950/15" />
           </span>
           <span className="flex min-w-0 flex-1 items-center gap-4 overflow-hidden">
-            {["Listings & Rentals", "Districts", "Revenue Estimator"].map((t) => (
+            {["Listings", "Watchlist", "Districts"].map((t) => (
               <span key={t} className={`relative whitespace-nowrap text-[10px] tracking-wide sm:text-[11px] ${TAB_FOR[active] === t ? "text-zinc-950" : "text-zinc-500"}`}>
                 {t}
                 {TAB_FOR[active] === t && <motion.span layoutId="tp-tab" className="absolute inset-x-0 -bottom-[11px] h-px bg-zinc-950" />}
@@ -505,7 +541,7 @@ export function TerminalPreview({ data }: { data: PreviewData }) {
               {active === "history" && <HistoryPane data={data} />}
               {active === "value" && <ValuePane data={data} />}
               {active === "zoning" && <ZoningPane data={data} />}
-              {active === "estimator" && <EstimatorPane data={data} />}
+              {active === "watchlist" && <WatchPane data={data} />}
             </motion.div>
           </AnimatePresence>
         </div>

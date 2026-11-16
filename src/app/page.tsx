@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, ArrowUpRight, BedDouble, Building2, Calculator, Download, Map as MapIcon, Search } from "lucide-react";
-import { SequenceLogo, Wordmark } from "@/components/logo";
+import { ArrowRight, ArrowUpRight, Building2, Download, Map as MapIcon, Pin, Search, TrendingDown } from "lucide-react";
+import { SequenceLockup, Wordmark } from "@/components/logo";
 import { TerminalPreview, type PreviewData } from "@/components/landing/terminal-preview";
 import { CountUp, MotionRoot, Reveal, Stagger, StaggerItem } from "@/components/motion/reveal";
 import { DISTRICT_METRICS, ROPV_ZONES, rampColor } from "@/components/dashboard/district-map-shared";
@@ -14,13 +14,12 @@ import {
   MOCK_SNAPSHOT,
   SCRAPE_RUNS,
   VILLA_PHOTOS,
-  estimateRevenue,
   type Listing,
   type Signal,
 } from "@/lib/aruba-data";
 
 /* ─────────────────────────────────────────────────────────────────────────
- * Sequence Data — landing page.
+ * Signal (powered by Sequence Data) — landing page.
  * Every number is read from src/lib/aruba-data.ts, the same source as the
  * dashboard. Photos are Unsplash placeholders until real listing photos.
  * ──────────────────────────────────────────────────────────────────────── */
@@ -51,21 +50,9 @@ const COMMERCIAL_COUNT = ALL_LISTINGS.filter((l) => l.category === "Commercial")
 const PROPERTIES = ALL_LISTINGS.filter((l) => l.category === "Property");
 const NEW_THIS_WEEK = ALL_LISTINGS.filter((l) => l.days_on_market <= 7).length;
 const UNDERVALUED = ALL_LISTINGS.filter((l) => l.signal === "UNDERVALUED").length;
-const RENTALS_TRACKED = DISTRICTS.reduce((a, d) => a + d.rentals_tracked, 0);
 const NEWEST = [...ALL_LISTINGS].sort((a, b) => a.days_on_market - b.days_on_market).slice(0, 6);
 const TOP_DISTRICTS = DISTRICTS.slice(0, 6);
 const NEW_PICK = NEWEST.find((l) => l.category === "Property") ?? NEWEST[0];
-
-const EXAMPLE_INPUT = {
-  district: "Malmok",
-  property_type: "Villa" as const,
-  bedrooms: 5,
-  bathrooms: 5.5,
-  beachfront: true,
-  asking_price_usd: 8_500_000,
-};
-const EXAMPLE = estimateRevenue(EXAMPLE_INPUT);
-const EXAMPLE_MAX = Math.max(...EXAMPLE.monthly.map((m) => m.revenue_usd));
 
 const TICKER: Array<[string, string, number | null]> = [
   ["For sale", String(ALL_LISTINGS.length), null],
@@ -73,10 +60,10 @@ const TICKER: Array<[string, string, number | null]> = [
   ["Median ask", usdM(median(ALL_LISTINGS.map((l) => l.asking_price_usd))), null],
   ["Land parcels", String(LAND.length), null],
   ["Undervalued", String(UNDERVALUED), null],
-  ["Rental occupancy", `${MOCK_SNAPSHOT.avg_occupancy_pct}%`, MOCK_SNAPSHOT.avg_occupancy_yoy_pct],
-  ["Nightly rate", usd(MOCK_SNAPSHOT.avg_daily_rate_usd), MOCK_SNAPSHOT.avg_daily_rate_yoy_pct],
-  ["Gross yield", `${MOCK_SNAPSHOT.est_gross_yield_pct}%`, MOCK_SNAPSHOT.est_gross_yield_yoy_pct],
-  ...TOP_DISTRICTS.slice(0, 3).map((d): [string, string, number | null] => [`${d.district} score`, String(d.score), d.revpar_yoy_pct]),
+  ["Price changes today", String(SCRAPE_RUNS[0].price_changes.length), null],
+  ["Under contract / sold today", String(SCRAPE_RUNS[0].status_changes.length), null],
+  ["Median land price", `${usd(median(LAND.map((l) => l.price_per_sqft_usd)))}/sq ft`, null],
+  ...TOP_DISTRICTS.slice(0, 3).map((d): [string, string, number | null] => [`${d.district} score`, String(d.score), null]),
 ];
 
 /* ── Terminal preview (hero) ─────────────────────────────────────────── */
@@ -84,6 +71,39 @@ const TICKER: Array<[string, string, number | null]> = [
 const RUN = SCRAPE_RUNS[0];
 const usdShort = (n: number) => (n >= 1e6 ? `$${(n / 1e6).toFixed(n >= 1e7 ? 1 : 2)}M` : `$${Math.round(n / 1000)}k`);
 const shortDate = (iso: string) => new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+
+/** A sample watchlist for the hero: two price moves, one under contract, one new. */
+function watchPreview(): PreviewData["watchlist"] {
+  const moved = RUN.price_changes.slice(0, 2);
+  const status = RUN.status_changes.slice(0, 1);
+  const fresh = RUN.new_listings.filter((l) => l.category === "Property").slice(0, 1);
+  const pinnedAgo = (days: number) => shortDate(new Date(Date.parse(RUN.date) - days * 86_400_000).toISOString().slice(0, 10));
+  const notes = ["Shortlist for a client", null, "Ask about the erfpacht term", null];
+  const rows = [
+    ...moved.map((c, i) => ({ l: c.listing, since: c.change.change_pct ?? 0, days: 12 + i * 9 })),
+    ...status.map((l) => ({ l, since: 0, days: 21 })),
+    ...fresh.map((l) => ({ l, since: 0, days: 0 })),
+  ].map(({ l, since, days }, i) => ({
+    id: l.listing_id,
+    name: l.asset_name,
+    district: l.district,
+    photo: l.photo_url,
+    price: usdShort(l.asking_price_usd),
+    sincePct: since,
+    pinned: days === 0 ? "today" : pinnedAgo(days),
+    status: l.status,
+    note: notes[i] ?? null,
+  }));
+  const activity = [
+    ...moved.map((c) => {
+      const p = c.change.change_pct ?? 0;
+      return { text: `${c.listing.asset_name}: price ${p < 0 ? "dropped" : "raised"} ${Math.abs(p).toFixed(1)}%`, color: p < 0 ? "#D64545" : "#2E9E5B", when: "Today" };
+    }),
+    ...status.map((l) => ({ text: `${l.asset_name}: now ${l.status.toLowerCase()}`, color: "#E08A1E", when: "Today" })),
+    ...fresh.map((l) => ({ text: `Pinned ${l.asset_name}`, color: "#0A0A0A", when: "Today" })),
+  ];
+  return { updatesToday: moved.length + status.length, rows, activity };
+}
 
 function previewData(): PreviewData {
   const priceToday = new Map(RUN.price_changes.map((c) => [c.listing.listing_id, c.change.change_pct ?? 0]));
@@ -217,17 +237,7 @@ function previewData(): PreviewData {
         "Luchthaven",
       ].map((z) => ({ en: ROPV_ZONES[z].en, color: ROPV_ZONES[z].color })),
     },
-    estimator: {
-      title: `${EXAMPLE_INPUT.bedrooms}-bedroom beachfront villa · ${EXAMPLE_INPUT.district} · asking $8.5M`,
-      annual: usdM(EXAMPLE.annual_revenue_usd),
-      adr: usd(EXAMPLE.adr_usd),
-      occ: `${EXAMPLE.occupancy_pct}%`,
-      yieldPct: `${EXAMPLE.gross_yield_pct?.toFixed(1)}%`,
-      months: EXAMPLE.monthly.map((m) => ({
-        m: new Date(`${m.month}T00:00:00Z`).toLocaleString("en-US", { month: "narrow", timeZone: "UTC" }),
-        v: m.revenue_usd,
-      })),
-    },
+    watchlist: watchPreview(),
   };
 }
 
@@ -370,14 +380,14 @@ export default function Home() {
       {/* Nav */}
       <header className="sticky top-0 z-[1000] border-b border-zinc-200 bg-white/90 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-[1240px] items-center justify-between px-5 sm:px-6">
-          <Link href="/" aria-label="Sequence Data home">
+          <Link href="/" aria-label="Signal home">
             <Wordmark tagline />
           </Link>
           <nav className="hidden items-center gap-8 md:flex">
             {[
               ["Listings", "#listings"],
               ["Districts", "#districts"],
-              ["Revenue Estimator", "#estimator"],
+              ["Watchlist", "#watchlist"],
               ["Pricing", "#pricing"],
             ].map(([label, href]) => (
               <a key={href} href={href} className="link-underline text-[14px] font-medium text-zinc-600 transition-colors hover:text-zinc-950">
@@ -416,7 +426,7 @@ export default function Home() {
               </h1>
               <p className="mt-5 max-w-[46ch] text-[16px] leading-relaxed text-zinc-600 sm:text-[17px]">
                 Every property, land and commercial listing in Aruba, scraped daily, with price history, the agent
-                handling it, district values, ROPV zoning and what each home would earn as a vacation rental.
+                handling it, district values and ROPV zoning. Pin the ones you care about and Signal tracks every move.
               </p>
 
               <div className="mt-8 max-w-[540px] rounded-2xl border border-zinc-200 bg-white p-2 shadow-xl shadow-zinc-900/5">
@@ -441,8 +451,8 @@ export default function Home() {
                   {[
                     { icon: Building2, label: "Listings", href: DASHBOARD },
                     { icon: MapIcon, label: "Districts", href: `${DASHBOARD}?tab=districts` },
-                    { icon: BedDouble, label: "Rentals", href: `${DASHBOARD}?tab=listings&view=rentals` },
-                    { icon: Calculator, label: "Estimator", href: `${DASHBOARD}?tab=estimator` },
+                    { icon: Pin, label: "Watchlist", href: `${DASHBOARD}?tab=watchlist` },
+                    { icon: TrendingDown, label: "Price drops", href: `${DASHBOARD}?tab=listings` },
                   ].map(({ icon: Icon, label, href }) => (
                     <Link
                       key={label}
@@ -458,7 +468,7 @@ export default function Home() {
               <dl className="mt-8 grid max-w-[540px] grid-cols-3 gap-4 border-t border-zinc-950/10 pt-6">
                 {[
                   [ALL_LISTINGS.length, "Listings for sale"],
-                  [RENTALS_TRACKED, "Rentals tracked"],
+                  [PREVIEW.run.newCount, "New today"],
                   [DISTRICTS.length, "Districts scored"],
                 ].map(([v, l]) => (
                   <div key={l}>
@@ -516,7 +526,7 @@ export default function Home() {
         {/* Overview bento */}
         <section className="mx-auto max-w-[1240px] px-5 py-16 sm:px-6 sm:py-24">
           <Reveal className="text-center">
-            <Eyebrow>The Sequence Data platform</Eyebrow>
+            <Eyebrow>The Signal platform</Eyebrow>
             <h2 className="mx-auto mt-4 max-w-[22ch] font-display text-[30px] font-bold leading-[1.08] tracking-tight text-zinc-950 sm:text-[44px]">
               From first look to final offer
             </h2>
@@ -565,28 +575,42 @@ export default function Home() {
               <div className="p-7">
                 <span className="rounded-full bg-white px-3 py-1 text-[12px] font-semibold text-zinc-700 ring-1 ring-mint-deep">Research</span>
                 <p className="mt-4 font-display text-[22px] font-bold text-zinc-950">Know where to buy</p>
-                <p className="mt-1 text-[14px] text-zinc-600">Every district scored on rental demand, growth, value and competition.</p>
+                <p className="mt-1 text-[14px] text-zinc-600">Every district ranked on value, growth and new supply, with official zoning.</p>
               </div>
             </a>
             </StaggerItem>
 
-            {/* Validate */}
+            {/* Track */}
             <StaggerItem>
-            <a href="#estimator" className="lift group block h-full overflow-hidden rounded-3xl border border-zinc-200 bg-mint-soft hover:shadow-xl">
-              <div className="relative h-[240px] overflow-hidden">
-                <Photo src={VILLA_PHOTOS[12]} alt="Villa with pool" w={620} h={240} className="h-full w-full transition-transform duration-500 group-hover:scale-[1.03]" />
-                <div className="absolute right-4 top-4 w-[190px] rounded-2xl bg-white p-4 shadow-lg">
-                  <p className="text-[11px] font-medium text-zinc-500">Projected revenue</p>
-                  <p className="font-display text-[22px] font-bold tabular-nums">{usdM(EXAMPLE.annual_revenue_usd)}</p>
-                  <p className="mt-1 text-[11px] text-zinc-500">
-                    {EXAMPLE.occupancy_pct}% occupancy · {usd(EXAMPLE.adr_usd)}/night
+            <a href="#watchlist" className="lift group block h-full overflow-hidden rounded-3xl border border-zinc-200 bg-mint-soft hover:shadow-xl">
+              <div className="h-[240px] bg-white p-6">
+                <div className="flex items-center justify-between">
+                  <p className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-zinc-500">
+                    <Pin size={12} strokeWidth={2} fill="currentColor" /> Your watchlist
                   </p>
+                  <span className="rounded-full bg-zinc-950 px-2.5 py-1 text-[11px] font-semibold text-mint">
+                    {PREVIEW.watchlist.updatesToday} updates today
+                  </span>
+                </div>
+                <div className="mt-4 divide-y divide-zinc-100">
+                  {PREVIEW.watchlist.rows.slice(0, 3).map((r) => (
+                    <div key={r.id} className="flex items-center gap-3 py-2.5">
+                      {r.photo && <Photo src={r.photo} alt={r.name} w={36} h={36} className="size-9 rounded-lg" />}
+                      <span className="flex-1 truncate text-[13px] font-medium text-zinc-800">{r.name}</span>
+                      <span className="text-right">
+                        <span className="block font-display text-[13px] font-bold tabular-nums">{r.price}</span>
+                        <span className="block text-[11px] font-semibold tabular-nums" style={{ color: r.status !== "Available" ? "#E08A1E" : r.sincePct < 0 ? DOWN : r.sincePct > 0 ? UP : "#71717A" }}>
+                          {r.status !== "Available" ? r.status : r.sincePct === 0 ? "No change" : pct(r.sincePct)}
+                        </span>
+                      </span>
+                    </div>
+                  ))}
                 </div>
               </div>
               <div className="p-7">
-                <span className="rounded-full bg-white px-3 py-1 text-[12px] font-semibold text-zinc-700 ring-1 ring-mint-deep">Validate</span>
-                <p className="mt-4 font-display text-[22px] font-bold text-zinc-950">See what it would earn</p>
-                <p className="mt-1 text-[14px] text-zinc-600">Rental income and yield for any property, from comparable rentals.</p>
+                <span className="rounded-full bg-white px-3 py-1 text-[12px] font-semibold text-zinc-700 ring-1 ring-mint-deep">Track</span>
+                <p className="mt-4 font-display text-[22px] font-bold text-zinc-950">Pin what matters</p>
+                <p className="mt-1 text-[14px] text-zinc-600">Keep a watchlist and see every price cut and status change on it.</p>
               </div>
             </a>
             </StaggerItem>
@@ -655,12 +679,12 @@ export default function Home() {
               <SectionHeading
                 eyebrow="Step 02 · Research"
                 title="Know which districts are worth it."
-                body="Compare Aruba's districts side by side: how luxury rentals perform there, how fast that is growing, how much new competition is coming, and what is for sale."
+                body="Compare Aruba's districts side by side on a value map: median asking prices, land prices, growth, new supply and what is for sale, with the official ROPV zoning on top."
               />
               <Bullets
                 items={[
-                  ["Sequence Score", "One number from 0 to 100 that ranks each district on rental demand, growth, value for buyers and new supply."],
-                  ["Rental performance", "Nightly rates, occupancy and revenue per night for luxury rentals in each district."],
+                  ["Sequence Score", "One number from 0 to 100 that ranks each district on demand, growth, value for buyers and new supply."],
+                  ["ROPV zoning", "The official land-use plan on a map, so you know what may be built on a parcel before you buy."],
                   ["Land prices", "Average price per sq ft of land in each district, so you can spot cheap parcels."],
                 ]}
               />
@@ -687,18 +711,18 @@ export default function Home() {
                   </div>
                   <div className="mt-4 grid grid-cols-3 gap-2 text-[11px] text-zinc-500">
                     <span>
-                      <span className="block font-display text-[14px] font-bold tabular-nums" style={{ color: d.revpar_yoy_pct >= 0 ? UP : DOWN }}>
-                        {pct(d.revpar_yoy_pct)}
+                      <span className="block font-display text-[14px] font-bold tabular-nums text-zinc-950">
+                        {d.median_asking_usd ? usdM(d.median_asking_usd).replace(".00M", "M") : "—"}
                       </span>
-                      RevPAR YoY
+                      Median ask
                     </span>
                     <span>
                       <span className="block font-display text-[14px] font-bold tabular-nums text-zinc-950">{d.properties_for_sale + d.land_for_sale + d.commercial_for_sale}</span>
                       For sale
                     </span>
                     <span>
-                      <span className="block font-display text-[14px] font-bold tabular-nums text-zinc-950">{d.occupancy_pct}%</span>
-                      Occupancy
+                      <span className="block font-display text-[14px] font-bold tabular-nums text-zinc-950">{d.land_psf_usd ? `$${d.land_psf_usd}` : "—"}</span>
+                      Land / sq ft
                     </span>
                   </div>
                 </Link>
@@ -708,61 +732,68 @@ export default function Home() {
           </div>
         </section>
 
-        {/* 03 Validate */}
-        <section id="estimator" className="scroll-mt-16 bg-mint-soft">
+        {/* 03 Track */}
+        <section id="watchlist" className="scroll-mt-16 bg-mint-soft">
           <div className="mx-auto grid max-w-[1240px] items-center gap-12 px-5 py-16 sm:px-6 sm:py-24 lg:grid-cols-2">
             <Reveal className="order-2 overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-xl shadow-zinc-900/5 lg:order-1">
-              <div className="relative">
-                <Photo src={VILLA_PHOTOS[13]} alt="Beachfront villa" w={600} h={220} className="h-[200px] w-full" />
-                <div className="absolute bottom-4 left-4 rounded-full bg-white/95 px-3 py-1.5 text-[12px] font-semibold text-zinc-900">
-                  {EXAMPLE_INPUT.bedrooms}-bedroom beachfront villa · {EXAMPLE_INPUT.district}
-                </div>
+              <div className="flex items-center justify-between border-b border-zinc-100 px-5 py-4">
+                <p className="inline-flex items-center gap-2 font-display text-[16px] font-bold text-zinc-950">
+                  <span className="flex size-7 items-center justify-center rounded-full bg-zinc-950 text-mint">
+                    <Pin size={13} strokeWidth={2} fill="currentColor" />
+                  </span>
+                  Watchlist
+                </p>
+                <span className="text-[12px] tabular-nums text-zinc-500">
+                  {PREVIEW.watchlist.rows.length} pinned · {PREVIEW.watchlist.updatesToday} updates today
+                </span>
               </div>
-              <div className="grid grid-cols-2 gap-px bg-zinc-100 sm:grid-cols-4">
-                {[
-                  ["Yearly revenue", usdM(EXAMPLE.annual_revenue_usd)],
-                  ["Nightly rate", usd(EXAMPLE.adr_usd)],
-                  ["Occupancy", `${EXAMPLE.occupancy_pct}%`],
-                  ["Yield at $8.5M", `${EXAMPLE.gross_yield_pct?.toFixed(1)}%`],
-                ].map(([k, v]) => (
-                  <div key={k} className="bg-white px-5 py-4">
-                    <p className="text-[11px] font-medium text-zinc-500">{k}</p>
-                    <p className="mt-1 font-display text-[20px] font-bold tabular-nums text-zinc-950">{v}</p>
-                  </div>
-                ))}
-              </div>
-              <div className="px-5 pb-5 pt-4">
-                <div className="mb-3 flex items-center justify-between">
-                  <span className="text-[12px] font-semibold text-zinc-500">Revenue by month</span>
-                  {EXAMPLE.signal && <SignalPill signal={EXAMPLE.signal} />}
-                </div>
-                <div className="flex h-28 items-end gap-1.5">
-                  {EXAMPLE.monthly.map((m) => (
-                    <div key={m.month} className="flex flex-1 flex-col items-center gap-1.5">
-                      <div className="w-full rounded-t-md bg-zinc-950" style={{ height: `${(m.revenue_usd / EXAMPLE_MAX) * 96}px` }} />
-                      <span className="text-[10px] text-zinc-400">
-                        {new Date(`${m.month}T00:00:00Z`).toLocaleString("en-US", { month: "narrow", timeZone: "UTC" })}
-                      </span>
+              <ul className="divide-y divide-zinc-100">
+                {PREVIEW.watchlist.rows.map((r) => (
+                  <li key={r.id} className="flex items-center gap-4 px-5 py-3.5">
+                    {r.photo && <Photo src={r.photo} alt={r.name} w={72} h={54} className="h-[54px] w-[72px] shrink-0 rounded-lg" />}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[14px] font-semibold text-zinc-950">{r.name}</p>
+                      <p className="truncate text-[12px] text-zinc-500">
+                        {r.note ? <span className="italic">“{r.note}”</span> : <>{r.district} · pinned {r.pinned}</>}
+                      </p>
                     </div>
+                    <div className="shrink-0 text-right">
+                      <p className="font-display text-[15px] font-bold tabular-nums text-zinc-950">{r.price}</p>
+                      <p className="text-[12px] font-semibold tabular-nums" style={{ color: r.status !== "Available" ? "#E08A1E" : r.sincePct < 0 ? DOWN : r.sincePct > 0 ? UP : "#71717A" }}>
+                        {r.status !== "Available" ? r.status : r.sincePct === 0 ? "No change" : `${pct(r.sincePct)} since pinned`}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              <div className="border-t border-zinc-100 bg-zinc-50 px-5 py-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Activity</p>
+                <ul className="mt-2.5 space-y-2">
+                  {PREVIEW.watchlist.activity.map((a, i) => (
+                    <li key={i} className="flex items-center gap-2.5 text-[13px] text-zinc-700">
+                      <span className="size-2 shrink-0 rounded-full" style={{ background: a.color }} />
+                      <span className="truncate">{a.text}</span>
+                      <span className="ml-auto shrink-0 text-[11px] text-zinc-400">{a.when}</span>
+                    </li>
                   ))}
-                </div>
+                </ul>
               </div>
             </Reveal>
             <div className="order-1 lg:order-2">
               <SectionHeading
-                eyebrow="Step 03 · Validate"
-                title="See what any property could earn."
-                body="Found a villa you like? Describe it and the Revenue Estimator shows what it would earn as a luxury vacation rental, based on comparable rentals in the same district."
+                eyebrow="Step 03 · Track"
+                title="Pin the properties you are watching."
+                body="Tap the pin on any listing and it goes on your watchlist. Every daily scrape checks your pinned properties, so you see a price cut or a sale the day it happens."
               />
               <Bullets
                 items={[
-                  ["Yearly revenue", "Estimated revenue with a low and high range, plus nightly rate and occupancy."],
-                  ["Month by month", "See how high and low season change the income through the year."],
-                  ["One click from a listing", "Open any listing in the estimator with its details already filled in."],
+                  ["One tap to pin", "Pin homes, land or commercial property from the list, the map or the listing details."],
+                  ["Every move since you pinned", "Price change since you pinned it and since it was listed, plus status: available, under contract or sold."],
+                  ["Private notes", "Add a note to each property, like which client it is for or what to ask the agent."],
                 ]}
               />
               <div className="mt-10">
-                <PrimaryCta href={`${DASHBOARD}?tab=estimator`}>Estimate a property</PrimaryCta>
+                <PrimaryCta href={`${DASHBOARD}?tab=watchlist`}>Open your watchlist</PrimaryCta>
               </div>
             </div>
           </div>
@@ -779,7 +810,7 @@ export default function Home() {
                   who: "Real estate agents",
                   points: [
                     "Price new listings with data on what similar homes and land are asking",
-                    "Show buyers what a villa would earn as a rental",
+                    "Keep a watchlist for each client's shortlist",
                     "Spot new listings and price drops the day they happen",
                     "Export any list to CSV for your clients",
                   ],
@@ -788,8 +819,8 @@ export default function Home() {
                   who: "Investors",
                   points: [
                     "Find undervalued homes and land before they are gone",
-                    "Compare districts on rental demand, growth and competition",
-                    "Check the yield on any property before you make an offer",
+                    "Compare districts on value, growth and ROPV zoning",
+                    "Pin properties and catch every price cut on them",
                     "Track how long listings sit and when sellers cut prices",
                   ],
                 },
@@ -856,7 +887,7 @@ export default function Home() {
                     "Price history vs. estimated market value on every listing",
                     "Listing agency and agent on every listing, with a link to the original",
                     "District value map, Sequence Score and official ROPV zoning",
-                    "Revenue Estimator and vacation-rental market data",
+                    "Watchlist that tracks price and status on the properties you pin",
                     "Export to CSV · cancel anytime",
                   ].map((f) => (
                     <li key={f} className="flex gap-3 text-[14px] text-zinc-700">
@@ -878,7 +909,7 @@ export default function Home() {
                   </p>
                 </div>
                 <a
-                  href={`mailto:${CONTACT_EMAIL}?subject=Sequence%20Labs%20Team%20Access`}
+                  href={`mailto:${CONTACT_EMAIL}?subject=Signal%20Team%20Access`}
                   className="mt-8 inline-flex items-center gap-2 self-start rounded-full border-2 border-zinc-950 px-5 py-3 font-display text-[14px] font-semibold text-zinc-950 transition-colors hover:bg-zinc-950 hover:text-white"
                 >
                   Contact us <ArrowUpRight size={15} strokeWidth={2} />
@@ -892,7 +923,10 @@ export default function Home() {
         <section className="relative overflow-hidden bg-zinc-950">
           <Image src={img(ARUBA_PHOTOS.beach, 1800, 800)} alt="" fill unoptimized className="object-cover opacity-40" />
           <div className="relative mx-auto flex max-w-[1240px] flex-col items-start justify-between gap-10 px-5 py-16 sm:px-6 sm:py-24 md:flex-row md:items-center">
-            <SequenceLogo tone="white" className="hidden h-56 w-auto shrink-0 opacity-95 lg:block" />
+            <div className="shrink-0 md:order-last md:hidden lg:order-none lg:block">
+              <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/60">Powered by</p>
+              <SequenceLockup tone="white" className="mt-3 h-10 w-auto sm:h-14" />
+            </div>
             <Reveal className="md:flex-1">
               <p className="flex items-center gap-2.5 text-[14px] font-semibold text-white/80">
                 <span className="size-2 rounded-full bg-mint" />
@@ -911,7 +945,7 @@ export default function Home() {
         <div className="mx-auto flex max-w-[1240px] flex-col gap-6 px-5 py-10 sm:px-6 md:flex-row md:items-center md:justify-between">
           <Wordmark tagline />
           <p className="max-w-[64ch] text-[12px] leading-relaxed text-zinc-500 md:text-right">
-            © 2026 Sequence Data · Oranjestad, Aruba · {CONTACT_EMAIL}
+            © 2026 Signal by Sequence Data · Oranjestad, Aruba · {CONTACT_EMAIL}
             <br />
             Data is for information only and is not investment advice. Photos: Unsplash.
           </p>

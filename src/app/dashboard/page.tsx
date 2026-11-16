@@ -17,21 +17,18 @@ import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { Wordmark } from "@/components/logo";
+import { useWatchlist, type WatchEntry } from "@/lib/watchlist";
 import {
   COMMERCIAL_USES,
   DISTRICTS,
   MARKET_ID,
-  PLATFORM_LABEL,
-  RENTAL_PLATFORMS,
   RESIDENTIAL_TYPES,
   LISTING_STATUSES,
   SCRAPE_RUNS,
   TENURES,
   TENURE_HINT,
   ZONINGS,
-  estimateRevenue,
   repository,
-  type EstimateInput,
   type DistrictStats,
   type Listing,
   type ListingSignal,
@@ -40,25 +37,23 @@ import {
   type ListingStatus,
   type Pool,
   type PriceEvent,
-  type PropertyType,
   type ScrapeRun,
   type Signal,
   type Tenure,
   type VacationRental,
 } from "@/lib/aruba-data";
-import { AgencyLogo, PLATFORM_COLOR } from "@/components/dashboard/map-shared";
+import { AgencyLogo } from "@/components/dashboard/map-shared";
 import DistrictMap, { HAS_DISTRICT_MAP } from "@/components/dashboard/district-map";
 import { DISTRICT_METRICS, ROPV_ZONES, ZONE_ORDER, type DistrictMetric } from "@/components/dashboard/district-map-shared";
 import { Inter } from "next/font/google";
 import {
-  ArrowDownRight,
   ArrowRight,
-  Calculator,
   ArrowUpRight,
   ArrowDown,
   ArrowUp,
   Bell,
   ChevronDown,
+  Pin,
   Waves,
   CreditCard,
   Download,
@@ -73,8 +68,6 @@ import {
   User,
 } from "lucide-react";
 import {
-  Bar,
-  BarChart,
   CartesianGrid,
   Line,
   LineChart,
@@ -91,7 +84,6 @@ import {
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 /** Numbers use Inter with tabular figures so columns line up (no monospace). */
 const MONO = "tabular-nums";
-const MONO_FAMILY = inter.style.fontFamily;
 
 /* ─────────────────────────────────────────────────────────────────────────
  * Palette (white / ink / slate; muted green & red reserved for deltas)
@@ -163,10 +155,6 @@ const fmtUsdCompact = (n: number) =>
 const fmtPct = (n: number, digits = 1) => `${n.toFixed(digits)}%`;
 const fmtDelta = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : "±"}${Math.abs(n).toFixed(1)}%`;
 const fmtBps = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : "±"}${int.format(Math.abs(n))} bps`;
-const fmtMonth = (iso: string) =>
-  new Date(`${iso}T00:00:00Z`).toLocaleString("en-US", { month: "short", timeZone: "UTC" }).toUpperCase();
-const fmtMonthYear = (iso: string) =>
-  new Date(`${iso}T00:00:00Z`).toLocaleString("en-US", { month: "short", year: "numeric", timeZone: "UTC" }).toUpperCase();
 const fmtTimestamp = (iso: string) =>
   new Date(iso).toISOString().replace("T", " ").slice(0, 16) + " UTC";
 
@@ -195,20 +183,27 @@ function PriceMove({ pct, label = true, size = 12 }: { pct: number; label?: bool
 
 function Logo() {
   return (
-    <Link href="/" className="select-none" aria-label="Sequence Data home">
+    <Link href="/" className="select-none" aria-label="Signal home">
       <Wordmark tagline />
     </Link>
   );
 }
 
-const TABS = ["Listings & Rentals", "Districts", "Revenue Estimator", "Rental Market"] as const;
+const TABS = ["Listings", "Watchlist", "Districts"] as const;
 type Tab = (typeof TABS)[number];
 const TAB_SLUG: Record<Tab, string> = {
-  "Listings & Rentals": "listings",
+  Listings: "listings",
+  Watchlist: "watchlist",
   Districts: "districts",
-  "Revenue Estimator": "estimator",
-  "Rental Market": "rental",
 };
+
+function TabCount({ n, active }: { n: number; active: boolean }) {
+  return (
+    <span className={`${MONO} ml-1.5 inline-flex h-[17px] min-w-[17px] items-center justify-center rounded-full px-1 text-[10px] font-semibold ${active ? "bg-zinc-950 text-mint" : "bg-zinc-950/10 text-zinc-700"}`}>
+      {n}
+    </span>
+  );
+}
 
 function AccountMenu({ compact = false }: { compact?: boolean }) {
   const [open, setOpen] = useState(false);
@@ -286,7 +281,7 @@ function AccountMenu({ compact = false }: { compact?: boolean }) {
   );
 }
 
-function Header({ tab, onTab, updates, onUpdates }: { tab: Tab; onTab: (t: Tab) => void; updates: number; onUpdates: () => void }) {
+function Header({ tab, onTab, updates, onUpdates, watchCount }: { tab: Tab; onTab: (t: Tab) => void; updates: number; onUpdates: () => void; watchCount: number }) {
   return (
     <header className="border-b border-mint-deep bg-mint">
       <div className="mx-auto flex max-w-[1400px] flex-col px-4 pt-3 sm:px-6 lg:h-16 lg:flex-row lg:items-center lg:justify-between lg:pt-0">
@@ -319,6 +314,7 @@ function Header({ tab, onTab, updates, onUpdates }: { tab: Tab; onTab: (t: Tab) 
                 }`}
               >
                 {t}
+                {t === "Watchlist" && watchCount > 0 && <TabCount n={watchCount} active={tab === t} />}
                 {tab === t && <span className="absolute inset-x-0 bottom-0 h-px bg-zinc-950" />}
               </button>
             ))}
@@ -361,6 +357,7 @@ function Header({ tab, onTab, updates, onUpdates }: { tab: Tab; onTab: (t: Tab) 
               className={`relative shrink-0 whitespace-nowrap py-3 text-[13px] transition-colors ${tab === t ? "font-medium text-zinc-950" : "text-zinc-500"}`}
             >
               {t}
+              {t === "Watchlist" && watchCount > 0 && <TabCount n={watchCount} active={tab === t} />}
               {tab === t && <span className="absolute inset-x-0 bottom-0 h-0.5 bg-zinc-950" />}
             </button>
           ))}
@@ -380,230 +377,12 @@ function scrollToRow(key: string, block: ScrollLogicalPosition = "center") {
   el?.scrollIntoView({ behavior: "smooth", block });
 }
 
-function SectionLabel({ index, title, meta }: { index: string; title: string; meta?: string }) {
-  return (
-    <div className="mb-6 flex items-baseline justify-between gap-4">
-      <div className="flex items-baseline gap-4">
-        <span className={`${MONO} text-[11px] text-zinc-500`}>{index}</span>
-        <h2 className="font-display text-[11px] font-medium uppercase tracking-[0.24em] text-zinc-700">{title}</h2>
-      </div>
-      {meta && <span className={`${MONO} hidden text-[11px] text-zinc-500 sm:block`}>{meta}</span>}
-    </div>
-  );
-}
-
-function Delta({ value, suffix = "YOY" }: { value: number; suffix?: string }) {
-  const Icon = value >= 0 ? ArrowUpRight : ArrowDownRight;
-  return (
-    <span className={`${MONO} inline-flex items-center gap-1 text-[12px]`} style={{ color: deltaColor(value) }}>
-      <Icon size={12} strokeWidth={1.5} />
-      {fmtDelta(value)}
-      <span className="ml-1 text-zinc-500">{suffix}</span>
-    </span>
-  );
-}
-
 function Skeleton({ className = "" }: { className?: string }) {
   return <div className={`animate-pulse bg-zinc-100 ${className}`} />;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
- * 01 — Anchor metrics
- * ──────────────────────────────────────────────────────────────────────── */
-
-function AnchorMetrics({ snapshot }: { snapshot?: MarketSnapshot }) {
-  const metrics = snapshot
-    ? [
-        { label: "Average Occupancy Rate", value: fmtPct(snapshot.avg_occupancy_pct), delta: snapshot.avg_occupancy_yoy_pct, note: "Trailing 12M" },
-        { label: "Average Daily Rate", value: fmtUsd(snapshot.avg_daily_rate_usd), unit: "USD", delta: snapshot.avg_daily_rate_yoy_pct, note: "Occupancy-weighted" },
-        { label: "Estimated Gross Yield", value: fmtPct(snapshot.est_gross_yield_pct), delta: snapshot.est_gross_yield_yoy_pct, note: "On asking price" },
-      ]
-    : null;
-
-  return (
-    <section>
-      <SectionLabel
-        index="01"
-        title="Aruba Luxury Market"
-        meta={snapshot ? `N=${snapshot.sample_size} ASSETS · AS OF ${fmtTimestamp(snapshot.as_of)}` : undefined}
-      />
-      <div className="grid grid-cols-1 sm:grid-cols-3">
-        {(metrics ?? [null, null, null]).map((m, i) => (
-          <div
-            key={i}
-            className={`py-6 sm:py-2 ${i > 0 ? "border-t border-zinc-200 sm:border-l sm:border-t-0 sm:pl-10" : ""}`}
-          >
-            {m ? (
-              <>
-                <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">{m.label}</p>
-                <p className={`${MONO} mt-5 text-[44px] font-semibold leading-none tracking-tight text-zinc-950`}>
-                  {m.value}
-                  {m.unit && <span className="ml-2 text-[13px] text-zinc-500">{m.unit}</span>}
-                </p>
-                <div className="mt-5 flex items-center justify-between pr-10">
-                  <Delta value={m.delta} />
-                  <span className="text-[11px] text-zinc-500">{m.note}</span>
-                </div>
-              </>
-            ) : (
-              <>
-                <Skeleton className="h-3 w-40" />
-                <Skeleton className="mt-5 h-11 w-36" />
-                <Skeleton className="mt-5 h-3 w-24" />
-              </>
-            )}
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────────────────
- * 02 — Historical booking analysis
- * ──────────────────────────────────────────────────────────────────────── */
-
-interface TooltipEntry {
-  dataKey?: string | number;
-  value?: number | string;
-  payload?: MonthlyPerformance;
-}
-
-function ChartTooltip({ active, payload }: { active?: boolean; payload?: TooltipEntry[] }) {
-  if (!active || !payload?.length) return null;
-  const row = payload[0].payload;
-  if (!row) return null;
-  return (
-    <div className={`${MONO} border border-zinc-300 bg-white px-4 py-3 text-[11px]`}>
-      <p className="mb-2 tracking-wider text-zinc-500">{fmtMonthYear(row.month)}</p>
-      <div className="grid grid-cols-[auto_auto] gap-x-6 gap-y-1">
-        <span className="text-zinc-500">RevPAR</span>
-        <span className="text-right text-zinc-950">{fmtUsd(row.revpar_usd)}</span>
-        <span className="text-zinc-500">Occupancy</span>
-        <span className="text-right text-zinc-700">{fmtPct(row.occupancy_pct)}</span>
-        <span className="text-zinc-500">ADR</span>
-        <span className="text-right text-zinc-700">{fmtUsd(row.adr_usd)}</span>
-      </div>
-    </div>
-  );
-}
-
-function LegendKey({ dashed, color, label }: { dashed?: boolean; color: string; label: string }) {
-  return (
-    <span className="flex items-center gap-2 text-[11px] text-zinc-600">
-      <svg width="20" height="2" aria-hidden>
-        <line x1="0" y1="1" x2="20" y2="1" stroke={color} strokeWidth="1.5" strokeDasharray={dashed ? "3 3" : undefined} />
-      </svg>
-      {label}
-    </span>
-  );
-}
-
-function HistoricalChart({ monthly }: { monthly?: MonthlyPerformance[] }) {
-  const stats = useMemo(() => {
-    if (!monthly?.length) return null;
-    const avg = monthly.reduce((sum, m) => sum + m.revpar_usd, 0) / monthly.length;
-    const peak = monthly.reduce((a, b) => (b.revpar_usd > a.revpar_usd ? b : a));
-    const trough = monthly.reduce((a, b) => (b.revpar_usd < a.revpar_usd ? b : a));
-    return { avg, peak, trough };
-  }, [monthly]);
-
-  const tick = { fill: C.slate500, fontSize: 11, fontFamily: MONO_FAMILY };
-
-  return (
-    <section>
-      <SectionLabel index="02" title="Historical Booking Analysis" meta="RevPAR vs. Occupancy · Trailing 12M" />
-      <div className="mb-6 flex flex-wrap items-center gap-x-8 gap-y-3">
-        <LegendKey color={C.ink} label="RevPAR (USD)" />
-        <LegendKey color={C.slate500} dashed label="Occupancy (%)" />
-        {stats && (
-          <span className={`${MONO} ml-auto flex gap-6 text-[11px] text-zinc-500`}>
-            <span>
-              PEAK <span className="text-zinc-800">{fmtUsd(stats.peak.revpar_usd)}</span> {fmtMonth(stats.peak.month)}
-            </span>
-            <span>
-              TROUGH <span className="text-zinc-800">{fmtUsd(stats.trough.revpar_usd)}</span> {fmtMonth(stats.trough.month)}
-            </span>
-            <span>
-              AVG <span className="text-zinc-800">{fmtUsd(stats.avg)}</span>
-            </span>
-          </span>
-        )}
-      </div>
-
-      <div className="h-[320px] w-full">
-        {monthly ? (
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={monthly} margin={{ top: 8, right: 4, bottom: 0, left: 4 }}>
-              <CartesianGrid vertical={false} stroke={C.hairline} strokeWidth={1} />
-              <XAxis
-                dataKey="month"
-                tickFormatter={fmtMonth}
-                axisLine={{ stroke: C.slate700 }}
-                tickLine={false}
-                tick={tick}
-                dy={10}
-                interval="preserveStartEnd"
-              />
-              <YAxis
-                yAxisId="revpar"
-                axisLine={false}
-                tickLine={false}
-                tick={tick}
-                width={56}
-                tickCount={5}
-                domain={[400, 1800]}
-                tickFormatter={(v: number) => `$${int.format(v)}`}
-              />
-              <YAxis
-                yAxisId="occ"
-                orientation="right"
-                axisLine={false}
-                tickLine={false}
-                tick={tick}
-                width={44}
-                tickCount={5}
-                domain={[50, 100]}
-                tickFormatter={(v: number) => `${v}%`}
-              />
-              <Tooltip
-                content={<ChartTooltip />}
-                cursor={{ stroke: C.slate700, strokeWidth: 1 }}
-                isAnimationActive={false}
-              />
-              <Line
-                yAxisId="revpar"
-                type="monotone"
-                dataKey="revpar_usd"
-                stroke={C.ink}
-                strokeWidth={1.5}
-                dot={false}
-                activeDot={{ r: 3, fill: C.ink, stroke: "#FFF", strokeWidth: 2 }}
-                animationDuration={900}
-              />
-              <Line
-                yAxisId="occ"
-                type="monotone"
-                dataKey="occupancy_pct"
-                stroke={C.slate500}
-                strokeWidth={1.25}
-                strokeDasharray="3 4"
-                dot={false}
-                activeDot={{ r: 3, fill: C.slate300, stroke: "#FFF", strokeWidth: 2 }}
-                animationDuration={900}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        ) : (
-          <Skeleton className="h-full w-full" />
-        )}
-      </div>
-    </section>
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────────────────
- * 03 — Yield radar (ledger)
+ * Signal badge (undervalued / at market / overpriced)
  * ──────────────────────────────────────────────────────────────────────── */
 
 const SIGNAL_STYLE: Record<Signal, { label: string; color: string }> = {
@@ -619,74 +398,6 @@ function SignalBadge({ signal }: { signal: Signal }) {
       <span className="h-1.5 w-1.5" style={{ background: s.color }} />
       {s.label}
     </span>
-  );
-}
-
-function YieldRadar({ listings, marketYield }: { listings?: ListingSignal[]; marketYield?: number }) {
-  const th = "px-4 py-3 text-[10px] font-medium uppercase tracking-[0.2em] text-zinc-500 border-b border-zinc-300";
-  const td = "px-4 py-4 border-b border-zinc-200";
-
-  return (
-    <section>
-      <SectionLabel
-        index="03"
-        title="Yield Radar — Villas For Sale"
-        meta={marketYield !== undefined ? `BENCHMARK GROSS YIELD ${fmtPct(marketYield)}` : undefined}
-      />
-      <div className="relative overflow-x-auto border-t border-zinc-300">
-        <table className="w-full min-w-[820px] border-collapse text-left">
-          <thead>
-            <tr>
-              <th className={`${th} w-[34%] pl-0`}>Asset Name</th>
-              <th className={`${th} text-right`}>Asking Price</th>
-              <th className={`${th} text-right`}>Sequence ADR</th>
-              <th className={`${th} text-right`}>Projected Yield</th>
-              <th className={`${th} pr-0 text-right`}>Signal</th>
-            </tr>
-          </thead>
-          <tbody>
-            {listings
-              ? listings.map((l) => (
-                  <tr key={l.listing_id} className="transition-colors hover:bg-zinc-50">
-                    <td className={`${td} pl-0`}>
-                      <p className="text-[13px] text-zinc-950">{l.asset_name}</p>
-                      <p className={`${MONO} mt-1 text-[11px] text-zinc-500`}>
-                        {l.listing_id} · {l.district.toUpperCase()} · {l.bedrooms}BR
-                      </p>
-                    </td>
-                    <td className={`${td} ${MONO} text-right text-[13px] text-zinc-800`}>
-                      {fmtUsdCompact(l.asking_price_usd)}
-                    </td>
-                    <td className={`${td} ${MONO} text-right text-[13px] text-zinc-800`}>
-                      {fmtUsd(l.sequence_adr_usd)}
-                      <span className="ml-1 text-[11px] text-zinc-500">/NT</span>
-                    </td>
-                    <td className={`${td} ${MONO} text-right`}>
-                      <p className="text-[13px] text-zinc-950">{fmtPct(l.projected_gross_yield_pct)}</p>
-                      <p className="mt-1 text-[11px]" style={{ color: deltaColor(l.yield_spread_bps) }}>
-                        {fmtBps(l.yield_spread_bps)}
-                      </p>
-                    </td>
-                    <td className={`${td} pr-0 text-right`}>
-                      <SignalBadge signal={l.signal} />
-                    </td>
-                  </tr>
-                ))
-              : Array.from({ length: 5 }).map((_, i) => (
-                  <tr key={i}>
-                    <td colSpan={5} className={`${td} px-0`}>
-                      <Skeleton className="h-8 w-full" />
-                    </td>
-                  </tr>
-                ))}
-          </tbody>
-        </table>
-      </div>
-      <p className="mt-4 text-[11px] leading-relaxed text-zinc-500">
-        Projected yield = Sequence ADR × 365 × modeled occupancy ÷ asking price. Spread shown against the
-        Aruba luxury benchmark. Gross, pre-OpEx, pre-management.
-      </p>
-    </section>
   );
 }
 
@@ -1249,15 +960,47 @@ function PriceHistory({ l, marketYield }: { l: Listing; marketYield?: number }) 
   );
 }
 
-function ListingDetails({
-  l,
-  marketYield,
-  onEstimate,
-}: {
-  l: Listing;
-  marketYield?: number;
-  onEstimate?: (l: ListingSignal) => void;
-}) {
+/** Pin / unpin a listing on the watchlist. "icon" is the compact row/card version. */
+function WatchButton({ l, variant = "full" }: { l: Listing; variant?: "full" | "icon" }) {
+  const { isPinned, toggle } = useWatchlist();
+  const pinned = isPinned(l.listing_id);
+  const label = pinned ? `Remove ${l.asset_name} from watchlist` : `Add ${l.asset_name} to watchlist`;
+  const onClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    toggle(l.listing_id, l.asking_price_usd);
+  };
+  if (variant === "icon") {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        aria-pressed={pinned}
+        aria-label={label}
+        title={pinned ? "On your watchlist" : "Add to watchlist"}
+        className={`inline-flex size-8 shrink-0 items-center justify-center rounded-full transition-all active:scale-90 ${
+          pinned ? "bg-zinc-950 text-mint" : "text-zinc-400 hover:bg-white hover:text-zinc-950"
+        }`}
+      >
+        <Pin size={14} strokeWidth={1.75} fill={pinned ? "currentColor" : "none"} />
+      </button>
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={pinned}
+      className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-[12px] font-medium transition-all active:scale-95 ${
+        pinned ? "bg-zinc-950 text-mint hover:bg-zinc-800" : "border border-zinc-950/20 bg-white text-zinc-900 hover:border-zinc-950"
+      }`}
+    >
+      <Pin size={13} strokeWidth={1.75} fill={pinned ? "currentColor" : "none"} />
+      {pinned ? "On your watchlist" : "Add to watchlist"}
+    </button>
+  );
+}
+
+function ListingDetails({ l, marketYield }: { l: Listing; marketYield?: number }) {
   const shared = (
     <>
       <DetailItem label="Status" value={<StatusBadge l={l} withDate />} />
@@ -1352,23 +1095,13 @@ function ListingDetails({
         <ListedBy l={l} />
       </div>
       <div>
+        <div className="mb-5">
+          <WatchButton l={l} />
+        </div>
         <dl className="grid grid-cols-2 gap-x-8 gap-y-5 sm:grid-cols-3 xl:grid-cols-4">
           {facts}
           {shared}
         </dl>
-        {onEstimate && l.category === "Property" && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onEstimate(l);
-            }}
-            className="mt-6 inline-flex items-center gap-2 bg-zinc-950 px-3 py-2 text-[12px] text-mint transition-colors hover:bg-zinc-800"
-          >
-            <Calculator size={13} strokeWidth={1.5} />
-            Open in Revenue Estimator
-          </button>
-        )}
         <PriceHistory l={l} marketYield={marketYield} />
       </div>
     </div>
@@ -1382,7 +1115,6 @@ function ActiveListings({
   initialQuery,
   initialOpenId,
   initialNewToday,
-  onEstimate,
 }: {
   listings?: Listing[];
   marketYield?: number;
@@ -1390,7 +1122,6 @@ function ActiveListings({
   initialQuery?: string;
   initialOpenId?: string;
   initialNewToday?: boolean;
-  onEstimate: (l: ListingSignal) => void;
 }) {
   const [query, setQuery] = useState(initialQuery ?? "");
   const [tenure, setTenure] = useState<Tenure | "All">("All");
@@ -1780,7 +1511,10 @@ function ActiveListings({
         {rows.map((l) => {
           const open = openId === l.listing_id;
           return (
-            <li key={l.listing_id} data-row={`row-${l.listing_id}`} className={`scroll-mt-24 ${open ? "bg-mint-soft" : ""}`}>
+            <li key={l.listing_id} data-row={`row-${l.listing_id}`} className={`relative scroll-mt-24 ${open ? "bg-mint-soft" : ""}`}>
+              <span className="absolute left-1 top-5 z-10 rounded-full bg-white/90 shadow-sm">
+                <WatchButton l={l} variant="icon" />
+              </span>
               <button
                 type="button"
                 onClick={() => setOpenId(open ? null : l.listing_id)}
@@ -1828,7 +1562,7 @@ function ActiveListings({
               </button>
               {open && (
                 <div className="pb-6">
-                  <ListingDetails l={l} marketYield={marketYield} onEstimate={onEstimate} />
+                  <ListingDetails l={l} marketYield={marketYield} />
                 </div>
               )}
             </li>
@@ -1977,13 +1711,16 @@ function ActiveListings({
                     </td>
                     <td className={num}>{l.is_new ? <span className="font-semibold text-zinc-950">Today</span> : `${l.days_on_market}d`}</td>
                     <td className={`${td} pr-0 text-right`}>
-                      <ChevronDown size={14} strokeWidth={1.5} className={`ml-auto text-zinc-400 transition-transform ${open ? "rotate-180" : ""}`} />
+                      <span className="flex items-center justify-end gap-1">
+                        <WatchButton l={l} variant="icon" />
+                        <ChevronDown size={14} strokeWidth={1.5} className={`text-zinc-400 transition-transform ${open ? "rotate-180" : ""}`} />
+                      </span>
                     </td>
                   </tr>
                   {open && (
                     <tr className="bg-mint-soft">
                       <td colSpan={colCount} className="border-b border-zinc-300 px-0 pb-8 pt-3">
-                        <ListingDetails l={l} marketYield={marketYield} onEstimate={onEstimate} />
+                        <ListingDetails l={l} marketYield={marketYield} />
                       </td>
                     </tr>
                   )}
@@ -2009,612 +1746,293 @@ function ActiveListings({
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
- * Vacation Rentals — Airbnb, Vrbo and direct-booking rentals on the map
+ * Watchlist — listings the user pinned to keep track of
  * ──────────────────────────────────────────────────────────────────────── */
 
-type RentalSortKey = "name" | "district" | "beds" | "sleeps" | "nightly" | "occupancy" | "revenue" | "rating";
-
-const RENTAL_SORT: Record<RentalSortKey, (r: VacationRental) => number | string | null> = {
-  name: (r) => r.name,
-  district: (r) => r.district,
-  beds: (r) => r.bedrooms,
-  sleeps: (r) => r.sleeps,
-  nightly: (r) => r.nightly_rate_usd,
-  occupancy: (r) => r.occupancy_pct,
-  revenue: (r) => r.annual_revenue_usd,
-  rating: (r) => r.rating,
-};
-const RENTAL_MOBILE_SORTS: Array<[RentalSortKey, "asc" | "desc", string]> = [
-  ["revenue", "desc", "Highest yearly revenue"],
-  ["nightly", "desc", "Price per night: high to low"],
-  ["nightly", "asc", "Price per night: low to high"],
-  ["occupancy", "desc", "Highest occupancy"],
-  ["rating", "desc", "Best rated"],
-  ["beds", "desc", "Most bedrooms"],
+type WatchSort = "pinned" | "moved" | "price" | "listed";
+const WATCH_SORTS: Array<[WatchSort, string]> = [
+  ["pinned", "Recently pinned"],
+  ["moved", "Biggest price move"],
+  ["price", "Highest price"],
+  ["listed", "Longest on market"],
 ];
-const NIGHTLY_STEPS = [150, 250, 400, 600, 800, 1000, 1500, 2500, 4000, 6000];
 
-/** Full details of one vacation rental (desktop row expansion and phone card). */
-function RentalDetails({ r, onShowForSale }: { r: VacationRental; onShowForSale: (district: string) => void }) {
-  return (
-    <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
-      {r.photo_url && (
-        <Image
-          src={`${r.photo_url}?auto=format&fit=crop&w=720&h=460&q=70`}
-          alt={r.name}
-          width={320}
-          height={205}
-          unoptimized
-          className="h-[205px] w-full rounded-xl bg-zinc-100 object-cover"
-        />
-      )}
-      <div>
-        <dl className="grid grid-cols-2 gap-x-8 gap-y-5 sm:grid-cols-3 xl:grid-cols-4">
-          <DetailItem label="Platform" value={`${PLATFORM_LABEL[r.platform]} · ${r.host_type}`} />
-          <DetailItem label="Type" value={r.property_type} />
-          <DetailItem label="Bedrooms / baths" value={`${r.bedrooms} / ${r.bathrooms}`} />
-          <DetailItem label="Sleeps" value={`${r.sleeps} guests`} />
-          <DetailItem label="Avg. nightly (next 30 days)" value={fmtUsd(r.nightly_rate_usd)} />
-          <DetailItem label="Low / high season" value={`${fmtUsd(r.low_season_rate_usd)} / ${fmtUsd(r.high_season_rate_usd)}`} />
-          <DetailItem label="Cleaning fee" value={fmtUsd(r.cleaning_fee_usd)} />
-          <DetailItem label="Occupancy (12 months)" value={`${r.occupancy_pct}% · ${Math.round((365 * r.occupancy_pct) / 100)} nights`} />
-          <DetailItem label="Est. yearly revenue" value={fmtUsd(r.annual_revenue_usd)} />
-          <DetailItem label="Rating" value={r.rating ? `★ ${r.rating.toFixed(2)} (${r.reviews} reviews)` : "No reviews yet"} />
-          <DetailItem label="First seen" value={fmtDate(r.first_seen)} />
-          <DetailItem label="Last scraped" value={fmtTimestamp(r.last_scraped)} />
-        </dl>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onShowForSale(r.district);
-          }}
-          className="mt-6 inline-flex items-center gap-2 bg-zinc-950 px-3 py-2 text-[12px] text-mint transition-colors hover:bg-zinc-800"
-        >
-          See properties for sale in {r.district}
-          <ArrowRight size={13} strokeWidth={1.5} />
-        </button>
-      </div>
-    </div>
-  );
+interface WatchUpdate {
+  id: string;
+  date: string;
+  text: string;
+  color: string;
 }
 
-function PlatformPill({ platform }: { platform: VacationRental["platform"] }) {
-  return (
-    <span
-      className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold text-white"
-      style={{ background: PLATFORM_COLOR[platform] }}
-    >
-      {PLATFORM_LABEL[platform]}
-    </span>
-  );
+/** What the daily scrapes saw on pinned listings, newest first. */
+function watchUpdates(ids: Set<string>, runs: ScrapeRun[]): WatchUpdate[] {
+  const out: WatchUpdate[] = [];
+  runs.forEach((run) => {
+    run.price_changes
+      .filter((c) => ids.has(c.listing.listing_id))
+      .forEach((c) => {
+        const pct = c.change.change_pct ?? 0;
+        out.push({
+          id: c.listing.listing_id,
+          date: run.date,
+          text: `${c.listing.asset_name}: price ${pct < 0 ? "dropped" : "raised"} ${Math.abs(pct).toFixed(1)}% to ${fmtUsdCompact(c.change.price_usd)}`,
+          color: priceColor(pct),
+        });
+      });
+    run.status_changes
+      .filter((l) => ids.has(l.listing_id))
+      .forEach((l) => out.push({ id: l.listing_id, date: run.date, text: `${l.asset_name}: now ${l.status.toLowerCase()}`, color: STATUS_STYLE[l.status].color }));
+  });
+  return out;
 }
 
-function RentalSortHeader({
-  label,
-  k,
-  sort,
-  onSort,
-  align = "right",
-}: {
-  label: string;
-  k: RentalSortKey;
-  sort: { key: RentalSortKey; dir: "asc" | "desc" };
-  onSort: (k: RentalSortKey) => void;
-  align?: "left" | "right";
-}) {
-  const active = sort.key === k;
-  return (
-    <th
-      aria-sort={active ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}
-      className={`border-b border-zinc-300 px-3 py-3 text-[10px] font-medium uppercase tracking-[0.14em] ${align === "right" ? "text-right" : "text-left"}`}
-    >
-      <button
-        type="button"
-        onClick={() => onSort(k)}
-        className={`inline-flex items-center gap-1 uppercase transition-colors ${active ? "text-zinc-950" : "text-zinc-500 hover:text-zinc-800"}`}
-      >
-        {label}
-        <span className="text-[9px]">{active ? (sort.dir === "asc" ? "▲" : "▼") : ""}</span>
-      </button>
-    </th>
-  );
-}
-
-function downloadRentalsCsv(rows: VacationRental[]) {
-  const cols: Array<[string, (r: VacationRental) => string | number | null]> = [
-    ["Rental ID", (r) => r.rental_id],
-    ["Name", (r) => r.name],
-    ["Platform", (r) => PLATFORM_LABEL[r.platform]],
-    ["Host", (r) => r.host_type],
-    ["Type", (r) => r.property_type],
-    ["District", (r) => r.district],
-    ["Bedrooms", (r) => r.bedrooms],
-    ["Bathrooms", (r) => r.bathrooms],
-    ["Sleeps", (r) => r.sleeps],
-    ["Nightly rate USD (next 30 days)", (r) => r.nightly_rate_usd],
-    ["Low season USD", (r) => r.low_season_rate_usd],
-    ["High season USD", (r) => r.high_season_rate_usd],
-    ["Cleaning fee USD", (r) => r.cleaning_fee_usd],
-    ["Occupancy % (12 months)", (r) => r.occupancy_pct],
-    ["Est. yearly revenue USD", (r) => r.annual_revenue_usd],
-    ["Rating", (r) => r.rating],
-    ["Reviews", (r) => r.reviews],
-    ["First seen", (r) => r.first_seen],
-    ["Last scraped", (r) => r.last_scraped],
-    ["Source URL", (r) => r.source_url],
-    ["Latitude", (r) => r.lat],
-    ["Longitude", (r) => r.lng],
-  ];
-  const esc = (v: string | number | null) => {
-    const t = v === null ? "" : String(v);
-    return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
-  };
-  const csv = [cols.map(([h]) => h), ...rows.map((r) => cols.map(([, f]) => f(r)))]
-    .map((line) => line.map(esc).join(","))
-    .join("\n");
-  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `sequence-data-aruba-vacation-rentals-${new Date().toISOString().slice(0, 10)}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-function VacationRentals({
-  rentals,
-  initialDistrict,
-  onShowForSale,
-}: {
-  rentals?: VacationRental[];
-  initialDistrict?: string;
-  onShowForSale: (district: string) => void;
-}) {
-  const [query, setQuery] = useState("");
-  const [platforms, setPlatforms] = useState<string[]>([]);
-  const [types, setTypes] = useState<string[]>([]);
-  const [district, setDistrict] = useState(initialDistrict ?? "All");
-  const [nightMin, setNightMin] = useState(0);
-  const [nightMax, setNightMax] = useState(0);
-  const [bedsMin, setBedsMin] = useState(0);
-  const [sleepsMin, setSleepsMin] = useState(0);
-  const [ratingMin, setRatingMin] = useState(0);
-  const [newOnly, setNewOnly] = useState(false);
-  const [moreOpen, setMoreOpen] = useState(false);
-  const [sort, setSort] = useState<{ key: RentalSortKey; dir: "asc" | "desc" }>({ key: "revenue", dir: "desc" });
+function Watchlist({ listings, marketYield, onOpenListing, onBrowse }: { listings?: Listing[]; marketYield?: number; onOpenListing: (id: string) => void; onBrowse: () => void }) {
+  const { entries, unpin, setNote, clear } = useWatchlist();
+  const [sort, setSort] = useState<WatchSort>("pinned");
   const [openId, setOpenId] = useState<string | null>(null);
-  const [hoverId, setHoverId] = useState<string | null>(null);
 
-  const districts = useMemo(
-    () => ["All", ...Array.from(new Set((rentals ?? []).map((r) => r.district))).sort()],
-    [rentals],
-  );
-  const newCutoff = Date.parse("2026-11-13T00:00:00Z") - 60 * 86_400_000;
-
+  const byId = useMemo(() => new Map((listings ?? []).map((l) => [l.listing_id, l])), [listings]);
   const rows = useMemo(() => {
-    if (!rentals) return [];
-    const q = query.trim().toLowerCase();
-    const filtered = rentals.filter(
-      (r) =>
-        (!platforms.length || platforms.includes(r.platform)) &&
-        (!types.length || types.includes(r.property_type)) &&
-        (district === "All" || r.district === district) &&
-        (!nightMin || r.nightly_rate_usd >= nightMin) &&
-        (!nightMax || r.nightly_rate_usd <= nightMax) &&
-        (!bedsMin || r.bedrooms >= bedsMin) &&
-        (!sleepsMin || r.sleeps >= sleepsMin) &&
-        (!ratingMin || (r.rating ?? 0) >= ratingMin) &&
-        (!newOnly || Date.parse(r.first_seen) >= newCutoff) &&
-        (!q || `${r.name} ${r.district} ${r.rental_id} ${r.property_type} ${r.platform}`.toLowerCase().includes(q)),
-    );
-    const dir = sort.dir === "asc" ? 1 : -1;
-    const get = RENTAL_SORT[sort.key];
-    return filtered.sort((a, b) => {
-      const x = get(a);
-      const y = get(b);
-      if (x === null && y === null) return 0;
-      if (x === null) return 1;
-      if (y === null) return -1;
-      return (typeof x === "string" ? x.localeCompare(y as string) : x - (y as number)) * dir;
-    });
-  }, [rentals, query, platforms, types, district, nightMin, nightMax, bedsMin, sleepsMin, ratingMin, newOnly, newCutoff, sort]);
-
-  const stats = useMemo(() => {
-    const rated = rows.filter((r) => r.rating !== null);
-    return {
-      count: rows.length,
-      medianNightly: median(rows.map((r) => r.nightly_rate_usd)),
-      avgOcc: rows.length ? rows.reduce((a, r) => a + r.occupancy_pct, 0) / rows.length : 0,
-      medianRevenue: median(rows.map((r) => r.annual_revenue_usd)),
-      avgRating: rated.length ? rated.reduce((a, r) => a + (r.rating ?? 0), 0) / rated.length : null,
-      byPlatform: RENTAL_PLATFORMS.map((p) => [p, rows.filter((r) => r.platform === p).length] as const),
+    const r = entries
+      .map((e) => ({ e, l: byId.get(e.id) }))
+      .filter((x): x is { e: WatchEntry; l: Listing } => Boolean(x.l))
+      .map((x) => ({ ...x, since: ((x.l.asking_price_usd - x.e.price_at_pin) / x.e.price_at_pin) * 100 }));
+    const key: Record<WatchSort, (x: (typeof r)[number]) => number> = {
+      pinned: (x) => -Date.parse(x.e.pinned_at),
+      moved: (x) => -Math.abs(x.l.price_change_pct),
+      price: (x) => -x.l.asking_price_usd,
+      listed: (x) => -x.l.days_on_market,
     };
-  }, [rows]);
+    return r.sort((a, b) => key[sort](a) - key[sort](b));
+  }, [entries, byId, sort]);
 
-  const onSort = (key: RentalSortKey) =>
-    setSort((s) => (s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: key === "name" || key === "district" ? "asc" : "desc" }));
-  const toggle = (set: React.Dispatch<React.SetStateAction<string[]>>, v: string) =>
-    set((xs) => (xs.includes(v) ? xs.filter((x) => x !== v) : [...xs, v]));
+  const ids = useMemo(() => new Set(rows.map((r) => r.l.listing_id)), [rows]);
+  const updates = useMemo(() => watchUpdates(ids, SCRAPE_RUNS), [ids]);
+  const today = SCRAPE_RUNS[0].date;
+  const todayCount = updates.filter((u) => u.date === today).length;
+  const total = rows.reduce((a, r) => a + r.l.asking_price_usd, 0);
+  const drops = rows.filter((r) => r.l.price_change_pct < 0).length;
+  const offMarket = rows.filter((r) => r.l.status !== "Available").length;
 
-  const moreCount = [nightMin, nightMax, bedsMin, sleepsMin, ratingMin].filter(Boolean).length + (newOnly ? 1 : 0);
-  const filtersActive = Boolean(query) || platforms.length > 0 || types.length > 0 || district !== "All" || moreCount > 0;
-  const clearAll = () => {
-    setQuery("");
-    setPlatforms([]);
-    setTypes([]);
-    setDistrict("All");
-    setNightMin(0);
-    setNightMax(0);
-    setBedsMin(0);
-    setSleepsMin(0);
-    setRatingMin(0);
-    setNewOnly(false);
-  };
-  const selectFromMap = (id: string) => {
-    setOpenId(id);
-    requestAnimationFrame(() => scrollToRow(`rental-${id}`));
-  };
-
-  const selectCls = `${MONO} rounded-md border border-zinc-300 bg-white px-3 py-2 text-[12px] text-zinc-800 outline-none transition-colors hover:border-zinc-500 focus:border-zinc-950`;
-  const chip = (on: boolean) =>
-    `rounded-full border px-3 py-1.5 text-[12px] font-medium transition-[colors,transform] active:scale-[0.96] ${
-      on ? "border-zinc-950 bg-zinc-950 text-mint" : "border-zinc-300 bg-white text-zinc-700 hover:border-zinc-500"
-    }`;
-  const toggleCls = (on: boolean) =>
-    `inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-md border px-3 py-2 text-[12px] font-medium transition-colors active:scale-[0.97] ${
-      on ? "border-zinc-950 bg-zinc-950 text-mint" : "border-zinc-300 bg-white text-zinc-700 hover:border-zinc-500"
-    }`;
-  const td = "px-3 py-4 border-b border-zinc-200 align-top";
-  const num = `${td} ${MONO} text-right text-[13px] text-zinc-800`;
+  if (!listings) {
+    return (
+      <div className="space-y-3 py-10">
+        <Skeleton className="h-10 w-64" />
+        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-24 w-full" />
+      </div>
+    );
+  }
 
   return (
-    <>
-      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-zinc-200 py-6 sm:py-8">
+    <div className="py-8 sm:py-10">
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500">Aruba · Airbnb, Vrbo &amp; direct sites</p>
-          <h1 className="mt-2 font-display text-[28px] font-bold tracking-tight text-zinc-950">Vacation Rentals</h1>
-          <p className="mt-1 max-w-[72ch] text-[13px] leading-relaxed text-zinc-600">
-            Every vacation rental we track in Aruba, with what it charges per night, how often it is booked and what it earns.
-            Pins show the nightly price; hover for a quick look, click for full details.
+          <h1 className="font-display text-[26px] font-bold tracking-tight text-zinc-950 sm:text-[30px]">Watchlist</h1>
+          <p className="mt-1 max-w-xl text-[13px] text-zinc-500">
+            Properties you are keeping track of. Every daily scrape checks them for price changes and status updates.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => downloadRentalsCsv(rows)}
-          disabled={!rows.length}
-          className="inline-flex items-center gap-2 bg-zinc-950 px-4 py-2 text-[12px] font-medium tracking-wide text-mint transition-colors hover:bg-zinc-800 disabled:opacity-40"
-        >
-          <Download size={13} strokeWidth={1.5} />
-          Export CSV
-        </button>
+        {rows.length > 0 && (
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 text-[12px] text-zinc-500">
+              Sort
+              <select value={sort} onChange={(e) => setSort(e.target.value as WatchSort)} className={`${MONO} rounded-md border border-zinc-300 bg-white px-3 py-2 text-[12px] text-zinc-800 outline-none transition-colors hover:border-zinc-500 focus:border-zinc-950`}>
+                {WATCH_SORTS.map(([k, label]) => (
+                  <option key={k} value={k}>{label}</option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              onClick={() => window.confirm("Remove every listing from your watchlist?") && clear()}
+              className="text-[12px] text-zinc-500 underline-offset-4 hover:text-zinc-950 hover:underline"
+            >
+              Clear all
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* summary */}
-      <div className="grid grid-cols-3 gap-x-4 border-b border-zinc-200 lg:grid-cols-6 lg:gap-x-0">
-        {[
-          ["Rentals shown", rentals ? int.format(stats.count) : "—"],
-          ["Median per night", rentals && stats.count ? fmtUsd(stats.medianNightly) : "—"],
-          ["Avg. occupancy", rentals && stats.count ? fmtPct(stats.avgOcc, 0) : "—"],
-          ["Median yearly revenue", rentals && stats.count ? fmtUsdCompact(stats.medianRevenue) : "—"],
-          ["Avg. rating", stats.avgRating !== null ? `★ ${stats.avgRating.toFixed(2)}` : "—"],
-        ].map(([label, value], i) => (
-          <div key={label} className={`py-3 sm:py-5 ${i > 0 ? "lg:border-l lg:border-zinc-200 lg:pl-6" : ""}`}>
-            <p className="truncate text-[9px] uppercase tracking-[0.12em] text-zinc-500 sm:text-[10px] sm:tracking-[0.14em]">{label}</p>
-            <p className={`${MONO} mt-1.5 font-display text-[24px] font-bold text-zinc-950`}>{value}</p>
-          </div>
-        ))}
-        <div className="py-5 lg:border-l lg:border-zinc-200 lg:pl-6">
-          <p className="text-[10px] uppercase tracking-[0.14em] text-zinc-500">By platform</p>
-          <div className="mt-2 space-y-1">
-            {stats.byPlatform.map(([p, n]) => (
-              <div key={p} className="flex items-center justify-between gap-3 text-[12px]">
-                <span className="flex items-center gap-1.5 text-zinc-700">
-                  <span className="size-2 rounded-full" style={{ background: PLATFORM_COLOR[p] }} />
-                  {PLATFORM_LABEL[p]}
-                </span>
-                <span className={`${MONO} font-semibold text-zinc-950`}>{rentals ? n : "—"}</span>
+      {rows.length === 0 ? (
+        <div className="mt-8 flex flex-col items-center rounded-3xl border border-dashed border-zinc-300 bg-mint-soft/60 px-6 py-16 text-center">
+          <span className="flex size-12 items-center justify-center rounded-full bg-zinc-950 text-mint">
+            <Pin size={18} strokeWidth={1.75} />
+          </span>
+          <h2 className="mt-5 font-display text-[20px] font-bold text-zinc-950">Nothing pinned yet</h2>
+          <p className="mt-2 max-w-md text-[13px] leading-relaxed text-zinc-600">
+            Tap the <Pin size={12} strokeWidth={2} className="inline -translate-y-px" /> pin on any listing to add it here. You will see
+            every price change and status update on the properties you care about, in one place.
+          </p>
+          <button
+            type="button"
+            onClick={onBrowse}
+            className="mt-6 inline-flex items-center gap-2 rounded-full bg-zinc-950 px-5 py-2.5 text-[13px] font-medium text-mint transition-all hover:bg-zinc-800 active:scale-95"
+          >
+            Browse listings <ArrowRight size={14} strokeWidth={1.75} />
+          </button>
+        </div>
+      ) : (
+        <>
+          <dl className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-200 sm:grid-cols-4">
+            {(
+              [
+                ["Pinned", String(rows.length)],
+                ["Total asking", fmtUsdCompact(total)],
+                ["Price drops", String(drops)],
+                ["Updates today", String(todayCount)],
+              ] as const
+            ).map(([k, v]) => (
+              <div key={k} className="bg-white px-4 py-4 sm:px-5">
+                <dt className="text-[11px] text-zinc-500">{k}</dt>
+                <dd className={`${MONO} mt-1 font-display text-[22px] font-bold text-zinc-950`}>{v}</dd>
               </div>
             ))}
-          </div>
-        </div>
-      </div>
-
-      {/* filters */}
-      <div className="space-y-3 py-5">
-        <div className="flex flex-wrap items-center gap-3">
-          <label className="relative w-full sm:w-auto">
-            <span className="sr-only">Search rentals</span>
-            <Search size={13} strokeWidth={1.5} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search name, district, ID"
-              className={`${selectCls} w-full pl-8 placeholder:text-zinc-400 sm:w-56`}
-            />
-          </label>
-          <label className="sr-only" htmlFor="r-district">District</label>
-          <select id="r-district" value={district} onChange={(e) => setDistrict(e.target.value)} className={selectCls}>
-            {districts.map((d) => (
-              <option key={d} value={d}>{d === "All" ? "All districts" : d}</option>
-            ))}
-          </select>
-          <button type="button" onClick={() => setMoreOpen((v) => !v)} aria-expanded={moreOpen} className={toggleCls(moreOpen || moreCount > 0)}>
-            <SlidersHorizontal size={13} strokeWidth={1.75} />
-            More filters{moreCount > 0 ? ` (${moreCount})` : ""}
-          </button>
-          {filtersActive && (
-            <button type="button" onClick={clearAll} className="text-[12px] text-zinc-500 underline-offset-4 hover:text-zinc-950 hover:underline">
-              Clear all
-            </button>
+          </dl>
+          {offMarket > 0 && (
+            <p className="mt-3 text-[12px] text-zinc-500">
+              {offMarket} pinned {offMarket === 1 ? "listing is" : "listings are"} under contract or sold.
+            </p>
           )}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="mr-1 text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500">Platform</span>
-          <button type="button" onClick={() => setPlatforms([])} className={chip(platforms.length === 0)}>All</button>
-          {RENTAL_PLATFORMS.map((p) => (
-            <button key={p} type="button" onClick={() => toggle(setPlatforms, p)} aria-pressed={platforms.includes(p)} className={chip(platforms.includes(p))}>
-              <span className="mr-1.5 inline-block size-2 rounded-full align-middle" style={{ background: PLATFORM_COLOR[p] }} />
-              {PLATFORM_LABEL[p]}
-            </button>
-          ))}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="mr-1 text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500">Type</span>
-          <button type="button" onClick={() => setTypes([])} className={chip(types.length === 0)}>All</button>
-          {RESIDENTIAL_TYPES.map((t) => (
-            <button key={t} type="button" onClick={() => toggle(setTypes, t)} aria-pressed={types.includes(t)} className={chip(types.includes(t))}>
-              {t}
-            </button>
-          ))}
-        </div>
-        {moreOpen && (
-          <div className="flex flex-wrap items-end gap-4 rounded-lg border border-zinc-200 bg-mint-soft p-4">
-            <label className="block">
-              <span className="text-[10px] uppercase tracking-[0.14em] text-zinc-500">Min per night</span>
-              <select value={nightMin} onChange={(e) => setNightMin(Number(e.target.value))} className={`${selectCls} mt-1.5 block`}>
-                <option value={0}>No min</option>
-                {NIGHTLY_STEPS.map((n) => (
-                  <option key={n} value={n}>{fmtUsd(n)}</option>
-                ))}
-              </select>
-            </label>
-            <label className="block">
-              <span className="text-[10px] uppercase tracking-[0.14em] text-zinc-500">Max per night</span>
-              <select value={nightMax} onChange={(e) => setNightMax(Number(e.target.value))} className={`${selectCls} mt-1.5 block`}>
-                <option value={0}>No max</option>
-                {NIGHTLY_STEPS.map((n) => (
-                  <option key={n} value={n}>{fmtUsd(n)}</option>
-                ))}
-              </select>
-            </label>
-            <label className="block">
-              <span className="text-[10px] uppercase tracking-[0.14em] text-zinc-500">Bedrooms</span>
-              <select value={bedsMin} onChange={(e) => setBedsMin(Number(e.target.value))} className={`${selectCls} mt-1.5 block`}>
-                <option value={0}>Any</option>
-                {[1, 2, 3, 4, 5, 6, 7].map((b) => (
-                  <option key={b} value={b}>{b}+</option>
-                ))}
-              </select>
-            </label>
-            <label className="block">
-              <span className="text-[10px] uppercase tracking-[0.14em] text-zinc-500">Sleeps</span>
-              <select value={sleepsMin} onChange={(e) => setSleepsMin(Number(e.target.value))} className={`${selectCls} mt-1.5 block`}>
-                <option value={0}>Any</option>
-                {[2, 4, 6, 8, 10, 12, 16].map((n) => (
-                  <option key={n} value={n}>{n}+ guests</option>
-                ))}
-              </select>
-            </label>
-            <label className="block">
-              <span className="text-[10px] uppercase tracking-[0.14em] text-zinc-500">Rating</span>
-              <select value={ratingMin} onChange={(e) => setRatingMin(Number(e.target.value))} className={`${selectCls} mt-1.5 block`}>
-                <option value={0}>Any</option>
-                {[4.5, 4.7, 4.8, 4.9].map((n) => (
-                  <option key={n} value={n}>★ {n}+</option>
-                ))}
-              </select>
-            </label>
-            <button type="button" onClick={() => setNewOnly((v) => !v)} aria-pressed={newOnly} className={toggleCls(newOnly)}>
-              New rentals (60 days)
-            </button>
-          </div>
-        )}
-      </div>
 
-      <ArubaMap mode="rentals" rentals={rows} selectedId={openId} hoveredId={hoverId} onSelect={selectFromMap} onHover={setHoverId} height={560} />
-
-      <div className="mt-8 flex flex-wrap items-baseline justify-between gap-3">
-        <p className="font-display text-[18px] font-bold text-zinc-950">
-          {rentals ? `${int.format(stats.count)} rental${stats.count === 1 ? "" : "s"}` : "Loading rentals…"}
-        </p>
-        <p className="hidden text-[12px] text-zinc-500 md:block">Click a row or a pin for full details · click a column to sort</p>
-        <label className="flex items-center gap-2 text-[12px] text-zinc-500 md:hidden">
-          Sort
-          <select
-            value={`${sort.key}:${sort.dir}`}
-            onChange={(e) => {
-              const [key, dir] = e.target.value.split(":") as [RentalSortKey, "asc" | "desc"];
-              setSort({ key, dir });
-            }}
-            className={selectCls}
-          >
-            {RENTAL_MOBILE_SORTS.map(([k, d, label]) => (
-              <option key={`${k}:${d}`} value={`${k}:${d}`}>{label}</option>
-            ))}
-          </select>
-        </label>
-      </div>
-      {/* phones: cards */}
-      <ul className="mt-3 divide-y divide-zinc-200 border-t border-zinc-950 md:hidden">
-        {!rentals &&
-          Array.from({ length: 5 }).map((_, i) => (
-            <li key={i} className="py-4">
-              <Skeleton className="h-20 w-full" />
-            </li>
-          ))}
-        {rentals && !rows.length && (
-          <li className="py-12 text-center text-[13px] text-zinc-500">
-            No rentals match these filters.{" "}
-            <button type="button" onClick={clearAll} className="underline underline-offset-4">
-              Clear all
-            </button>
-          </li>
-        )}
-        {rows.map((r) => {
-          const open = openId === r.rental_id;
-          return (
-            <li key={r.rental_id} data-row={`rental-${r.rental_id}`} className={`scroll-mt-24 ${open ? "bg-mint-soft" : ""}`}>
-              <button
-                type="button"
-                onClick={() => setOpenId(open ? null : r.rental_id)}
-                aria-expanded={open}
-                className="flex w-full gap-3 py-4 text-left transition-colors active:bg-mint-soft"
-              >
-                <Thumb src={r.photo_url} alt={r.name} w={96} h={72} />
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-start justify-between gap-2">
-                    <span className="text-[14px] font-medium leading-snug text-zinc-950">{r.name}</span>
-                    <ChevronDown size={15} strokeWidth={1.5} className={`mt-0.5 shrink-0 text-zinc-400 transition-transform ${open ? "rotate-180" : ""}`} />
-                  </span>
-                  <span className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-500">
-                    {r.district} · {r.bedrooms} bd / {r.bathrooms} ba · sleeps {r.sleeps}
-                  </span>
-                  <span className="mt-1.5 block">
-                    <PlatformPill platform={r.platform} />
-                  </span>
-                  <span className={`${MONO} mt-2.5 grid grid-cols-3 gap-2 text-[11px] text-zinc-500`}>
-                    <span>
-                      <span className="block font-display text-[15px] font-bold text-zinc-950">{fmtUsd(r.nightly_rate_usd)}</span>
-                      per night
-                    </span>
-                    <span>
-                      <span className="block font-display text-[15px] font-bold text-zinc-950">{r.occupancy_pct}%</span>
-                      occupancy
-                    </span>
-                    <span>
-                      <span className="block font-display text-[15px] font-bold text-zinc-950">{fmtUsdCompact(r.annual_revenue_usd)}</span>
-                      per year
-                    </span>
-                  </span>
-                </span>
-              </button>
-              {open && (
-                <div className="pb-6">
-                  <RentalDetails r={r} onShowForSale={onShowForSale} />
-                </div>
-              )}
-            </li>
-          );
-        })}
-      </ul>
-
-      <div className="relative mt-3 hidden overflow-x-auto border-t border-zinc-950 md:block">
-        <table className="w-full min-w-[1120px] border-collapse text-left">
-          <thead>
-            <tr>
-              <RentalSortHeader label="Rental" k="name" sort={sort} onSort={onSort} align="left" />
-              <RentalSortHeader label="District" k="district" sort={sort} onSort={onSort} align="left" />
-              <th className="border-b border-zinc-300 px-3 py-3 text-left text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-500">Platform</th>
-              <RentalSortHeader label="Bd / Ba" k="beds" sort={sort} onSort={onSort} />
-              <RentalSortHeader label="Sleeps" k="sleeps" sort={sort} onSort={onSort} />
-              <RentalSortHeader label="Per night" k="nightly" sort={sort} onSort={onSort} />
-              <RentalSortHeader label="Occupancy" k="occupancy" sort={sort} onSort={onSort} />
-              <RentalSortHeader label="Est. yearly" k="revenue" sort={sort} onSort={onSort} />
-              <RentalSortHeader label="Rating" k="rating" sort={sort} onSort={onSort} />
-              <th className="w-8 border-b border-zinc-300" aria-label="Details" />
-            </tr>
-          </thead>
-          <tbody>
-            {!rentals &&
-              Array.from({ length: 8 }).map((_, i) => (
-                <tr key={i}>
-                  <td colSpan={10} className="border-b border-zinc-200 py-3">
-                    <Skeleton className="h-8 w-full" />
-                  </td>
-                </tr>
-              ))}
-            {rentals && !rows.length && (
-              <tr>
-                <td colSpan={10} className="py-16 text-center text-[13px] text-zinc-500">
-                  No rentals match these filters.{" "}
-                  <button type="button" onClick={clearAll} className="underline underline-offset-4 hover:text-zinc-950">
-                    Clear all
-                  </button>
-                </td>
-              </tr>
-            )}
-            {rows.map((r) => {
-              const open = openId === r.rental_id;
-              const hot = hoverId === r.rental_id;
-              return (
-                <Fragment key={r.rental_id}>
-                  <tr
-                    id={`rental-${r.rental_id}`}
-                    data-row={`rental-${r.rental_id}`}
-                    onClick={() => setOpenId(open ? null : r.rental_id)}
-                    onMouseEnter={() => setHoverId(r.rental_id)}
-                    onMouseLeave={() => setHoverId(null)}
-                    className={`cursor-pointer scroll-mt-24 transition-colors hover:bg-mint-soft ${open || hot ? "bg-mint-soft" : ""}`}
-                  >
-                    <td className={`${td} pl-0`}>
-                      <div className="flex items-start gap-3">
-                        <Thumb src={r.photo_url} alt={r.name} />
-                        <div>
-                          <p className="text-[13px] font-medium text-zinc-950">{r.name}</p>
-                          <p className="mt-1 text-[11px] text-zinc-500">
-                            {r.rental_id} · {r.property_type}
-                          </p>
+          <div className="mt-8 grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
+            <ul className="divide-y divide-zinc-200 border-t border-zinc-950">
+              {rows.map(({ e, l, since }) => {
+                const open = openId === l.listing_id;
+                return (
+                  <li key={l.listing_id} className={`py-4 transition-colors ${open ? "bg-mint-soft" : ""}`}>
+                    <div className="flex gap-3 sm:gap-4">
+                      <button type="button" onClick={() => setOpenId(open ? null : l.listing_id)} className="relative shrink-0 self-start" aria-label={`Details for ${l.asset_name}`}>
+                        <span className="sm:hidden">
+                          <Thumb src={l.photo_url} alt={l.asset_name} w={84} h={64} />
+                        </span>
+                        <span className="hidden sm:block">
+                          <Thumb src={l.photo_url} alt={l.asset_name} w={112} h={84} />
+                        </span>
+                        <span className="absolute -bottom-1.5 -right-1.5 rounded-[5px] ring-2 ring-white">
+                          <AgencyLogo agency={l.agency} size={20} rounded={4} />
+                        </span>
+                      </button>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <button type="button" onClick={() => setOpenId(open ? null : l.listing_id)} className="min-w-0 text-left">
+                            <span className="block text-[14px] font-semibold leading-snug text-zinc-950 hover:underline sm:text-[15px]">{l.asset_name}</span>
+                            <span className="mt-0.5 block text-[11px] text-zinc-500">
+                              {l.district} · {typeLine(l)}
+                              <span className="hidden sm:inline"> · {l.listing_id}</span>
+                            </span>
+                          </button>
+                          <WatchButton l={l} variant="icon" />
+                        </div>
+                        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                          <StatusBadge l={l} />
+                          <ScrapeTags l={l} />
+                          <TenureTag l={l} />
+                          <SignalBadge signal={l.signal} />
                         </div>
                       </div>
-                    </td>
-                    <td className={`${td} text-[13px] text-zinc-700`}>{r.district}</td>
-                    <td className={td}>
-                      <PlatformPill platform={r.platform} />
-                    </td>
-                    <td className={num}>
-                      {r.bedrooms} / {r.bathrooms}
-                    </td>
-                    <td className={num}>{r.sleeps}</td>
-                    <td className={`${num} text-zinc-950`}>
-                      {fmtUsd(r.nightly_rate_usd)}
-                      <p className="mt-1 text-[10px] text-zinc-400">
-                        {fmtUsd(r.low_season_rate_usd)}–{fmtUsd(r.high_season_rate_usd)}
+                    </div>
+                    <div className="sm:pl-[128px]">
+                      <div className={`${MONO} mt-3 grid grid-cols-3 gap-2 text-[11px] text-zinc-500 sm:max-w-md`}>
+                        <span>
+                          <span className="block font-display text-[16px] font-bold text-zinc-950">{fmtUsdCompact(l.asking_price_usd)}</span>
+                          asking
+                        </span>
+                        <span>
+                          <span className="block text-[13px]">
+                            {Math.abs(since) < 0.05 ? <span className="font-semibold text-zinc-400">No change</span> : <PriceMove pct={since} size={11} />}
+                          </span>
+                          since pinned
+                        </span>
+                        <span>
+                          <span className="block text-[13px]">
+                            {l.price_change_pct === 0 ? <span className="font-semibold text-zinc-400">No change</span> : <PriceMove pct={l.price_change_pct} size={11} />}
+                          </span>
+                          since listed
+                        </span>
+                      </div>
+                      <p className="mt-2 text-[11px] leading-relaxed text-zinc-500">
+                        {l.agency.name}
+                        {l.agent && <> · {l.agent.name}{l.agent.phone && <> · <span className="tabular-nums">{l.agent.phone}</span></>}</>}
+                        {" · "}
+                        {l.is_new ? "Listed today" : `${l.days_on_market}d on market`} · pinned {fmtDate(e.pinned_at.slice(0, 10))}
                       </p>
-                    </td>
-                    <td className={num}>{r.occupancy_pct}%</td>
-                    <td className={`${num} text-zinc-950`}>{fmtUsdCompact(r.annual_revenue_usd)}</td>
-                    <td className={num}>
-                      {r.rating ? (
-                        <>
-                          ★ {r.rating.toFixed(2)}
-                          <p className="mt-1 text-[10px] text-zinc-400">{r.reviews} reviews</p>
-                        </>
-                      ) : (
-                        <span className="text-[11px] text-zinc-400">New</span>
-                      )}
-                    </td>
-                    <td className={`${td} pr-0 text-right`}>
-                      <ChevronDown size={14} strokeWidth={1.5} className={`ml-auto text-zinc-400 transition-transform ${open ? "rotate-180" : ""}`} />
-                    </td>
-                  </tr>
-                  {open && (
-                    <tr className="bg-mint-soft">
-                      <td colSpan={10} className="border-b border-zinc-300 px-0 pb-8 pt-3">
-                        <RentalDetails r={r} onShowForSale={onShowForSale} />
-                      </td>
-                    </tr>
-                  )}
-                </Fragment>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-      <p className="mt-4 text-[11px] leading-relaxed text-zinc-500">
-        Nightly rates are the average quoted price for the next 30 days. Occupancy is booked nights over the last 12 months,
-        read from each rental&apos;s public calendar; yearly revenue is estimated from rate × booked nights, before fees.
-      </p>
-    </>
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <input
+                          defaultValue={e.note ?? ""}
+                          onBlur={(ev) => setNote(l.listing_id, ev.target.value.trim())}
+                          placeholder="Add a private note…"
+                          aria-label={`Note for ${l.asset_name}`}
+                          className="w-full rounded-md border border-zinc-200 bg-white px-2.5 py-1.5 text-[12px] text-zinc-800 placeholder:text-zinc-400 focus:border-zinc-950 focus:outline-none sm:w-auto sm:min-w-0 sm:flex-1 sm:max-w-xs"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setOpenId(open ? null : l.listing_id)}
+                          className="inline-flex items-center gap-1 rounded-md border border-zinc-300 px-2.5 py-1.5 text-[12px] text-zinc-800 transition-colors hover:border-zinc-950"
+                        >
+                          {open ? "Hide details" : "Details"}
+                          <ChevronDown size={12} strokeWidth={1.75} className={`transition-transform ${open ? "rotate-180" : ""}`} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onOpenListing(l.listing_id)}
+                          className="inline-flex items-center gap-1 rounded-md border border-zinc-300 px-2.5 py-1.5 text-[12px] text-zinc-800 transition-colors hover:border-zinc-950"
+                        >
+                          In listings <ArrowUpRight size={12} strokeWidth={1.75} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => unpin(l.listing_id)}
+                          className="ml-auto px-1 text-[12px] text-zinc-500 underline-offset-4 hover:text-zinc-950 hover:underline sm:ml-0"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                    {open && (
+                      <div className="pt-6">
+                        <ListingDetails l={l} marketYield={marketYield} />
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+
+            <aside className="lg:sticky lg:top-6 lg:self-start">
+              <div className="rounded-2xl border border-zinc-200 bg-white">
+                <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-3">
+                  <h2 className="text-[13px] font-semibold text-zinc-950">Activity on your watchlist</h2>
+                  <span className={`${MONO} text-[11px] text-zinc-500`}>Last 7 days</span>
+                </div>
+                {updates.length === 0 ? (
+                  <p className="px-4 py-6 text-[12px] leading-relaxed text-zinc-500">
+                    No price or status changes on your pinned listings this week. New changes show up here after each daily scrape.
+                  </p>
+                ) : (
+                  <ul className="max-h-[420px] divide-y divide-zinc-100 overflow-y-auto overscroll-contain" data-lenis-prevent>
+                    {updates.map((u, i) => (
+                      <li key={i}>
+                        <button type="button" onClick={() => setOpenId(u.id)} className="flex w-full gap-3 px-4 py-3 text-left transition-colors hover:bg-zinc-50">
+                          <span className="mt-1.5 size-2 shrink-0 rounded-full" style={{ background: u.color }} />
+                          <span className="min-w-0">
+                            <span className="block text-[12px] leading-snug text-zinc-800">{u.text}</span>
+                            <span className={`${MONO} mt-0.5 block text-[11px] text-zinc-500`}>{u.date === today ? "Today" : fmtDate(u.date)}</span>
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <p className="mt-3 text-[11px] leading-relaxed text-zinc-500">
+                Your watchlist is saved on this device for now. It will sync to your account once sign-in is live.
+              </p>
+            </aside>
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 
@@ -2899,201 +2317,6 @@ function ZoningMap({ districts }: { districts: DistrictStats[] }) {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
- * Revenue Estimator — what would this property earn as a luxury rental?
- * ──────────────────────────────────────────────────────────────────────── */
-
-export interface EstimatorPrefill extends Partial<EstimateInput> {
-  label?: string;
-}
-
-const ESTIMATOR_TYPES: PropertyType[] = RESIDENTIAL_TYPES;
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block">
-      <span className="text-[10px] uppercase tracking-[0.16em] text-zinc-500">{label}</span>
-      <div className="mt-2">{children}</div>
-    </label>
-  );
-}
-
-function Stepper({ value, onChange, min, max, step = 1 }: { value: number; onChange: (n: number) => void; min: number; max: number; step?: number }) {
-  return (
-    <div className="flex items-center border border-zinc-300">
-      <button type="button" onClick={() => onChange(Math.max(min, value - step))} className="px-3 py-2 text-zinc-500 hover:text-zinc-950" aria-label="Decrease">−</button>
-      <span className={`${MONO} flex-1 text-center text-[13px] text-zinc-950`}>{value}</span>
-      <button type="button" onClick={() => onChange(Math.min(max, value + step))} className="px-3 py-2 text-zinc-500 hover:text-zinc-950" aria-label="Increase">+</button>
-    </div>
-  );
-}
-
-function RevenueEstimator({ prefill, districts }: { prefill?: EstimatorPrefill | null; districts: DistrictStats[] }) {
-  const [district, setDistrict] = useState(prefill?.district ?? "Malmok");
-  const [type, setType] = useState<PropertyType>(prefill?.property_type ?? "Villa");
-  const [beds, setBeds] = useState(prefill?.bedrooms ?? 5);
-  const [baths, setBaths] = useState(prefill?.bathrooms ?? 5);
-  const [beachfront, setBeachfront] = useState(prefill?.beachfront ?? false);
-  const [price, setPrice] = useState(prefill?.asking_price_usd ? String(prefill.asking_price_usd) : "");
-
-  const priceNum = Number(price.replace(/[^0-9.]/g, "")) || null;
-  const est = useMemo(
-    () => estimateRevenue({ district, property_type: type, bedrooms: beds, bathrooms: baths, beachfront, asking_price_usd: priceNum }),
-    [district, type, beds, baths, beachfront, priceNum],
-  );
-  const selectCls = `${MONO} w-full border border-zinc-300 bg-white px-3 py-2 text-[13px] text-zinc-900 outline-none hover:border-zinc-500 focus:border-zinc-950`;
-  const tick = { fill: C.slate500, fontSize: 11, fontFamily: MONO_FAMILY };
-
-  return (
-    <>
-      <div className="border-b border-zinc-200 py-10">
-        <p className={`${MONO} text-[11px] tracking-wider text-zinc-500`}>TOOL / REVENUE ESTIMATOR</p>
-        <h1 className="font-display mt-3 text-[26px] font-semibold tracking-tight text-zinc-950">Revenue Estimator</h1>
-        <p className="mt-2 max-w-[72ch] text-[13px] leading-relaxed text-zinc-600">
-          What would this property earn as a luxury vacation rental? Describe it, and we estimate nightly rate, occupancy
-          and yearly revenue from comparable rentals in the same district. Add an asking price to see the yield.
-        </p>
-      </div>
-
-      <div className="grid gap-10 pt-10 lg:grid-cols-[340px_1fr]">
-        {/* form */}
-        <div className="space-y-6">
-          {prefill?.label && (
-            <p className={`${MONO} border border-zinc-200 bg-zinc-50 px-3 py-2 text-[11px] text-zinc-600`}>
-              FROM LISTING: <span className="text-zinc-950">{prefill.label}</span>
-            </p>
-          )}
-          <Field label="District">
-            <select value={district} onChange={(e) => setDistrict(e.target.value)} className={selectCls}>
-              {districts.map((d) => (
-                <option key={d.district} value={d.district}>{d.district}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Property type">
-            <div className="grid grid-cols-2 border border-zinc-300">
-              {ESTIMATOR_TYPES.map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => setType(t)}
-                  className={`${MONO} px-3 py-2 text-[11px] uppercase tracking-wider ${type === t ? "bg-zinc-950 text-mint" : "text-zinc-500 hover:text-zinc-950"}`}
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
-          </Field>
-          <div className="grid grid-cols-2 gap-4">
-            <Field label="Bedrooms"><Stepper value={beds} onChange={setBeds} min={2} max={12} /></Field>
-            <Field label="Bathrooms"><Stepper value={baths} onChange={setBaths} min={1} max={14} step={0.5} /></Field>
-          </div>
-          <label className="flex cursor-pointer items-center justify-between border border-zinc-300 px-3 py-2.5">
-            <span className="text-[12px] text-zinc-800">Beachfront</span>
-            <input type="checkbox" checked={beachfront} onChange={(e) => setBeachfront(e.target.checked)} className="size-4 accent-zinc-950" />
-          </label>
-          <Field label="Asking price (optional, USD)">
-            <input
-              inputMode="numeric"
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              placeholder="e.g. 8,500,000"
-              className={`${selectCls} placeholder:text-zinc-400`}
-            />
-          </Field>
-        </div>
-
-        {/* results */}
-        <div>
-          <div className="grid gap-px border border-zinc-200 bg-zinc-200 sm:grid-cols-[1.4fr_1fr_1fr_1fr]">
-            <div className="bg-white p-6">
-              <p className="text-[10px] uppercase tracking-[0.16em] text-zinc-500">Est. yearly revenue</p>
-              <p className={`${MONO} mt-3 text-[36px] font-semibold leading-none tracking-tight text-zinc-950`}>{fmtUsdCompact(est.annual_revenue_usd)}</p>
-              <p className={`${MONO} mt-3 text-[11px] text-zinc-500`}>
-                RANGE {fmtUsdCompact(est.revenue_low_usd)} – {fmtUsdCompact(est.revenue_high_usd)}
-              </p>
-            </div>
-            <div className="bg-white p-6">
-              <p className="text-[10px] uppercase tracking-[0.16em] text-zinc-500">Nightly rate</p>
-              <p className={`${MONO} mt-3 text-[22px] text-zinc-950`}>{fmtUsd(est.adr_usd)}</p>
-            </div>
-            <div className="bg-white p-6">
-              <p className="text-[10px] uppercase tracking-[0.16em] text-zinc-500">Occupancy</p>
-              <p className={`${MONO} mt-3 text-[22px] text-zinc-950`}>{est.occupancy_pct}%</p>
-              <p className={`${MONO} mt-2 text-[11px] text-zinc-500`}>{Math.round((365 * est.occupancy_pct) / 100)} NIGHTS</p>
-            </div>
-            <div className="bg-white p-6">
-              <p className="text-[10px] uppercase tracking-[0.16em] text-zinc-500">{est.gross_yield_pct !== null ? "Gross yield" : "RevPAR"}</p>
-              {est.gross_yield_pct !== null && est.signal ? (
-                <>
-                  <p className={`${MONO} mt-3 text-[22px] text-zinc-950`}>{fmtPct(est.gross_yield_pct)}</p>
-                  <div className="mt-2"><SignalBadge signal={est.signal} /></div>
-                </>
-              ) : (
-                <p className={`${MONO} mt-3 text-[22px] text-zinc-950`}>{fmtUsd(est.revpar_usd)}</p>
-              )}
-            </div>
-          </div>
-
-          <div className="mt-10">
-            <p className="mb-4 text-[11px] font-medium uppercase tracking-[0.24em] text-zinc-700">Revenue by month</p>
-            <div className="h-[220px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={est.monthly} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
-                  <CartesianGrid vertical={false} stroke={C.hairline} />
-                  <XAxis dataKey="month" tickFormatter={fmtMonth} axisLine={{ stroke: C.slate700 }} tickLine={false} tick={tick} />
-                  <YAxis axisLine={false} tickLine={false} tick={tick} width={56} tickFormatter={(v: number) => `$${Math.round(v / 1000)}k`} />
-                  <Tooltip
-                    cursor={{ fill: "#F4F4F5" }}
-                    formatter={(v) => [fmtUsd(Number(v)), "Revenue"]}
-                    labelFormatter={(l) => fmtMonthYear(String(l))}
-                    contentStyle={{ fontFamily: MONO_FAMILY, fontSize: 11, border: "1px solid #D4D4D8", borderRadius: 0 }}
-                  />
-                  <Bar dataKey="revenue_usd" fill={C.ink} maxBarSize={28} isAnimationActive={false} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          <div className="mt-10">
-            <p className="mb-4 text-[11px] font-medium uppercase tracking-[0.24em] text-zinc-700">Comparable rentals</p>
-            <table className="w-full border-collapse text-left">
-              <thead>
-                <tr className="text-[10px] uppercase tracking-[0.16em] text-zinc-500">
-                  <th className="border-b border-zinc-300 py-2 font-medium">Rental</th>
-                  <th className="border-b border-zinc-300 py-2 text-right font-medium">Nightly rate</th>
-                  <th className="border-b border-zinc-300 py-2 text-right font-medium">Occupancy</th>
-                  <th className="border-b border-zinc-300 py-2 text-right font-medium">Yearly revenue</th>
-                </tr>
-              </thead>
-              <tbody>
-                {est.comps.map((c) => (
-                  <tr key={c.comp_id}>
-                    <td className="border-b border-zinc-200 py-3 text-[13px] text-zinc-900">
-                      {c.label}
-                      <span className={`${MONO} ml-2 text-[10px] text-zinc-400`}>{c.comp_id}</span>
-                    </td>
-                    <td className={`${MONO} border-b border-zinc-200 py-3 text-right text-[13px]`}>{fmtUsd(c.adr_usd)}</td>
-                    <td className={`${MONO} border-b border-zinc-200 py-3 text-right text-[13px]`}>{c.occupancy_pct}%</td>
-                    <td className={`${MONO} border-b border-zinc-200 py-3 text-right text-[13px] text-zinc-950`}>{fmtUsdCompact(c.annual_revenue_usd)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <p className="mt-4 text-[11px] leading-relaxed text-zinc-500">
-              Estimates are gross revenue before cleaning, management and platform fees. Comparable rentals are anonymized.
-            </p>
-          </div>
-        </div>
-      </div>
-    </>
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────────────────
- * Page
- * ──────────────────────────────────────────────────────────────────────── */
-
-/* ─────────────────────────────────────────────────────────────────────────
  * Terminal updates — message board fed by every daily scrape
  * ──────────────────────────────────────────────────────────────────────── */
 
@@ -3200,7 +2423,7 @@ function TerminalUpdates({
                 <p className="sticky top-0 z-10 flex justify-between border-b border-zinc-100 bg-white/95 px-4 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500 backdrop-blur">
                   <span>{fmtRunDay(run, i)}</span>
                   <span className="font-normal normal-case tracking-normal text-zinc-400">
-                    {fmtRunTime(run.run_at)} · {run.listings_checked} listings, {int.format(run.rentals_checked)} rentals checked
+                    {fmtRunTime(run.run_at)} · {run.listings_checked} listings checked
                   </span>
                 </p>
                 <ul>
@@ -3280,7 +2503,7 @@ const SLUG_TAB = Object.fromEntries(Object.entries(TAB_SLUG).map(([t, s]) => [s,
 
 function Dashboard() {
   const params = useSearchParams();
-  const [tab, setTabState] = useState<Tab>(SLUG_TAB[params.get("tab") ?? ""] ?? "Listings & Rentals");
+  const [tab, setTabState] = useState<Tab>(SLUG_TAB[params.get("tab") ?? ""] ?? "Listings");
   const [listingsView, setListingsView] = useState<{
     key: number;
     district?: string;
@@ -3295,154 +2518,66 @@ function Dashboard() {
   const [boardOpen, setBoardOpen] = useState(false);
   const toggleBoard = useCallback(() => setBoardOpen((o) => !o), []);
   const updatesToday = SCRAPE_RUNS[0].new_listings.length + SCRAPE_RUNS[0].price_changes.length + SCRAPE_RUNS[0].status_changes.length;
-  const [marketView, setMarketViewState] = useState<"sale" | "rentals">(params.get("view") === "rentals" ? "rentals" : "sale");
-  const [prefill, setPrefill] = useState<{ key: number; value: EstimatorPrefill | null }>({ key: 0, value: null });
   const { data, error } = useDashboardData(MARKET_ID);
+  const watchCount = useWatchlist().entries.length;
 
-  const setTab = (t: Tab, view: "sale" | "rentals" = marketView) => {
+  const setTab = (t: Tab) => {
     setTabState(t);
-    const viewParam = t === "Listings & Rentals" && view === "rentals" ? "&view=rentals" : "";
-    window.history.replaceState(null, "", `?tab=${TAB_SLUG[t]}${viewParam}`);
+    window.history.replaceState(null, "", `?tab=${TAB_SLUG[t]}`);
     window.scrollTo({ top: 0 });
-  };
-  const setMarketView = (v: "sale" | "rentals") => {
-    setMarketViewState(v);
-    window.history.replaceState(null, "", `?tab=listings${v === "rentals" ? "&view=rentals" : ""}`);
   };
   const showForSale = (district: string) => {
     setListingsView((v) => ({ key: v.key + 1, district, query: undefined }));
-    setMarketViewState("sale");
-    setTab("Listings & Rentals", "sale");
+    setTab("Listings");
   };
   const openDistrict = (district: string) => showForSale(district);
   const openListing = (id: string) => {
     setListingsView((v) => ({ key: v.key + 1, openId: id }));
-    setMarketViewState("sale");
-    setTabState("Listings & Rentals");
+    setTabState("Listings");
     window.history.replaceState(null, "", "?tab=listings");
   };
   const showNewToday = () => {
     setListingsView((v) => ({ key: v.key + 1, newToday: true }));
-    setMarketViewState("sale");
     window.history.replaceState(null, "", "?tab=listings");
   };
   const openUpdates = () => {
     setBoardOpen(true);
-    setTabState("Listings & Rentals");
+    setTabState("Listings");
     requestAnimationFrame(() => document.getElementById("terminal-updates")?.scrollIntoView({ behavior: "smooth", block: "start" }));
-  };
-  const openEstimator = (l: ListingSignal) => {
-    setPrefill((p) => ({
-      key: p.key + 1,
-      value: {
-        label: l.asset_name,
-        district: l.district,
-        property_type: l.property_type,
-        bedrooms: l.bedrooms,
-        bathrooms: l.bathrooms,
-        beachfront: false,
-        asking_price_usd: l.asking_price_usd,
-      },
-    }));
-    setTab("Revenue Estimator");
   };
 
   return (
     <div className={`${inter.className} min-h-screen bg-white text-zinc-800 antialiased selection:bg-mint selection:text-zinc-950`}>
-      <Header tab={tab} onTab={setTab} updates={updatesToday} onUpdates={openUpdates} />
+      <Header tab={tab} onTab={setTab} updates={updatesToday} onUpdates={openUpdates} watchCount={watchCount} />
 
       <main className="mx-auto max-w-[1400px] px-4 pb-20 sm:px-6">
         {error ? (
           <div className={`${MONO} py-24 text-center text-[12px]`} style={{ color: C.down }}>
             FEED ERROR — {error}
           </div>
-        ) : tab === "Listings & Rentals" ? (
+        ) : tab === "Listings" ? (
           <>
-          <TerminalUpdates
-            runs={SCRAPE_RUNS}
-            open={boardOpen}
-            onToggle={toggleBoard}
-            onOpenListing={openListing}
-            onShowNew={showNewToday}
-          />
-          <div className="flex flex-wrap items-center justify-between gap-4 pt-6">
-            <div className="inline-flex rounded-xl border border-zinc-300 bg-white p-1 shadow-sm" role="tablist" aria-label="Market view">
-              {(
-                [
-                  ["sale", "For sale", data?.allListings.length],
-                  ["rentals", "Vacation rentals", data?.rentals.length],
-                ] as const
-              ).map(([v, label, count]) => (
-                <button
-                  key={v}
-                  type="button"
-                  role="tab"
-                  aria-selected={marketView === v}
-                  onClick={() => setMarketView(v)}
-                  className={`rounded-lg px-5 py-2.5 font-display text-[14px] font-semibold transition-colors ${
-                    marketView === v ? "bg-zinc-950 text-mint" : "text-zinc-600 hover:text-zinc-950"
-                  }`}
-                >
-                  {label}
-                  {count !== undefined && <span className={`ml-2 text-[12px] ${marketView === v ? "text-mint/70" : "text-zinc-400"}`}>{count}</span>}
-                </button>
-              ))}
-            </div>
-            <p className="text-[12px] text-zinc-500">
-              {marketView === "sale"
-                ? "Properties, land and commercial real estate listed for sale"
-                : "Airbnb, Vrbo and direct-booking rentals with nightly prices"}
-            </p>
-          </div>
-          {marketView === "rentals" ? (
-            <VacationRentals rentals={data?.rentals} initialDistrict={listingsView.district} onShowForSale={showForSale} />
-          ) : (
-          <ActiveListings
-            key={listingsView.key}
-            listings={data?.allListings}
-            marketYield={data?.snapshot.est_gross_yield_pct}
-            initialDistrict={listingsView.district}
-            initialQuery={listingsView.query}
-            initialOpenId={listingsView.openId}
-            initialNewToday={listingsView.newToday}
-            onEstimate={openEstimator}
-          />
-          )}
+            <TerminalUpdates runs={SCRAPE_RUNS} open={boardOpen} onToggle={toggleBoard} onOpenListing={openListing} onShowNew={showNewToday} />
+            <ActiveListings
+              key={listingsView.key}
+              listings={data?.allListings}
+              marketYield={data?.snapshot.est_gross_yield_pct}
+              initialDistrict={listingsView.district}
+              initialQuery={listingsView.query}
+              initialOpenId={listingsView.openId}
+              initialNewToday={listingsView.newToday}
+            />
           </>
-        ) : tab === "Districts" ? (
-          <Districts districts={DISTRICTS} onOpenDistrict={openDistrict} />
-        ) : tab === "Revenue Estimator" ? (
-          <RevenueEstimator key={prefill.key} prefill={prefill.value} districts={DISTRICTS} />
+        ) : tab === "Watchlist" ? (
+          <Watchlist listings={data?.allListings} marketYield={data?.snapshot.est_gross_yield_pct} onOpenListing={openListing} onBrowse={() => setTab("Listings")} />
         ) : (
-          <>
-            <div className="flex flex-wrap items-end justify-between gap-4 border-b border-zinc-200 py-10">
-              <div>
-                <p className={`${MONO} text-[11px] tracking-wider text-zinc-500`}>DATASET / AW-LUX-STR / v1</p>
-                <h1 className="font-display mt-3 text-[26px] font-semibold tracking-tight text-zinc-950">
-                  Aruba Ultra-Luxury Short-Term Rental Market
-                </h1>
-              </div>
-              <p className={`${MONO} text-[11px] text-zinc-500`}>
-                {data ? `LAST SYNC ${fmtTimestamp(data.snapshot.as_of)}` : "SYNCING…"}
-              </p>
-            </div>
-
-            <div className="space-y-16 pt-10">
-              <AnchorMetrics snapshot={data?.snapshot} />
-              <div className="border-t border-zinc-200 pt-10">
-                <HistoricalChart monthly={data?.monthly} />
-              </div>
-              <div className="border-t border-zinc-200 pt-10">
-                <YieldRadar listings={data?.listings} marketYield={data?.snapshot.est_gross_yield_pct} />
-              </div>
-            </div>
-          </>
+          <Districts districts={DISTRICTS} onOpenDistrict={openDistrict} />
         )}
       </main>
 
       <footer className="border-t border-zinc-200">
         <div className={`${MONO} mx-auto flex max-w-[1400px] flex-wrap justify-between gap-2 px-6 py-5 text-[10px] tracking-wider text-zinc-500`}>
-          <span>© 2026 SEQUENCE DATA · PROPRIETARY & CONFIDENTIAL</span>
+          <span>© 2026 SIGNAL · POWERED BY SEQUENCE DATA · PROPRIETARY & CONFIDENTIAL</span>
           <span>NOT INVESTMENT ADVICE · FOR LICENSED SUBSCRIBERS ONLY</span>
         </div>
       </footer>

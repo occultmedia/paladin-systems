@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Aruba Terminal | Sequence Data",
-  description: "Aruba ultra-luxury short-term rental market terminal: occupancy, ADR, RevPAR, gross yield and listing signals.",
+  title: "Aruba Terminal | Signal",
+  description: "Aruba real estate terminal: every listing scraped daily, your watchlist, district values and ROPV zoning.",
   alternates: { canonical: "/dashboard" },
   robots: { index: false, follow: false },
 };
