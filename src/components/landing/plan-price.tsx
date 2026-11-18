@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 import { useState } from "react";
 import { PLANS, YEARLY_SAVINGS_USD, type Billing } from "@/lib/site";
 
@@ -37,6 +39,13 @@ export function PlanPrice() {
           ? "Billed monthly. Cancel anytime."
           : `One payment for 12 months. That is $${Math.round(PLANS.yearly.price / 12)}/month, $${YEARLY_SAVINGS_USD} less than paying monthly.`}
       </p>
+      <Link
+        href={`/signup?plan=${billing}`}
+        className="shine group mt-6 inline-flex items-center gap-2.5 rounded-full bg-zinc-950 px-6 py-3.5 font-display text-[14px] font-semibold text-mint transition-[background-color,transform] duration-300 hover:bg-zinc-800 active:scale-[0.97]"
+      >
+        Start with {billing === "monthly" ? "monthly" : "yearly"}
+        <ArrowRight size={16} strokeWidth={2} className="transition-transform duration-300 group-hover:translate-x-1" />
+      </Link>
     </div>
   );
 }

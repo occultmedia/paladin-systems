@@ -21,6 +21,8 @@ import { Wordmark } from "@/components/logo";
 import { useWatchlist, type WatchEntry } from "@/lib/watchlist";
 import { useInterestedClients, type ClientInput, type InterestedClient } from "@/lib/clients";
 import { useListingNote, useMarketBrief } from "@/lib/use-signal";
+import { displayName, logOut, useUser } from "@/lib/auth";
+import { PLANS } from "@/lib/site";
 import type { AISource, Verdict } from "@/lib/signal-ai";
 import {
   COMMERCIAL_USES,
@@ -246,6 +248,7 @@ function TabSwitch({ tab, onTab, watchCount, full = false }: { tab: Tab; onTab: 
 }
 
 function AccountMenu({ compact = false }: { compact?: boolean }) {
+  const { user } = useUser();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -269,6 +272,30 @@ function AccountMenu({ compact = false }: { compact?: boolean }) {
     { icon: CreditCard, label: "Billing" },
   ];
 
+  if (!user)
+    return (
+      <div className="flex shrink-0 items-center gap-1">
+        <Link href="/login" className={`whitespace-nowrap rounded-full px-3 py-1.5 text-[12.5px] font-medium text-zinc-700 transition-colors hover:bg-white/70 hover:text-zinc-950 ${compact ? "hidden sm:inline-flex" : ""}`}>
+          Log in
+        </Link>
+        <Link
+          href="/signup"
+          className="shine inline-flex shrink-0 items-center whitespace-nowrap rounded-full bg-zinc-950 px-3.5 py-1.5 font-display text-[12.5px] font-semibold text-mint transition-colors hover:bg-zinc-800"
+        >
+          Sign up
+        </Link>
+      </div>
+    );
+
+  const name = displayName(user);
+  const plan = user.user_metadata?.plan === "yearly" ? "yearly" : "monthly";
+  const initials = name
+    .split(/\s+/)
+    .map((w) => w[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+
   return (
     <div ref={ref} className="relative">
       <button
@@ -277,31 +304,40 @@ function AccountMenu({ compact = false }: { compact?: boolean }) {
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label="Account"
-        className={`flex items-center gap-2 border border-zinc-950/15 bg-white/70 text-[12px] tracking-wide text-zinc-800 transition-colors hover:bg-white hover:text-zinc-950 ${
-          compact ? "size-9 justify-center rounded-full" : "px-3 py-1.5"
+        className={`flex items-center gap-2 rounded-full border border-zinc-950/10 bg-white/70 text-[12.5px] text-zinc-800 transition-colors hover:bg-white hover:text-zinc-950 ${
+          compact ? "size-9 justify-center" : "py-1 pl-1 pr-3"
         }`}
       >
-        <User size={compact ? 15 : 13} strokeWidth={1.5} />
+        <span className="grid size-7 place-items-center rounded-full bg-zinc-950 font-display text-[11px] font-bold text-mint">{initials}</span>
         {!compact && (
           <>
-            Account
-            <ChevronDown size={13} strokeWidth={1.5} className={`transition-transform ${open ? "rotate-180" : ""}`} />
+            <span className="max-w-[120px] truncate font-medium">{name}</span>
+            <ChevronDown size={13} strokeWidth={1.75} className={`transition-transform ${open ? "rotate-180" : ""}`} />
           </>
         )}
       </button>
 
       {open && (
-        <div role="menu" className="absolute right-0 z-[1100] mt-2 w-60 border border-zinc-300 bg-white shadow-xl">
-          <div className="border-b border-zinc-200 px-4 py-3">
-            <p className="text-[12px] text-zinc-950">Investor Account</p>
-            <p className={`${MONO} mt-1 text-[11px] text-zinc-500`}>TIER: ARUBA CORE · $99/MO</p>
+        <motion.div
+          role="menu"
+          initial={{ opacity: 0, y: -6, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+          className="absolute right-0 z-[1100] mt-2 w-64 origin-top-right overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-xl shadow-zinc-900/10"
+        >
+          <div className="border-b border-zinc-100 px-4 py-3">
+            <p className="truncate text-[13px] font-semibold text-zinc-950">{name}</p>
+            <p className="truncate text-[12px] text-zinc-500">{user.email}</p>
+            <p className="mt-2 inline-flex rounded-full bg-mint px-2 py-0.5 text-[11px] font-semibold text-zinc-950">
+              Aruba · ${PLANS[plan].price.toLocaleString("en-US")}/{PLANS[plan].per}
+            </p>
           </div>
           {items.map(({ icon: Icon, label }) => (
             <button
               key={label}
               role="menuitem"
               type="button"
-              className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-[12px] text-zinc-600 transition-colors hover:bg-zinc-50 hover:text-zinc-950"
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-[12.5px] text-zinc-600 transition-colors hover:bg-zinc-50 hover:text-zinc-950"
             >
               <Icon size={13} strokeWidth={1.5} />
               {label}
@@ -310,12 +346,16 @@ function AccountMenu({ compact = false }: { compact?: boolean }) {
           <button
             role="menuitem"
             type="button"
-            className="flex w-full items-center gap-3 border-t border-zinc-200 px-4 py-2.5 text-left text-[12px] text-zinc-500 transition-colors hover:bg-zinc-50 hover:text-zinc-950"
+            onClick={() => {
+              setOpen(false);
+              void logOut();
+            }}
+            className="flex w-full items-center gap-3 border-t border-zinc-100 px-4 py-2.5 text-left text-[12.5px] text-zinc-500 transition-colors hover:bg-zinc-50 hover:text-zinc-950"
           >
             <LogOut size={13} strokeWidth={1.5} />
             Sign out
           </button>
-        </div>
+        </motion.div>
       )}
     </div>
   );
@@ -1278,8 +1318,9 @@ const VERDICT_STYLE: Record<Verdict, { color: string; bg: string }> = {
 function AIMark({ size = 13 }: { size?: number }) {
   return (
     <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-950">
-      <span className="grid size-5 place-items-center rounded-md bg-zinc-950 text-mint">
-        <Sparkles size={size - 2} strokeWidth={2} />
+      <span className="relative grid size-5 place-items-center rounded-md bg-zinc-950 text-mint">
+        <span className="absolute inset-0 animate-[ai-breathe_2.8s_ease-in-out_infinite] rounded-md bg-zinc-950 motion-reduce:animate-none" />
+        <Sparkles size={size - 2} strokeWidth={2} className="relative" />
       </span>
       AI Signal
     </span>
@@ -1307,7 +1348,7 @@ function AIShimmer({ lines = 3 }: { lines?: number }) {
 function AINote({ l }: { l: Listing }) {
   const { data, loading, error } = useListingNote(l.listing_id);
   return (
-    <section aria-label="AI analysis" className="mb-6 rounded-xl border border-mint-deep/70 bg-gradient-to-br from-mint-soft to-white p-4 sm:p-5">
+    <section aria-label="AI analysis" className="ai-ring mb-6 rounded-xl p-4 [--ai-bg:#f7faf7] sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <AIMark />
         {data && (
@@ -1327,7 +1368,7 @@ function AINote({ l }: { l: Listing }) {
       )}
       {error && <p className="mt-3 text-[12px] text-zinc-500">The analysis could not load right now. Close and reopen the listing to try again.</p>}
       {data && (
-        <>
+        <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}>
           <p className="mt-3 font-display text-[15px] font-semibold leading-snug tracking-tight text-zinc-950 sm:text-[16px]">{data.headline}</p>
           <p className="mt-2 text-[13px] leading-relaxed text-zinc-700">{data.analysis}</p>
           {data.points.length > 0 && (
@@ -1347,7 +1388,7 @@ function AINote({ l }: { l: Listing }) {
             </span>
           </p>
           <AISourceLine source={data.source} className="mt-3" />
-        </>
+        </motion.div>
       )}
     </section>
   );

@@ -350,3 +350,48 @@ body {
   border-color: #0a0a0a;
   box-shadow: 0 0 0 3px rgb(221 229 220 / 0.95), 0 2px 8px rgb(0 0 0 / 0.35);
 }
+
+/* ── AI Signal motion ─────────────────────────────────────────────────── */
+@keyframes ai-breathe {
+  0%, 100% { opacity: 0; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(1.45); }
+}
+
+/* Light sweep across a button on hover. */
+@utility shine {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(105deg, transparent 35%, rgb(255 255 255 / 0.22) 50%, transparent 65%);
+    transform: translateX(-120%);
+    transition: transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  &:hover::after {
+    transform: translateX(120%);
+  }
+}
+
+/* Gradient hairline border that slowly rotates (AI cards). */
+@property --ai-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+@keyframes ai-spin {
+  to { --ai-angle: 360deg; }
+}
+@utility ai-ring {
+  border: 1px solid transparent;
+  background:
+    linear-gradient(var(--ai-bg, #fff), var(--ai-bg, #fff)) padding-box,
+    conic-gradient(from var(--ai-angle), #c3d2c2, #0a0a0a 18%, #c3d2c2 36%, #dde5dc 60%, #0a0a0a 78%, #c3d2c2) border-box;
+  animation: ai-spin 7s linear infinite;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}

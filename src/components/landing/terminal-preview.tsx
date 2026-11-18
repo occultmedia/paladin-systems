@@ -8,7 +8,8 @@
  */
 
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowDown, ArrowUp, Bell, MessageCircle, Minus, Pin, Users } from "lucide-react";
+import { ArrowDown, ArrowUp, Bell, MessageCircle, Minus, Pin, Sparkles, Users } from "lucide-react";
+import { TypeText } from "@/components/ai/ai-visuals";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
@@ -29,6 +30,7 @@ export interface PreviewRow {
 }
 
 export interface PreviewData {
+  headline?: string; // AI Signal headline for the latest scrape
   run: { time: string; newCount: number; drops: number; ups: number; statusChanges: number; checked: number };
   rows: PreviewRow[];
   featured: {
@@ -125,14 +127,14 @@ function ScrapePane({ data }: { data: PreviewData }) {
   return (
     <div className="flex h-full flex-col">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-[11px]">
-        <span className="relative flex size-1.5">
-          <span className="absolute inline-flex size-full animate-ping rounded-full bg-[#2E9E5B] opacity-60" />
-          <span className="relative inline-flex size-1.5 rounded-full bg-[#2E9E5B]" />
+        <span className="inline-flex items-center gap-1.5 font-semibold text-zinc-950">
+          <Sparkles size={11} strokeWidth={2.2} />
+          AI Signal
         </span>
-        <span className="font-semibold text-zinc-950">Terminal updated</span>
-        <span className="text-zinc-500">Today {r.time}</span>
+        <span className="min-w-0 flex-1 basis-[180px] truncate text-zinc-700">
+          {data.headline ? <TypeText text={data.headline} delay={900} caret={false} /> : `Today ${r.time}`}
+        </span>
         <span className="ml-auto flex items-center gap-2.5 tabular-nums">
-          <span className="font-semibold text-zinc-950">{r.newCount} new</span>
           <span className="inline-flex items-center gap-0.5" style={{ color: DOWN }}>
             <ArrowDown size={10} strokeWidth={2.5} />
             {r.drops}
@@ -141,7 +143,6 @@ function ScrapePane({ data }: { data: PreviewData }) {
             <ArrowUp size={10} strokeWidth={2.5} />
             {r.ups}
           </span>
-          <span className="hidden text-zinc-500 sm:inline">{r.statusChanges} status changes</span>
         </span>
       </div>
       <ul className="mt-2.5 flex-1 divide-y divide-zinc-100 overflow-hidden rounded-lg border border-zinc-200 bg-white">

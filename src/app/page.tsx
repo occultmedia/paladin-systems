@@ -3,6 +3,9 @@ import Link from "next/link";
 import { ArrowRight, ArrowUpRight, Building2, MessageCircle, Phone, Pin, Search, Sparkles, TrendingDown, Users } from "lucide-react";
 import { SequenceLockup, Wordmark } from "@/components/logo";
 import { PlanPrice } from "@/components/landing/plan-price";
+import { AIBadge, AIMarketScan, Spotlight } from "@/components/ai/ai-visuals";
+import { NavAuth } from "@/components/auth/nav-auth";
+import { MARKET_TOTAL, marketBrief, scanRows } from "@/lib/scan-data";
 import { ClientsPane, HistoryPane, TerminalPreview, type PreviewData } from "@/components/landing/terminal-preview";
 import { CountUp, MotionRoot, Reveal, Stagger, StaggerItem } from "@/components/motion/reveal";
 import { CONTACT_EMAIL, PLANS, SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/site";
@@ -216,6 +219,8 @@ function previewData(): PreviewData {
 }
 
 const PREVIEW = previewData();
+const BRIEF = marketBrief();
+const SCAN = scanRows(12);
 
 
 const jsonLd = {
@@ -248,7 +253,7 @@ function PrimaryCta({ href = DASHBOARD, children, light }: { href?: string; chil
   return (
     <Link
       href={href}
-      className={`group inline-flex items-center gap-2.5 rounded-full px-6 py-3.5 font-display text-[14px] font-semibold transition-[background-color,transform] duration-300 active:scale-[0.97] ${
+      className={`shine group inline-flex items-center gap-2.5 rounded-full px-6 py-3.5 font-display text-[14px] font-semibold transition-[background-color,transform] duration-300 active:scale-[0.97] ${
         light ? "bg-mint text-zinc-950 hover:bg-white" : "bg-zinc-950 text-mint hover:bg-zinc-800"
       }`}
     >
@@ -360,8 +365,8 @@ export default function Home() {
           </Link>
           <nav className="hidden items-center gap-8 md:flex">
             {[
+              ["AI Signal", "#ai-signal"],
               ["Listings", "#listings"],
-              ["Price history", "#price-history"],
               ["Watchlist", "#watchlist"],
               ["Clients", "#clients"],
               ["Pricing", "#pricing"],
@@ -371,13 +376,7 @@ export default function Home() {
               </a>
             ))}
           </nav>
-          <Link
-            href={DASHBOARD}
-            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-zinc-950 px-4 py-2 font-display text-[13px] font-semibold text-mint transition-colors hover:bg-zinc-800"
-          >
-            <span className="hidden sm:inline">Open </span>Dashboard
-            <ArrowUpRight size={14} strokeWidth={2} />
-          </Link>
+          <NavAuth />
         </div>
       </header>
 
@@ -395,14 +394,15 @@ export default function Home() {
                   <span className="absolute inline-flex size-full animate-ping rounded-full bg-[#2E9E5B] opacity-60 motion-reduce:animate-none" />
                   <span className="relative inline-flex size-1.5 rounded-full bg-[#2E9E5B]" />
                 </span>
-                Terminal updated today · {PREVIEW.run.newCount} new listings
+                AI Signal read {MARKET_TOTAL} listings this morning · {PREVIEW.run.newCount} new
               </p>
               <h1 className="mt-5 font-display text-[40px] font-bold leading-[1.02] tracking-tight text-zinc-950 sm:text-[56px] lg:text-[60px]">
                 Aruba Real Estate Market Intelligence
               </h1>
               <p className="mt-5 max-w-[46ch] text-[16px] leading-relaxed text-zinc-600 sm:text-[17px]">
-                Every home, land and commercial listing in Aruba in one place, checked every morning. See every price
-                change, who is selling it, pin the properties you are watching and keep track of the clients who asked.
+                Every morning Signal&apos;s AI reads every home, land and commercial listing in Aruba, then tells you what
+                changed, what each property is worth a look for and who is selling it. Pin what you are watching and keep
+                track of the clients who asked.
               </p>
 
               <div className="mt-8 max-w-[540px] rounded-2xl border border-zinc-200 bg-white p-2 shadow-xl shadow-zinc-900/5">
@@ -458,7 +458,7 @@ export default function Home() {
             </Reveal>
 
             <Reveal delay={0.12} y={24} className="min-w-0">
-              <TerminalPreview data={PREVIEW} />
+              <TerminalPreview data={{ ...PREVIEW, headline: BRIEF.headline }} />
             </Reveal>
           </div>
         </section>
@@ -498,6 +498,64 @@ export default function Home() {
           </div>
           <style>{`@keyframes ticker { from { transform: translateX(0) } to { transform: translateX(-50%) } }`}</style>
         </div>
+
+        {/* AI Signal */}
+        <section id="ai-signal" className="scroll-mt-16 bg-zinc-950 text-white">
+          <Spotlight>
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0 opacity-40 [background-image:radial-gradient(rgb(221_229_220/0.10)_1px,transparent_1px)] [background-size:24px_24px] [mask-image:radial-gradient(ellipse_at_70%_40%,black,transparent_70%)]"
+            />
+            <div className="relative mx-auto grid max-w-[1240px] grid-cols-[minmax(0,1fr)] gap-12 px-5 py-16 sm:px-6 sm:py-24 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:items-center lg:gap-16">
+              <div>
+                <Reveal>
+                  <AIBadge dark />
+                  <h2 className="mt-5 max-w-[16ch] font-display text-[32px] font-bold leading-[1.06] tracking-tight sm:text-[48px]">
+                    AI reads the whole Aruba market before you do.
+                  </h2>
+                  <p className="mt-5 max-w-[50ch] text-[16px] leading-relaxed text-zinc-400">
+                    Every morning Signal reads every listing on Aruba&apos;s agency websites, checks each one against its comps and
+                    its own history, and tells you what changed and what it means.
+                  </p>
+                </Reveal>
+                <Stagger className="relative mt-10 space-y-7" gap={0.14}>
+                  <span aria-hidden className="absolute bottom-3 left-[17px] top-3 w-px bg-gradient-to-b from-mint/60 via-white/10 to-transparent" />
+                  {[
+                    ["Read", `${MARKET_TOTAL} listings from ${AGENCIES} agencies, every morning: price, size, land title, status, agent and photos.`],
+                    ["Compare", "Each listing against similar ones in its district: price per sq ft, days on market, price cuts and status changes."],
+                    ["Explain", "A daily market briefing, plus a plain-English note on every listing with a verdict and the next step to take."],
+                  ].map(([k, v], i) => (
+                    <StaggerItem key={k} className="relative flex gap-5">
+                      <span className="relative grid size-[35px] shrink-0 place-items-center rounded-full border border-mint/30 bg-zinc-950 font-display text-[13px] font-bold text-mint">
+                        {i + 1}
+                      </span>
+                      <div>
+                        <p className="font-display text-[17px] font-semibold">{k}</p>
+                        <p className="mt-1 max-w-[46ch] text-[14px] leading-relaxed text-zinc-400">{v}</p>
+                      </div>
+                    </StaggerItem>
+                  ))}
+                </Stagger>
+              </div>
+
+              <Reveal delay={0.1} y={24} className="min-w-0">
+                <AIMarketScan dark rows={SCAN} total={MARKET_TOTAL} headline={BRIEF.headline} />
+                <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+                  <p className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-zinc-500">Today&apos;s briefing</p>
+                  <p className="mt-2 text-[14px] leading-relaxed text-zinc-300">{BRIEF.summary}</p>
+                  <Stagger className="mt-3 space-y-2" gap={0.1}>
+                    {BRIEF.points.slice(0, 3).map((pt) => (
+                      <StaggerItem key={pt} className="flex gap-2.5 text-[13px] leading-snug text-zinc-400">
+                        <span className="mt-[7px] size-1 shrink-0 rounded-full bg-mint" />
+                        {pt}
+                      </StaggerItem>
+                    ))}
+                  </Stagger>
+                </div>
+              </Reveal>
+            </div>
+          </Spotlight>
+        </section>
 
         {/* Overview bento */}
         <section className="mx-auto max-w-[1240px] px-5 py-16 sm:px-6 sm:py-24">
@@ -847,32 +905,6 @@ export default function Home() {
           </div>
         </section>
 
-        {/* How we score */}
-        <section id="methodology" className="mx-auto max-w-[1240px] scroll-mt-16 px-5 py-16 sm:px-6 sm:py-24">
-          <SectionHeading eyebrow="How we score" title="Simple math. Data nobody else has." />
-          <Stagger className="mt-10 grid gap-5 sm:mt-12 md:grid-cols-2" gap={0.12}>
-            <StaggerItem className="h-full rounded-3xl border border-zinc-200 p-7 sm:p-10">
-              <p className="font-display text-[20px] font-bold text-zinc-950">Homes and villas</p>
-              <p className="mt-5 rounded-xl bg-mint-soft px-5 py-4 font-display text-[16px] font-semibold leading-relaxed text-zinc-950">
-                Yield = Nightly rate × 365 × Occupancy ÷ Asking price
-              </p>
-              <p className="mt-5 text-[14px] leading-relaxed text-zinc-600">
-                Nightly rate and occupancy come from comparable luxury rentals in the same district. 1 point or more above the
-                Aruba average ({MOCK_SNAPSHOT.est_gross_yield_pct}%) is Undervalued; 1 point or more below is Overpriced.
-              </p>
-            </StaggerItem>
-            <StaggerItem className="h-full rounded-3xl border border-zinc-200 p-7 sm:p-10">
-              <p className="font-display text-[20px] font-bold text-zinc-950">Land</p>
-              <p className="mt-5 rounded-xl bg-mint-soft px-5 py-4 font-display text-[16px] font-semibold leading-relaxed text-zinc-950">
-                Price per sq ft vs. district average
-              </p>
-              <p className="mt-5 text-[14px] leading-relaxed text-zinc-600">
-                10% or more below the district&apos;s average land price is Undervalued; 10% or more above is Overpriced.
-              </p>
-            </StaggerItem>
-          </Stagger>
-        </section>
-
         {/* Pricing */}
         <section id="pricing" className="scroll-mt-16 bg-mint-soft">
           <div className="mx-auto max-w-[1240px] px-5 py-16 sm:px-6 sm:py-24">
@@ -903,9 +935,6 @@ export default function Home() {
                     </li>
                   ))}
                 </ul>
-                <div className="mt-8">
-                  <PrimaryCta>Open the Dashboard</PrimaryCta>
-                </div>
               </StaggerItem>
               <StaggerItem className="flex flex-col justify-between rounded-3xl border border-zinc-200 bg-white p-7 sm:p-10">
                 <div>
@@ -940,10 +969,20 @@ export default function Home() {
                 {NEW_THIS_WEEK} new listings this week
               </p>
               <h2 className="mt-5 max-w-[18ch] font-display text-[34px] font-bold leading-[1.05] tracking-tight text-white sm:text-[52px]">
-                See every move. Call the right client first.
+                The market moved this morning. Signal already read it.
               </h2>
             </Reveal>
-            <PrimaryCta light>Open the Dashboard</PrimaryCta>
+            <div className="flex flex-wrap gap-3">
+              <PrimaryCta light href="/signup">
+                Create your account
+              </PrimaryCta>
+              <Link
+                href={DASHBOARD}
+                className="inline-flex items-center gap-2 rounded-full border border-white/25 px-6 py-3.5 font-display text-[14px] font-semibold text-white transition-colors hover:bg-white/10"
+              >
+                See the dashboard
+              </Link>
+            </div>
           </div>
         </section>
       </main>
