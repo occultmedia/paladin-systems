@@ -2,9 +2,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, ArrowUpRight, Building2, MessageCircle, Phone, Pin, Search, Sparkles, TrendingDown, Users } from "lucide-react";
 import { SequenceLockup, Wordmark } from "@/components/logo";
+import { PlanPrice } from "@/components/landing/plan-price";
 import { ClientsPane, HistoryPane, TerminalPreview, type PreviewData } from "@/components/landing/terminal-preview";
 import { CountUp, MotionRoot, Reveal, Stagger, StaggerItem } from "@/components/motion/reveal";
-import { CONTACT_EMAIL, SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/site";
+import { CONTACT_EMAIL, PLANS, SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/site";
 import {
   ALL_LISTINGS,
   ARUBA_PHOTOS,
@@ -224,12 +225,13 @@ const jsonLd = {
   description: SITE_DESCRIPTION,
   url: SITE_URL,
   brand: { "@type": "Organization", name: SITE_NAME, url: SITE_URL, email: CONTACT_EMAIL },
-  offers: {
+  offers: (["monthly", "yearly"] as const).map((b) => ({
     "@type": "Offer",
-    price: "150",
+    name: b === "monthly" ? "Monthly" : "Yearly",
+    price: String(PLANS[b].price),
     priceCurrency: "USD",
-    priceSpecification: { "@type": "UnitPriceSpecification", price: "150", priceCurrency: "USD", unitText: "MONTH" },
-  },
+    priceSpecification: { "@type": "UnitPriceSpecification", price: String(PLANS[b].price), priceCurrency: "USD", unitText: b === "monthly" ? "MONTH" : "ANN" },
+  })),
 };
 
 /* ── building blocks ─────────────────────────────────────────────────── */
@@ -881,9 +883,9 @@ export default function Home() {
             <Stagger className="mx-auto mt-10 grid max-w-[1000px] gap-5 sm:mt-12 lg:grid-cols-[1.35fr_1fr]" gap={0.12}>
               <StaggerItem className="rounded-3xl border-2 border-zinc-950 bg-white p-7 shadow-xl shadow-zinc-900/5 sm:p-10">
                 <p className="font-display text-[18px] font-bold text-zinc-950">Aruba</p>
-                <p className="mt-4 font-display text-[48px] font-bold sm:text-[56px] leading-none tracking-tight tabular-nums text-zinc-950">
-                  $150<span className="ml-1 text-[16px] font-semibold text-zinc-500">/month</span>
-                </p>
+                <div className="mt-5">
+                  <PlanPrice />
+                </div>
                 <ul className="mt-8 space-y-3">
                   {[
                     "Every home, land and commercial listing in Aruba, checked daily",
@@ -892,7 +894,8 @@ export default function Home() {
                     "Agency and listing agent with call, WhatsApp and e-mail",
                     "Watchlist for the properties you are tracking",
                     "Interested clients with phone and notes on every listing",
-                    "List and 3D map view · export to CSV · cancel anytime",
+                    "AI Signal: a daily market briefing and an AI note on every listing",
+                    "List and 3D map view · export to CSV",
                   ].map((f) => (
                     <li key={f} className="flex gap-3 text-[14px] text-zinc-700">
                       <span className="mt-[7px] size-1.5 shrink-0 rounded-full bg-zinc-950" />

@@ -294,7 +294,7 @@ function AccountMenu({ compact = false }: { compact?: boolean }) {
         <div role="menu" className="absolute right-0 z-[1100] mt-2 w-60 border border-zinc-300 bg-white shadow-xl">
           <div className="border-b border-zinc-200 px-4 py-3">
             <p className="text-[12px] text-zinc-950">Investor Account</p>
-            <p className={`${MONO} mt-1 text-[11px] text-zinc-500`}>TIER: ARUBA CORE · $150/MO</p>
+            <p className={`${MONO} mt-1 text-[11px] text-zinc-500`}>TIER: ARUBA CORE · $99/MO</p>
           </div>
           {items.map(({ icon: Icon, label }) => (
             <button
