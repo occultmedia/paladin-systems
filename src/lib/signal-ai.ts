@@ -88,7 +88,7 @@ export function listingFacts(l: Listing, all: Listing[]): ListingFacts {
   // Homes split into villas/estates vs apartments/condos/townhouses, since
   // their price per sq ft is not comparable.
   const seg = segmentOf(l);
-  const sameCat = all.filter((x) => segmentOf(x) === seg && x.status !== "Sold");
+  const sameCat = all.filter((x) => segmentOf(x) === seg && x.status !== "Sold" && x.status !== "De-listed");
   const inDistrict = sameCat.filter((x) => x.district === l.district);
   const pool = inDistrict.length >= 3 ? inDistrict : sameCat;
   const psfs = pool.map((x) => x.price_per_sqft_usd);
@@ -153,7 +153,7 @@ export function computedListingNote(f: ListingFacts): ListingNote {
   const yieldBps = typeof f.scoring.yield_vs_market_bps === "number" ? f.scoring.yield_vs_market_bps : null;
 
   const verdict: Verdict =
-    f.status !== "Available"
+    f.status !== "For sale"
       ? "Watch"
       : (cheap || (yieldBps ?? 0) >= 100) && !rich
         ? "Opportunity"
@@ -166,8 +166,10 @@ export function computedListingNote(f: ListingFacts): ListingNote {
   const segName = c.basis.replace(/ (in .*|island-wide)$/, "");
   const psfLine = `${usd(f.price_per_sqft_usd)}/sq ft is ${Math.abs(c.vs_median_pct).toFixed(0)}% ${c.vs_median_pct < 0 ? "below" : "above"} the ${usd(c.median_psf_usd)} median for ${c.basis} (${c.count} comps).`;
   const headline =
-    f.status !== "Available"
-      ? `${f.status} after ${f.days_on_market} days; useful as a pricing comp for ${f.district}.`
+    f.status !== "For sale"
+      ? f.status === "De-listed"
+        ? `Taken off the agency site after ${f.days_on_market} days; call the agent to ask if it is still available.`
+        : `${f.status} after ${f.days_on_market} days; useful as a pricing comp for ${f.district}.`
       : verdict === "Opportunity"
         ? cheap
           ? `${Math.abs(c.vs_median_pct).toFixed(0)}% under comparable ${segName} per sq ft${cut ? " after a price cut" : ""}: worth a call today.`
@@ -198,7 +200,9 @@ export function computedListingNote(f: ListingFacts): ListingNote {
     (f.days_on_market === 0 ? "It first appeared in today's scrape, so expect interest from other agents quickly." : stale ? "Time on market is long for this segment, which usually means a softer seller." : cut ? "The seller has already lowered the price, so there may be more flexibility." : "Nothing in the history suggests pressure on the seller yet.");
 
   const next_step =
-    f.status !== "Available"
+    f.status === "De-listed"
+      ? "Ask the listing agent whether it was withdrawn or sold privately before quoting it to clients."
+      : f.status !== "For sale"
       ? "Use the final ask as a comp when pricing similar listings."
       : verdict === "Opportunity"
         ? "Match it with interested clients and book a viewing before it moves."
@@ -216,8 +220,8 @@ export function computedListingNote(f: ListingFacts): ListingNote {
 export interface BriefFacts {
   scrape_date: string;
   listings_checked_today: number;
-  today: { new: number; price_drops: number; price_increases: number; under_contract: number; sold: number };
-  last_7_days: { new: number; price_drops: number; price_increases: number; under_contract_or_sold: number };
+  today: { new: number; price_drops: number; price_increases: number; under_contract: number; sold: number; de_listed: number };
+  last_7_days: { new: number; price_drops: number; price_increases: number; under_contract: number; sold: number; de_listed: number };
   biggest_moves_7d: Array<{ listing_id: string; name: string; district: string; kind: string; from_usd: number; to_usd: number; change_pct: number; date: string }>;
   new_today: Array<{ listing_id: string; name: string; district: string; kind: string; asking_usd: number; vs_comp_median_psf_pct: number }>;
   went_off_market_7d: Array<{ listing_id: string; name: string; district: string; status: string; asking_usd: number; days_on_market: number }>;
@@ -231,7 +235,7 @@ export function briefFacts(runs: ScrapeRun[], all: Listing[]): BriefFacts {
   const moves = week.flatMap((r) => r.price_changes);
   const isDrop = (c: { change: { event: string } }) => c.change.event === "Price drop";
 
-  const active = all.filter((l) => l.status === "Available");
+  const active = all.filter((l) => l.status === "For sale");
   const byDistrict = new Map<string, Listing[]>();
   active.forEach((l) => byDistrict.set(l.district, [...(byDistrict.get(l.district) ?? []), l]));
 
@@ -244,12 +248,15 @@ export function briefFacts(runs: ScrapeRun[], all: Listing[]): BriefFacts {
       price_increases: today.price_changes.filter((c) => !isDrop(c)).length,
       under_contract: today.status_changes.filter((l) => l.status === "Under contract").length,
       sold: today.status_changes.filter((l) => l.status === "Sold").length,
+      de_listed: today.status_changes.filter((l) => l.status === "De-listed").length,
     },
     last_7_days: {
       new: week.reduce((n, r) => n + r.new_listings.length, 0),
       price_drops: moves.filter(isDrop).length,
       price_increases: moves.filter((c) => !isDrop(c)).length,
-      under_contract_or_sold: week.reduce((n, r) => n + r.status_changes.length, 0),
+      under_contract: week.reduce((n, r) => n + r.status_changes.filter((l) => l.status === "Under contract").length, 0),
+      sold: week.reduce((n, r) => n + r.status_changes.filter((l) => l.status === "Sold").length, 0),
+      de_listed: week.reduce((n, r) => n + r.status_changes.filter((l) => l.status === "De-listed").length, 0),
     },
     biggest_moves_7d: [...moves]
       .sort((a, b) => Math.abs(b.change.change_pct ?? 0) - Math.abs(a.change.change_pct ?? 0))
@@ -299,7 +306,8 @@ export function computedBrief(f: BriefFacts): MarketBrief {
   if (t.new) points.push(`${t.new} new listing${t.new > 1 ? "s" : ""} today${f.new_today[0] ? `, including ${f.new_today[0].name} in ${f.new_today[0].district} at ${usd(f.new_today[0].asking_usd)}` : ""}.`);
   if (top) points.push(`Biggest move this week: ${top.name} (${top.district}) ${top.change_pct < 0 ? "cut" : "raised"} ${Math.abs(top.change_pct).toFixed(1)}% to ${usd(top.to_usd)}.`);
   points.push(`${w.price_drops} price drops vs ${w.price_increases} increases over 7 days: sellers are ${tone === "softening" ? "giving ground" : tone === "firming" ? "holding firm" : "mostly holding"}.`);
-  if (w.under_contract_or_sold) points.push(`${w.under_contract_or_sold} listing${w.under_contract_or_sold > 1 ? "s" : ""} went under contract or sold this week.`);
+  if (w.under_contract || w.sold || w.de_listed)
+    points.push(`This week ${w.under_contract} went under contract, ${w.sold} sold and ${w.de_listed} ${w.de_listed === 1 ? "was" : "were"} taken off the market (de-listed).`);
   if (busiest) points.push(`${busiest.district} has the most supply: ${busiest.active} active listings, median ask ${usd(busiest.median_asking_usd)}.`);
 
   const watch = [

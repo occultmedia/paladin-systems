@@ -116,7 +116,7 @@ function Monogram({ name, color, size = 18 }: { name: string; color: string; siz
   );
 }
 
-const STATUS_COLOR: Record<string, string> = { Available: UP, "Under contract": FLAT, Sold: DOWN };
+const STATUS_COLOR: Record<string, string> = { "For sale": UP, "Under contract": FLAT, Sold: DOWN, "De-listed": "#71717A" };
 
 /* ── panes ─────────────────────────────────────────────────────────────── */
 
@@ -141,7 +141,7 @@ function ScrapePane({ data }: { data: PreviewData }) {
             <ArrowUp size={10} strokeWidth={2.5} />
             {r.ups}
           </span>
-          <span className="hidden text-zinc-500 sm:inline">{r.statusChanges} under contract / sold</span>
+          <span className="hidden text-zinc-500 sm:inline">{r.statusChanges} status changes</span>
         </span>
       </div>
       <ul className="mt-2.5 flex-1 divide-y divide-zinc-100 overflow-hidden rounded-lg border border-zinc-200 bg-white">
@@ -404,7 +404,7 @@ export function WatchPane({ data }: { data: PreviewData }) {
               </span>
               <span className="shrink-0 text-right">
                 <span className="block font-display text-[12px] font-bold tabular-nums text-zinc-950">{r.price}</span>
-                {r.status !== "Available" ? (
+                {r.status !== "For sale" ? (
                   <span className="text-[10px] font-semibold" style={{ color: STATUS_COLOR[r.status] }}>{r.status}</span>
                 ) : (
                   <Move pct={r.sincePct} />

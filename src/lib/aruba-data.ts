@@ -55,8 +55,15 @@ export const TENURE_HINT: Record<Tenure, string> = {
 };
 
 /** Where the listing is in the sale process, read from the listing site on every scrape. */
-export type ListingStatus = "Available" | "Under contract" | "Sold";
-export const LISTING_STATUSES: ListingStatus[] = ["Available", "Under contract", "Sold"];
+export type ListingStatus = "For sale" | "Under contract" | "Sold" | "De-listed";
+export const LISTING_STATUSES: ListingStatus[] = ["For sale", "Under contract", "Sold", "De-listed"];
+/** How the scraper decides each status (shown as help text in the UI). */
+export const STATUS_HINT: Record<ListingStatus, string> = {
+  "For sale": "Listed and active on the agency's website.",
+  "Under contract": "The agency marks it under contract, under offer or sale pending.",
+  Sold: "The agency marks it sold.",
+  "De-listed": "Taken off the agency's website without being marked sold. It may be withdrawn, expired or sold privately.",
+};
 
 /** The real-estate company whose site the listing was scraped from. */
 export interface Agency {
@@ -170,7 +177,7 @@ export interface ListingBase {
   price_history: PriceEvent[]; // oldest first; last entry = current price
   last_price_change: PriceEvent | null;
   status: ListingStatus;
-  status_changed: string | null; // ISO date the scrape saw the current status (null = available since listed)
+  status_changed: string | null; // ISO date the scrape saw the current status (null = for sale since listed)
   pool: Pool | null; // null for land
   listing_id: string;
   market_id: string;
@@ -449,6 +456,9 @@ const STATUS_CHANGES: Record<string, [ListingStatus, number]> = {
   "AW-0265": ["Sold", 1],
   "AW-0249": ["Sold", 4],
   "AW-L624": ["Sold", 6],
+  "AW-0503": ["De-listed", 0],
+  "AW-0322": ["De-listed", 3],
+  "AW-C731": ["De-listed", 5],
 };
 
 /** Pool from the listing text (mock): houses mostly private, units mostly shared, land none. */
@@ -505,7 +515,7 @@ function scrapeMeta(
     is_new: dom === 0,
     price_history: history,
     last_price_change: history.length > 1 ? history[history.length - 1] : null,
-    status: status ? status[0] : "Available",
+    status: status ? status[0] : "For sale",
     status_changed: status ? isoDaysAgo(status[1]) : null,
     pool: poolFor(kind, h),
   };

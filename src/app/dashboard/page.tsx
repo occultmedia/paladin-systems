@@ -29,6 +29,7 @@ import {
   RESIDENTIAL_TYPES,
   LISTING_STATUSES,
   SCRAPE_RUNS,
+  STATUS_HINT,
   TENURES,
   TENURE_HINT,
   ZONINGS,
@@ -752,20 +753,22 @@ function TenureTag({ l }: { l: Listing }) {
 }
 
 const STATUS_STYLE: Record<ListingStatus, { color: string; bg: string }> = {
-  Available: { color: "#1F7A45", bg: "#E6F4EC" },
+  "For sale": { color: "#1F7A45", bg: "#E6F4EC" },
   "Under contract": { color: "#9A5B00", bg: "#FDF1DC" },
   Sold: { color: "#B42318", bg: "#FDE8E7" },
+  "De-listed": { color: "#52525B", bg: "#EEEEF0" },
 };
 
 function StatusBadge({ l, withDate = false, align = "start" }: { l: Listing; withDate?: boolean; align?: "start" | "end" }) {
   const st = STATUS_STYLE[l.status];
   return (
     <span className={`inline-flex flex-col gap-0.5 ${align === "end" ? "items-end" : "items-start"}`}>
-      <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ color: st.color, background: st.bg }}>
+      <span title={STATUS_HINT[l.status]} className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ color: st.color, background: st.bg }}>
         <span className="h-1.5 w-1.5 rounded-full" style={{ background: st.color }} />
         {l.status}
       </span>
-      {withDate && l.status_changed && <span className="text-[10px] text-zinc-400">since {fmtDate(l.status_changed)}</span>}
+      {withDate && <span className="text-[10px] text-zinc-400">{l.status_changed ? `since ${fmtDate(l.status_changed)}` : `since ${fmtDate(l.first_seen)}`}</span>}
+      {withDate && <span className="max-w-[220px] text-[10.5px] leading-snug text-zinc-500">{STATUS_HINT[l.status]}</span>}
     </span>
   );
 }
@@ -1453,6 +1456,12 @@ function ListingDetails({ l, marketYield }: { l: Listing; marketYield?: number }
               <p className="mt-1 font-display text-[18px] font-bold leading-tight tracking-tight text-zinc-950 sm:text-[20px]">{l.asset_name}</p>
               <p className="mt-1 text-[12px] text-zinc-500">
                 {l.district} · {l.listing_id}
+              </p>
+              <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11.5px] text-zinc-500">
+                <StatusBadge l={l} />
+                <span>
+                  {l.status_changed ? `${l.status === "For sale" ? "Back on sale" : "Marked"} ${fmtDate(l.status_changed)}` : `For sale since ${fmtDate(l.first_seen)}`}
+                </span>
               </p>
             </div>
             <WatchButton l={l} />
@@ -2177,7 +2186,7 @@ function Watchlist({ listings, marketYield, onOpenListing, onBrowse }: { listing
   const todayCount = updates.filter((u) => u.date === today).length;
   const total = rows.reduce((a, r) => a + r.l.asking_price_usd, 0);
   const drops = rows.filter((r) => r.l.price_change_pct < 0).length;
-  const offMarket = rows.filter((r) => r.l.status !== "Available").length;
+  const offMarket = rows.filter((r) => r.l.status !== "For sale").length;
 
   if (!listings) {
     return (
@@ -2256,7 +2265,7 @@ function Watchlist({ listings, marketYield, onOpenListing, onBrowse }: { listing
           </dl>
           {offMarket > 0 && (
             <p className="mt-3 text-[12px] text-zinc-500">
-              {offMarket} pinned {offMarket === 1 ? "listing is" : "listings are"} under contract or sold.
+              {offMarket} pinned {offMarket === 1 ? "listing is" : "listings are"} no longer for sale (under contract, sold or de-listed).
             </p>
           )}
 
@@ -2496,7 +2505,7 @@ function TerminalUpdates({
           </span>
           {latest.status_changes.length > 0 && (
             <span>
-              <b className={`${MONO} text-zinc-950`}>{latest.status_changes.length}</b> under contract / sold
+              <b className={`${MONO} text-zinc-950`}>{latest.status_changes.length}</b> status {latest.status_changes.length === 1 ? "change" : "changes"}
             </span>
           )}
         </span>
@@ -2603,7 +2612,7 @@ function TerminalUpdates({
                                   className="rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide"
                                   style={{ color: STATUS_STYLE[m.l.status].color, background: STATUS_STYLE[m.l.status].bg }}
                                 >
-                                  {m.l.status === "Sold" ? "SOLD" : "CONTRACT"}
+                                  {m.l.status === "Sold" ? "SOLD" : m.l.status === "De-listed" ? "DE-LISTED" : "CONTRACT"}
                                 </span>
                               ) : (
                                 <PriceMove pct={m.e.change_pct ?? 0} label={false} />

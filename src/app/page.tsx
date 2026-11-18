@@ -59,7 +59,7 @@ const TICKER: Array<[string, string, number | null]> = [
   ["Land parcels", String(LAND.length), null],
   ["Undervalued", String(UNDERVALUED), null],
   ["Price changes today", String(SCRAPE_RUNS[0].price_changes.length), null],
-  ["Under contract / sold today", String(SCRAPE_RUNS[0].status_changes.length), null],
+  ["Under contract, sold or de-listed today", String(SCRAPE_RUNS[0].status_changes.length), null],
   ["Median land price", `${usd(median(LAND.map((l) => l.price_per_sqft_usd)))}/sq ft`, null],
   ["Agencies tracked", String(AGENCIES), null],
 ];
@@ -579,8 +579,8 @@ export default function Home() {
                       <span className="flex-1 truncate text-[13px] font-medium text-zinc-800">{r.name}</span>
                       <span className="text-right">
                         <span className="block font-display text-[13px] font-bold tabular-nums">{r.price}</span>
-                        <span className="block text-[11px] font-semibold tabular-nums" style={{ color: r.status !== "Available" ? "#E08A1E" : r.sincePct < 0 ? DOWN : r.sincePct > 0 ? UP : "#71717A" }}>
-                          {r.status !== "Available" ? r.status : r.sincePct === 0 ? "No change" : pct(r.sincePct)}
+                        <span className="block text-[11px] font-semibold tabular-nums" style={{ color: r.status !== "For sale" ? "#E08A1E" : r.sincePct < 0 ? DOWN : r.sincePct > 0 ? UP : "#71717A" }}>
+                          {r.status !== "For sale" ? r.status : r.sincePct === 0 ? "No change" : pct(r.sincePct)}
                         </span>
                       </span>
                     </div>
@@ -668,7 +668,7 @@ export default function Home() {
                   ["Price history", "Every drop and increase with the date, so you know how motivated the seller is."],
                   ["Estimated market value", "Asking price against our estimate, with a clear Undervalued, At market or Overpriced signal."],
                   ["Agency and listing agent", "The agency, the agent handling it, and one tap to call, WhatsApp or e-mail them, plus a link to the original listing."],
-                  ["Daily updates feed", "New listings, price changes and properties going under contract or sold, every morning."],
+                  ["Daily updates feed", "New listings, price changes and properties going under contract, sold or de-listed, every morning."],
                 ]}
               />
               <div className="mt-10">
@@ -736,8 +736,8 @@ export default function Home() {
                     </div>
                     <div className="shrink-0 text-right">
                       <p className="font-display text-[15px] font-bold tabular-nums text-zinc-950">{r.price}</p>
-                      <p className="text-[12px] font-semibold tabular-nums" style={{ color: r.status !== "Available" ? "#E08A1E" : r.sincePct < 0 ? DOWN : r.sincePct > 0 ? UP : "#71717A" }}>
-                        {r.status !== "Available" ? r.status : r.sincePct === 0 ? "No change" : `${pct(r.sincePct)} since pinned`}
+                      <p className="text-[12px] font-semibold tabular-nums" style={{ color: r.status !== "For sale" ? "#E08A1E" : r.sincePct < 0 ? DOWN : r.sincePct > 0 ? UP : "#71717A" }}>
+                        {r.status !== "For sale" ? r.status : r.sincePct === 0 ? "No change" : `${pct(r.sincePct)} since pinned`}
                       </p>
                     </div>
                   </li>
@@ -765,7 +765,7 @@ export default function Home() {
               <Bullets
                 items={[
                   ["One tap to pin", "Pin homes, land or commercial property from the list, the map or the listing details."],
-                  ["Every move since you pinned", "Price change since you pinned it and since it was listed, plus status: available, under contract or sold."],
+                  ["Every move since you pinned", "Price change since you pinned it and since it was listed, plus status: for sale, under contract, sold or de-listed."],
                   ["Private notes", "Add a note to each property, like which client it is for or what to ask the agent."],
                 ]}
               />

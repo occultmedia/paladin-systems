@@ -72,9 +72,10 @@ export const num = (n: number) => n.toLocaleString("en-US");
 export const pct = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : "±"}${Math.abs(n).toFixed(1)}%`;
 
 const STATUS_PILL: Record<Listing["status"], { color: string; bg: string }> = {
-  Available: { color: "#1F7A45", bg: "#E6F4EC" },
+  "For sale": { color: "#1F7A45", bg: "#E6F4EC" },
   "Under contract": { color: "#9A5B00", bg: "#FDF1DC" },
   Sold: { color: "#B42318", bg: "#FDE8E7" },
+  "De-listed": { color: "#52525B", bg: "#EEEEF0" },
 };
 
 export function HoverCard({ l }: { l: Listing }) {
