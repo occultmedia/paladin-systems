@@ -1,7 +1,7 @@
 "use client";
 
 /*
- * AI Signal visuals: the market "being read" (a scan through real listings),
+ * Tide AI visuals: the market "being read" (a scan through real listings),
  * typed briefing text, and a cursor spotlight for dark panels. All content is
  * passed in from the scrape data; nothing here invents numbers. Motion is
  * skipped for people who prefer reduced motion.
@@ -71,8 +71,8 @@ export function TypeText({ text, speed = 18, className = "", delay = 0, caret = 
   );
 }
 
-/** "AI Signal" label with a breathing glow. */
-export function AIBadge({ dark = false, label = "AI Signal" }: { dark?: boolean; label?: string }) {
+/** "Tide AI" label with a breathing glow. */
+export function AIBadge({ dark = false, label = "Tide AI" }: { dark?: boolean; label?: string }) {
   return (
     <span className={`inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] ${dark ? "text-white" : "text-zinc-950"}`}>
       <span className={`relative grid size-6 place-items-center rounded-lg ${dark ? "bg-mint text-zinc-950" : "bg-zinc-950 text-mint"}`}>

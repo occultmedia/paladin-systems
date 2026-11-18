@@ -42,7 +42,7 @@ export const metadata: Metadata = {
         url: "/og.png",
         width: 1200,
         height: 630,
-        alt: "Signal, powered by Sequence Data: Aruba Real Estate Market Intelligence.",
+        alt: "Tide, powered by Sequence Data: Aruba Real Estate Market Intelligence.",
       },
     ],
   },

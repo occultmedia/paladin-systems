@@ -30,7 +30,7 @@ export interface PreviewRow {
 }
 
 export interface PreviewData {
-  headline?: string; // AI Signal headline for the latest scrape
+  headline?: string; // Tide AI headline for the latest scrape
   run: { time: string; newCount: number; drops: number; ups: number; statusChanges: number; checked: number };
   rows: PreviewRow[];
   featured: {
@@ -129,7 +129,7 @@ function ScrapePane({ data }: { data: PreviewData }) {
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-[11px]">
         <span className="inline-flex items-center gap-1.5 font-semibold text-zinc-950">
           <Sparkles size={11} strokeWidth={2.2} />
-          AI Signal
+          Tide AI
         </span>
         <span className="min-w-0 flex-1 basis-[180px] truncate text-zinc-700">
           {data.headline ? <TypeText text={data.headline} delay={900} caret={false} /> : `Today ${r.time}`}
