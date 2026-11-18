@@ -395,3 +395,19 @@ body {
     animation: none;
   }
 }
+
+/* ── Terminal "deck": the black band at the top of the dashboard ───────── */
+/* Breaks a block out of the centered container to full width. Pair with
+   overflow-x: clip on the page root so 100vw never adds a scrollbar. */
+@utility bleed {
+  margin-inline: calc(50% - 50vw);
+}
+/* Black with a faint dot grid fixed to the viewport, so stacked deck
+   sections line up without seams. */
+@utility deck {
+  background-color: #09090b;
+  background-image: radial-gradient(rgb(221 229 220 / 0.07) 1px, transparent 1px);
+  background-size: 22px 22px;
+  background-attachment: fixed;
+  color: #fff;
+}

@@ -194,7 +194,7 @@ function PriceMove({ pct, label = true, size = 12 }: { pct: number; label?: bool
 function Logo() {
   return (
     <Link href="/" className="select-none" aria-label="Signal home">
-      <Wordmark tagline />
+      <Wordmark tagline tone="white" />
     </Link>
   );
 }
@@ -211,7 +211,7 @@ const TAB_ICON: Record<Tab, typeof Pin> = { Listings: LayoutList, Watchlist: Pin
 /** Pill switch between the dashboard tabs. */
 function TabSwitch({ tab, onTab, watchCount, full = false }: { tab: Tab; onTab: (t: Tab) => void; watchCount: number; full?: boolean }) {
   return (
-    <div className={`${full ? "grid w-full grid-cols-2" : "inline-flex"} gap-1 rounded-full bg-white/60 p-1 ring-1 ring-zinc-950/10`} role="tablist">
+    <div className={`${full ? "grid w-full grid-cols-2" : "inline-flex"} gap-1 rounded-full bg-white/[0.06] p-1 ring-1 ring-white/10`} role="tablist">
       {TABS.map((t) => {
         const on = tab === t;
         const Icon = TAB_ICON[t];
@@ -223,17 +223,17 @@ function TabSwitch({ tab, onTab, watchCount, full = false }: { tab: Tab; onTab: 
             aria-selected={on}
             onClick={() => onTab(t)}
             className={`relative inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full px-4 py-1.5 text-[13px] font-medium transition-colors ${
-              on ? "text-mint" : "text-zinc-600 hover:text-zinc-950"
+              on ? "text-zinc-950" : "text-zinc-400 hover:text-white"
             }`}
           >
-            {on && <motion.span layoutId={full ? "tab-pill-mobile" : "tab-pill"} className="absolute inset-0 rounded-full bg-zinc-950" transition={{ type: "spring", stiffness: 500, damping: 40 }} />}
+            {on && <motion.span layoutId={full ? "tab-pill-mobile" : "tab-pill"} className="absolute inset-0 rounded-full bg-mint" transition={{ type: "spring", stiffness: 500, damping: 40 }} />}
             <span className="relative inline-flex items-center gap-2">
               <Icon size={14} strokeWidth={1.75} fill={t === "Watchlist" && on ? "currentColor" : "none"} />
               {t}
               {t === "Watchlist" && watchCount > 0 && (
                 <span
                   className={`${MONO} inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-semibold ${
-                    on ? "bg-mint text-zinc-950" : "bg-zinc-950/10 text-zinc-700"
+                    on ? "bg-zinc-950 text-mint" : "bg-white/10 text-zinc-300"
                   }`}
                 >
                   {watchCount}
@@ -275,12 +275,12 @@ function AccountMenu({ compact = false }: { compact?: boolean }) {
   if (!user)
     return (
       <div className="flex shrink-0 items-center gap-1">
-        <Link href="/login" className={`whitespace-nowrap rounded-full px-3 py-1.5 text-[12.5px] font-medium text-zinc-700 transition-colors hover:bg-white/70 hover:text-zinc-950 ${compact ? "hidden sm:inline-flex" : ""}`}>
+        <Link href="/login" className={`whitespace-nowrap rounded-full px-3 py-1.5 text-[12.5px] font-medium text-zinc-300 transition-colors hover:bg-white/10 hover:text-white ${compact ? "hidden sm:inline-flex" : ""}`}>
           Log in
         </Link>
         <Link
           href="/signup"
-          className="shine inline-flex shrink-0 items-center whitespace-nowrap rounded-full bg-zinc-950 px-3.5 py-1.5 font-display text-[12.5px] font-semibold text-mint transition-colors hover:bg-zinc-800"
+          className="shine inline-flex shrink-0 items-center whitespace-nowrap rounded-full bg-mint px-3.5 py-1.5 font-display text-[12.5px] font-semibold text-zinc-950 transition-colors hover:bg-white"
         >
           Sign up
         </Link>
@@ -304,11 +304,11 @@ function AccountMenu({ compact = false }: { compact?: boolean }) {
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label="Account"
-        className={`flex items-center gap-2 rounded-full border border-zinc-950/10 bg-white/70 text-[12.5px] text-zinc-800 transition-colors hover:bg-white hover:text-zinc-950 ${
+        className={`flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] text-[12.5px] text-zinc-200 transition-colors hover:bg-white/[0.12] hover:text-white ${
           compact ? "size-9 justify-center" : "py-1 pl-1 pr-3"
         }`}
       >
-        <span className="grid size-7 place-items-center rounded-full bg-zinc-950 font-display text-[11px] font-bold text-mint">{initials}</span>
+        <span className="grid size-7 place-items-center rounded-full bg-mint font-display text-[11px] font-bold text-zinc-950">{initials}</span>
         {!compact && (
           <>
             <span className="max-w-[120px] truncate font-medium">{name}</span>
@@ -363,7 +363,7 @@ function AccountMenu({ compact = false }: { compact?: boolean }) {
 
 function Header({ tab, onTab, updates, onUpdates, watchCount }: { tab: Tab; onTab: (t: Tab) => void; updates: number; onUpdates: () => void; watchCount: number }) {
   return (
-    <header className="border-b border-mint-deep bg-mint">
+    <header className="deck border-b border-white/[0.08]">
       <div className="mx-auto flex max-w-[1400px] flex-col px-4 pt-3 sm:px-6 lg:h-16 lg:flex-row lg:items-center lg:justify-between lg:pt-0">
         <div className="flex items-center justify-between gap-4 lg:justify-start lg:gap-12">
           <Logo />
@@ -372,11 +372,11 @@ function Header({ tab, onTab, updates, onUpdates, watchCount }: { tab: Tab; onTa
               type="button"
               onClick={onUpdates}
               aria-label={`Terminal updates: ${updates} today`}
-              className="relative flex size-9 items-center justify-center rounded-full border border-zinc-950/15 bg-white/60 text-zinc-800 transition-colors hover:bg-white"
+              className="relative flex size-9 items-center justify-center rounded-full border border-white/15 bg-white/[0.06] text-zinc-200 transition-colors hover:bg-white/[0.12] hover:text-white"
             >
               <Bell size={15} strokeWidth={1.75} />
               {updates > 0 && (
-                <span className={`${MONO} absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-zinc-950 px-1 text-[10px] font-semibold text-mint`}>
+                <span className={`${MONO} absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-mint px-1 text-[10px] font-semibold text-zinc-950`}>
                   {updates}
                 </span>
               )}
@@ -394,19 +394,19 @@ function Header({ tab, onTab, updates, onUpdates, watchCount }: { tab: Tab; onTa
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-60" style={{ background: C.up }} />
               <span className="relative inline-flex h-1.5 w-1.5 rounded-full" style={{ background: C.up }} />
             </span>
-            <span className={`${MONO} whitespace-nowrap text-[11px] tracking-wider text-zinc-600`}>
-              UPDATED TODAY <span className="text-zinc-800">{fmtRunTime(SCRAPE_RUNS[0].run_at)} AST</span>
+            <span className={`${MONO} whitespace-nowrap text-[11px] tracking-wider text-zinc-500`}>
+              UPDATED TODAY <span className="text-zinc-200">{fmtRunTime(SCRAPE_RUNS[0].run_at)} AST</span>
             </span>
           </div>
           <button
             type="button"
             onClick={onUpdates}
             aria-label={`Terminal updates: ${updates} today`}
-            className="relative flex h-9 w-9 items-center justify-center rounded-full border border-zinc-950/15 bg-white/60 text-zinc-800 transition-colors hover:bg-white"
+            className="relative flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/[0.06] text-zinc-200 transition-colors hover:bg-white/[0.12] hover:text-white"
           >
             <Bell size={15} strokeWidth={1.75} />
             {updates > 0 && (
-              <span className={`${MONO} absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-zinc-950 px-1 text-[10px] font-semibold text-mint`}>
+              <span className={`${MONO} absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-mint px-1 text-[10px] font-semibold text-zinc-950`}>
                 {updates}
               </span>
             )}
@@ -1315,11 +1315,11 @@ const VERDICT_STYLE: Record<Verdict, { color: string; bg: string }> = {
   Watch: { color: "#B5650B", bg: "#FDF0DF" },
 };
 
-function AIMark({ size = 13 }: { size?: number }) {
+function AIMark({ size = 13, dark = false }: { size?: number; dark?: boolean }) {
   return (
-    <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-950">
-      <span className="relative grid size-5 place-items-center rounded-md bg-zinc-950 text-mint">
-        <span className="absolute inset-0 animate-[ai-breathe_2.8s_ease-in-out_infinite] rounded-md bg-zinc-950 motion-reduce:animate-none" />
+    <span className={`inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] ${dark ? "text-white" : "text-zinc-950"}`}>
+      <span className={`relative grid size-5 place-items-center rounded-md ${dark ? "bg-mint text-zinc-950" : "bg-zinc-950 text-mint"}`}>
+        <span className={`absolute inset-0 animate-[ai-breathe_2.8s_ease-in-out_infinite] rounded-md motion-reduce:animate-none ${dark ? "bg-mint" : "bg-zinc-950"}`} />
         <Sparkles size={size - 2} strokeWidth={2} className="relative" />
       </span>
       AI Signal
@@ -1335,11 +1335,11 @@ function AISourceLine({ source, className = "" }: { source: AISource; className?
   );
 }
 
-function AIShimmer({ lines = 3 }: { lines?: number }) {
+function AIShimmer({ lines = 3, dark = false }: { lines?: number; dark?: boolean }) {
   return (
     <div className="space-y-2" aria-hidden>
       {Array.from({ length: lines }).map((_, i) => (
-        <div key={i} className="h-3 animate-pulse rounded bg-zinc-950/[0.07]" style={{ width: `${92 - i * 14}%` }} />
+        <div key={i} className={`h-3 animate-pulse rounded ${dark ? "bg-white/10" : "bg-zinc-950/[0.07]"}`} style={{ width: `${92 - i * 14}%` }} />
       ))}
     </div>
   );
@@ -1348,9 +1348,9 @@ function AIShimmer({ lines = 3 }: { lines?: number }) {
 function AINote({ l }: { l: Listing }) {
   const { data, loading, error } = useListingNote(l.listing_id);
   return (
-    <section aria-label="AI analysis" className="ai-ring mb-6 rounded-xl p-4 [--ai-bg:#f7faf7] sm:p-5">
+    <section aria-label="AI analysis" className="ai-ring mb-6 rounded-xl p-4 text-white [--ai-bg:#0b0b0d] sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <AIMark />
+        <AIMark dark />
         {data && (
           <span
             className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
@@ -1362,32 +1362,32 @@ function AINote({ l }: { l: Listing }) {
       </div>
       {loading && (
         <div className="mt-4">
-          <p className="mb-3 text-[12px] text-zinc-500">Reading comps and price history…</p>
-          <AIShimmer />
+          <p className="mb-3 text-[12px] text-zinc-400">Reading comps and price history…</p>
+          <AIShimmer dark />
         </div>
       )}
-      {error && <p className="mt-3 text-[12px] text-zinc-500">The analysis could not load right now. Close and reopen the listing to try again.</p>}
+      {error && <p className="mt-3 text-[12px] text-zinc-400">The analysis could not load right now. Close and reopen the listing to try again.</p>}
       {data && (
         <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}>
-          <p className="mt-3 font-display text-[15px] font-semibold leading-snug tracking-tight text-zinc-950 sm:text-[16px]">{data.headline}</p>
-          <p className="mt-2 text-[13px] leading-relaxed text-zinc-700">{data.analysis}</p>
+          <p className="mt-3 font-display text-[15px] font-semibold leading-snug tracking-tight text-white sm:text-[16px]">{data.headline}</p>
+          <p className="mt-2 text-[13px] leading-relaxed text-zinc-300">{data.analysis}</p>
           {data.points.length > 0 && (
             <ul className="mt-3 space-y-1.5">
               {data.points.map((p, i) => (
-                <li key={i} className="flex gap-2 text-[12.5px] leading-snug text-zinc-700">
-                  <span className="mt-[7px] size-1 shrink-0 rounded-full bg-zinc-400" />
+                <li key={i} className="flex gap-2 text-[12.5px] leading-snug text-zinc-400">
+                  <span className="mt-[7px] size-1 shrink-0 rounded-full bg-mint" />
                   {p}
                 </li>
               ))}
             </ul>
           )}
-          <p className="mt-4 flex items-start gap-2 rounded-lg bg-white/80 px-3 py-2.5 text-[12.5px] leading-snug text-zinc-900 ring-1 ring-zinc-950/5">
+          <p className="mt-4 flex items-start gap-2 rounded-lg bg-mint px-3 py-2.5 text-[12.5px] leading-snug text-zinc-950">
             <ArrowRight size={14} strokeWidth={2} className="mt-px shrink-0" />
             <span>
               <b className="font-semibold">Next step:</b> {data.next_step}
             </span>
           </p>
-          <AISourceLine source={data.source} className="mt-3" />
+          <AISourceLine source={data.source} className="mt-3 !text-zinc-500" />
         </motion.div>
       )}
     </section>
@@ -1679,11 +1679,13 @@ function ActiveListings({
 
   return (
     <>
-      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-zinc-200 py-6 sm:py-8">
+      <div className="deck bleed">
+      <div className="mx-auto max-w-[1400px] px-4 sm:px-6">
+      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-white/10 py-6 sm:py-8">
         <div>
-          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500">Aruba · Scraped daily</p>
-          <h1 className="mt-2 font-display text-[28px] font-bold tracking-tight text-zinc-950">Active Listings</h1>
-          <p className="mt-1 max-w-[72ch] text-[13px] leading-relaxed text-zinc-600">
+          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500">Aruba · Read daily by AI Signal</p>
+          <h1 className="mt-2 font-display text-[28px] font-bold tracking-tight text-white sm:text-[34px]">Active Listings</h1>
+          <p className="mt-1 max-w-[72ch] text-[13px] leading-relaxed text-zinc-400">
             Every home, condo, piece of land and commercial property for sale in Aruba. Hover a pin for a quick look, click it
             for full details in the list below.
           </p>
@@ -1692,7 +1694,7 @@ function ActiveListings({
           type="button"
           onClick={() => downloadCsv(rows)}
           disabled={!rows.length}
-          className="inline-flex items-center gap-2 bg-zinc-950 px-4 py-2 text-[12px] font-medium tracking-wide text-mint transition-colors hover:bg-zinc-800 disabled:opacity-40"
+          className="shine inline-flex items-center gap-2 rounded-full bg-mint px-4 py-2 text-[12px] font-semibold tracking-wide text-zinc-950 transition-colors hover:bg-white disabled:opacity-40"
         >
           <Download size={13} strokeWidth={1.5} />
           Export CSV
@@ -1700,22 +1702,24 @@ function ActiveListings({
       </div>
 
       {/* summary */}
-      <div className="grid grid-cols-3 gap-x-4 border-b border-zinc-200 lg:grid-cols-6 lg:gap-x-0">
+      <div className="grid grid-cols-3 gap-x-4 lg:grid-cols-6 lg:gap-x-0">
         {[
           ["Listings shown", listings ? int.format(stats.count) : "—", undefined],
           ["Residential", listings ? int.format(stats.residential) : "—", undefined],
           ["Land", listings ? int.format(stats.land) : "—", undefined],
           ["Commercial", listings ? int.format(stats.commercial) : "—", undefined],
           ["Median asking", listings && stats.count ? fmtUsdCompact(stats.medianAsk) : "—", undefined],
-          ["Undervalued", listings ? int.format(stats.undervalued) : "—", listings ? C.up : undefined],
+          ["Undervalued", listings ? int.format(stats.undervalued) : "—", listings ? "#7FD3A0" : undefined],
         ].map(([label, value, color], i) => (
-          <div key={label} className={`py-3 sm:py-5 ${i > 0 ? "lg:border-l lg:border-zinc-200 lg:pl-6" : ""}`}>
+          <div key={label} className={`py-3 sm:py-6 ${i > 0 ? "lg:border-l lg:border-white/10 lg:pl-6" : ""}`}>
             <p className="truncate text-[9px] uppercase tracking-[0.12em] text-zinc-500 sm:text-[10px] sm:tracking-[0.14em]">{label}</p>
-            <p className={`${MONO} mt-1 font-display text-[19px] font-bold text-zinc-950 sm:mt-1.5 sm:text-[24px]`} style={color ? { color } : undefined}>
+            <p className={`${MONO} mt-1 font-display text-[19px] font-bold text-white sm:mt-1.5 sm:text-[26px]`} style={color ? { color } : undefined}>
               {value}
             </p>
           </div>
         ))}
+      </div>
+      </div>
       </div>
 
       {/* filters */}
@@ -2240,19 +2244,22 @@ function Watchlist({ listings, marketYield, onOpenListing, onBrowse }: { listing
   }
 
   return (
-    <div className="py-8 sm:py-10">
+    <div className="pb-8 sm:pb-10">
+      <div className="deck bleed">
+      <div className="mx-auto max-w-[1400px] px-4 pb-8 pt-8 sm:px-6 sm:pt-10">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="font-display text-[26px] font-bold tracking-tight text-zinc-950 sm:text-[30px]">Watchlist</h1>
-          <p className="mt-1 max-w-xl text-[13px] text-zinc-500">
+          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500">Tracked by AI Signal every morning</p>
+          <h1 className="mt-2 font-display text-[28px] font-bold tracking-tight text-white sm:text-[34px]">Watchlist</h1>
+          <p className="mt-1 max-w-xl text-[13px] text-zinc-400">
             Properties you are keeping track of. Every daily scrape checks them for price changes and status updates.
           </p>
         </div>
         {rows.length > 0 && (
           <div className="flex items-center gap-3">
-            <label className="flex items-center gap-2 text-[12px] text-zinc-500">
+            <label className="flex items-center gap-2 text-[12px] text-zinc-400">
               Sort
-              <select value={sort} onChange={(e) => setSort(e.target.value as WatchSort)} className={`${MONO} rounded-md border border-zinc-300 bg-white px-3 py-2 text-[12px] text-zinc-800 outline-none transition-colors hover:border-zinc-500 focus:border-zinc-950`}>
+              <select value={sort} onChange={(e) => setSort(e.target.value as WatchSort)} className={`${MONO} rounded-md border border-white/15 bg-white/[0.06] px-3 py-2 text-[12px] text-zinc-100 outline-none transition-colors hover:border-white/30 focus:border-mint [&>option]:text-zinc-900`}>
                 {WATCH_SORTS.map(([k, label]) => (
                   <option key={k} value={k}>{label}</option>
                 ))}
@@ -2261,12 +2268,38 @@ function Watchlist({ listings, marketYield, onOpenListing, onBrowse }: { listing
             <button
               type="button"
               onClick={() => window.confirm("Remove every listing from your watchlist?") && clear()}
-              className="text-[12px] text-zinc-500 underline-offset-4 hover:text-zinc-950 hover:underline"
+              className="text-[12px] text-zinc-400 underline-offset-4 hover:text-white hover:underline"
             >
               Clear all
             </button>
           </div>
         )}
+      </div>
+      {rows.length > 0 && (
+        <>
+          <dl className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-white/10 bg-white/10 sm:grid-cols-4">
+            {(
+              [
+                ["Pinned", String(rows.length)],
+                ["Total asking", fmtUsdCompact(total)],
+                ["Price drops", String(drops)],
+                ["Updates today", String(todayCount)],
+              ] as const
+            ).map(([k, v]) => (
+              <div key={k} className="bg-[#0d0d0f] px-4 py-4 sm:px-5">
+                <dt className="text-[11px] text-zinc-500">{k}</dt>
+                <dd className={`${MONO} mt-1 font-display text-[22px] font-bold text-white`}>{v}</dd>
+              </div>
+            ))}
+          </dl>
+          {offMarket > 0 && (
+            <p className="mt-3 text-[12px] text-zinc-500">
+              {offMarket} pinned {offMarket === 1 ? "listing is" : "listings are"} no longer for sale (under contract, sold or de-listed).
+            </p>
+          )}
+        </>
+      )}
+      </div>
       </div>
 
       {rows.length === 0 ? (
@@ -2289,27 +2322,6 @@ function Watchlist({ listings, marketYield, onOpenListing, onBrowse }: { listing
         </div>
       ) : (
         <>
-          <dl className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-200 sm:grid-cols-4">
-            {(
-              [
-                ["Pinned", String(rows.length)],
-                ["Total asking", fmtUsdCompact(total)],
-                ["Price drops", String(drops)],
-                ["Updates today", String(todayCount)],
-              ] as const
-            ).map(([k, v]) => (
-              <div key={k} className="bg-white px-4 py-4 sm:px-5">
-                <dt className="text-[11px] text-zinc-500">{k}</dt>
-                <dd className={`${MONO} mt-1 font-display text-[22px] font-bold text-zinc-950`}>{v}</dd>
-              </div>
-            ))}
-          </dl>
-          {offMarket > 0 && (
-            <p className="mt-3 text-[12px] text-zinc-500">
-              {offMarket} pinned {offMarket === 1 ? "listing is" : "listings are"} no longer for sale (under contract, sold or de-listed).
-            </p>
-          )}
-
           <div className="mt-8 grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
             <ul className="divide-y divide-zinc-200 border-t border-zinc-950">
               {rows.map(({ e, l, since }) => {
@@ -2513,15 +2525,16 @@ function TerminalUpdates({
   }, [open, onToggle]);
 
   return (
-    <div ref={boxRef} id="terminal-updates" className="relative mt-4 scroll-mt-4">
+    <div ref={boxRef} id="terminal-updates" className="deck bleed relative z-30 scroll-mt-4">
+      <div className="relative mx-auto max-w-[1400px] px-4 pt-4 sm:px-6">
       {/* slim bar */}
       <button
         type="button"
         onClick={onToggle}
         aria-expanded={open}
-        className="flex w-full flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-mint-deep bg-mint-soft px-4 py-2 text-left text-[12px] transition-colors hover:bg-mint"
+        className="ai-ring flex w-full flex-wrap items-center gap-x-4 gap-y-1 rounded-xl px-4 py-2.5 text-left text-[12px] text-zinc-300 [--ai-bg:#111113] transition-[filter] hover:brightness-125"
       >
-        <span className="flex items-center gap-2 font-semibold text-zinc-950">
+        <span className="flex items-center gap-2 font-semibold text-white">
           <span className="relative flex h-1.5 w-1.5">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-60" style={{ background: PRICE_UP }} />
             <span className="relative inline-flex h-1.5 w-1.5 rounded-full" style={{ background: PRICE_UP }} />
@@ -2529,12 +2542,12 @@ function TerminalUpdates({
           <Sparkles size={13} strokeWidth={2} />
           AI Signal
         </span>
-        <span className="min-w-0 flex-1 basis-[260px] truncate text-zinc-800">
+        <span className="min-w-0 flex-1 basis-[260px] truncate text-zinc-200">
           {brief.data ? brief.data.headline : brief.loading ? <span className="text-zinc-500">Reading today&apos;s scrape…</span> : `Updated today ${fmtRunTime(latest.run_at)} AST`}
         </span>
-        <span className="flex items-center gap-3 text-zinc-700">
+        <span className="flex items-center gap-3 text-zinc-400">
           <span>
-            <b className={`${MONO} text-zinc-950`}>{latest.new_listings.length}</b> new
+            <b className={`${MONO} text-white`}>{latest.new_listings.length}</b> new
           </span>
           <span className="inline-flex items-center gap-1">
             <ArrowDown size={12} strokeWidth={2.5} style={{ color: PRICE_DOWN }} />
@@ -2546,11 +2559,11 @@ function TerminalUpdates({
           </span>
           {latest.status_changes.length > 0 && (
             <span>
-              <b className={`${MONO} text-zinc-950`}>{latest.status_changes.length}</b> status {latest.status_changes.length === 1 ? "change" : "changes"}
+              <b className={`${MONO} text-white`}>{latest.status_changes.length}</b> status {latest.status_changes.length === 1 ? "change" : "changes"}
             </span>
           )}
         </span>
-        <span className="ml-auto inline-flex items-center gap-1 font-medium text-zinc-700">
+        <span className="ml-auto inline-flex items-center gap-1 font-medium text-mint">
           {open ? "Close" : "Today's briefing"}
           <ChevronDown size={13} strokeWidth={1.75} className={`transition-transform ${open ? "rotate-180" : ""}`} />
         </span>
@@ -2560,27 +2573,27 @@ function TerminalUpdates({
       {open && (
         <div className="absolute right-0 top-full z-40 mt-2 w-full max-w-[640px] overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-[0_18px_40px_-12px_rgb(0_0_0/0.25)]">
           <div className="max-h-[min(72vh,620px)] overflow-y-auto overscroll-contain" data-lenis-prevent>
-          <section aria-label="AI Signal briefing" className="border-b border-zinc-200 bg-gradient-to-br from-mint-soft to-white px-4 py-4 sm:px-5">
+          <section aria-label="AI Signal briefing" className="deck border-b border-zinc-200 px-4 py-4 [background-attachment:scroll] sm:px-5">
             <div className="flex items-center justify-between gap-2">
-              <AIMark />
+              <AIMark dark />
               <span className="text-[11px] text-zinc-500">
                 {fmtRunDay(latest, 0)} · {fmtRunTime(latest.run_at)} AST
               </span>
             </div>
             {brief.loading && (
               <div className="mt-4">
-                <AIShimmer lines={4} />
+                <AIShimmer lines={4} dark />
               </div>
             )}
             {brief.error && <p className="mt-3 text-[12px] text-zinc-500">The briefing could not load right now. The scrape log below is up to date.</p>}
             {brief.data && (
               <>
-                <p className="mt-3 font-display text-[16px] font-semibold leading-snug tracking-tight text-zinc-950">{brief.data.headline}</p>
-                <p className="mt-2 text-[13px] leading-relaxed text-zinc-700">{brief.data.summary}</p>
+                <p className="mt-3 font-display text-[16px] font-semibold leading-snug tracking-tight text-white">{brief.data.headline}</p>
+                <p className="mt-2 text-[13px] leading-relaxed text-zinc-300">{brief.data.summary}</p>
                 <ul className="mt-3 space-y-1.5">
                   {brief.data.points.map((p, i) => (
-                    <li key={i} className="flex gap-2 text-[12.5px] leading-snug text-zinc-700">
-                      <span className="mt-[7px] size-1 shrink-0 rounded-full bg-zinc-400" />
+                    <li key={i} className="flex gap-2 text-[12.5px] leading-snug text-zinc-400">
+                      <span className="mt-[7px] size-1 shrink-0 rounded-full bg-mint" />
                       {p}
                     </li>
                   ))}
@@ -2600,14 +2613,14 @@ function TerminalUpdates({
                                 onOpenListing(w.listing_id);
                                 onToggle();
                               }}
-                              className="flex w-full items-center gap-3 rounded-lg bg-white px-3 py-2 text-left ring-1 ring-zinc-950/5 transition-colors hover:bg-mint-soft"
+                              className="flex w-full items-center gap-3 rounded-lg bg-white/[0.05] px-3 py-2 text-left ring-1 ring-white/10 transition-colors hover:bg-white/[0.1]"
                             >
                               <span className="min-w-0 flex-1">
-                                <span className="block truncate text-[12.5px] font-medium text-zinc-950">{wl.asset_name}</span>
-                                <span className="block text-[11.5px] leading-snug text-zinc-600">{w.reason}</span>
+                                <span className="block truncate text-[12.5px] font-medium text-white">{wl.asset_name}</span>
+                                <span className="block text-[11.5px] leading-snug text-zinc-400">{w.reason}</span>
                               </span>
-                              <span className={`${MONO} shrink-0 text-[12px] font-semibold text-zinc-950`}>{fmtUsdCompact(wl.asking_price_usd)}</span>
-                              <ArrowRight size={13} strokeWidth={1.75} className="shrink-0 text-zinc-400" />
+                              <span className={`${MONO} shrink-0 text-[12px] font-semibold text-white`}>{fmtUsdCompact(wl.asking_price_usd)}</span>
+                              <ArrowRight size={13} strokeWidth={1.75} className="shrink-0 text-zinc-500" />
                             </button>
                           </li>
                         );
@@ -2615,7 +2628,7 @@ function TerminalUpdates({
                     </ul>
                   </div>
                 )}
-                <AISourceLine source={brief.data.source} className="mt-3" />
+                <AISourceLine source={brief.data.source} className="mt-3 !text-zinc-500" />
               </>
             )}
           </section>
@@ -2699,6 +2712,7 @@ function TerminalUpdates({
           )}
         </div>
       )}
+      </div>
     </div>
   );
 }
@@ -2746,7 +2760,7 @@ function Dashboard() {
   };
 
   return (
-    <div className={`${inter.className} min-h-screen bg-white text-zinc-800 antialiased selection:bg-mint selection:text-zinc-950`}>
+    <div className={`${inter.className} min-h-screen overflow-x-clip bg-white text-zinc-800 antialiased selection:bg-mint selection:text-zinc-950`}>
       <Header tab={tab} onTab={setTab} updates={updatesToday} onUpdates={openUpdates} watchCount={watchCount} />
 
       <main className="mx-auto max-w-[1400px] px-4 pb-20 sm:px-6">
