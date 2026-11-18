@@ -351,7 +351,7 @@ body {
   box-shadow: 0 0 0 3px rgb(221 229 220 / 0.95), 0 2px 8px rgb(0 0 0 / 0.35);
 }
 
-/* ── Tide AI motion ─────────────────────────────────────────────────── */
+/* ── AI Signal motion ─────────────────────────────────────────────────── */
 @keyframes ai-breathe {
   0%, 100% { opacity: 0; transform: scale(1); }
   50% { opacity: 0.35; transform: scale(1.45); }

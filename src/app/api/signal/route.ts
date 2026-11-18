@@ -1,6 +1,6 @@
 /*
  * POST /api/signal
- *   { kind: "brief" }                -> Tide AI market brief for the latest scrape
+ *   { kind: "brief" }                -> AI Signal market brief for the latest scrape
  *   { kind: "listing", id: string }  -> AI note for one listing
  *
  * The server builds the facts itself from the scrape data (the client only
@@ -32,7 +32,7 @@ export const maxDuration = 60;
 
 const MODEL = "claude-opus-5-5";
 
-const SYSTEM = `You are Tide, the market analyst inside an Aruba real estate intelligence terminal used by real estate agents and investors.
+const SYSTEM = `You are Signal, the market analyst inside an Aruba real estate intelligence terminal used by real estate agents and investors.
 You are given FACTS as JSON, computed from daily scrapes of agency websites. Write for a busy agent: plain English, specific, no hype, no emojis.
 Rules:
 - Use only numbers that appear in the facts (you may round them). Never invent comps, prices, dates, rents or names.
@@ -88,7 +88,7 @@ async function buildListing(id: string): Promise<Cached | null> {
 async function buildBrief(): Promise<Cached> {
   const facts = briefFacts(SCRAPE_RUNS, ALL_LISTINGS);
   const ai = await askClaude<MarketBrief>(
-    "Write today's Tide AI briefing from the latest scrapes: a headline, a 2-3 sentence summary of what changed and what it says about the market, 3-5 takeaways, and up to 3 listings (by listing_id from the facts) worth looking at today with a one-line reason each.",
+    "Write today's AI Signal briefing from the latest scrapes: a headline, a 2-3 sentence summary of what changed and what it says about the market, 3-5 takeaways, and up to 3 listings (by listing_id from the facts) worth looking at today with a one-line reason each.",
     facts,
     MARKET_BRIEF_SCHEMA,
   );

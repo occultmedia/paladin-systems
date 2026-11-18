@@ -1,6 +1,6 @@
 "use client";
 
-/* Client side of Tide AI: fetch the brief / a listing note once per visit. */
+/* Client side of AI Signal: fetch the brief / a listing note once per visit. */
 
 import { useEffect, useState } from "react";
 import type { ListingNote, MarketBrief, WithSource } from "./signal-ai";
@@ -11,7 +11,7 @@ function load<T>(key: string, body: object): Promise<T> {
   let p = memo.get(key) as Promise<T> | undefined;
   if (!p) {
     p = fetch("/api/signal", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then((r) => {
-      if (!r.ok) throw new Error(`Tide AI ${r.status}`);
+      if (!r.ok) throw new Error(`AI Signal ${r.status}`);
       return r.json() as Promise<T>;
     });
     memo.set(key, p);

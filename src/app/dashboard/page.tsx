@@ -193,7 +193,7 @@ function PriceMove({ pct, label = true, size = 12 }: { pct: number; label?: bool
 
 function Logo() {
   return (
-    <Link href="/" className="select-none" aria-label="Tide home">
+    <Link href="/" className="select-none" aria-label="Signal home">
       <Wordmark tagline tone="white" compactOnMobile />
     </Link>
   );
@@ -1305,7 +1305,7 @@ function WatchButton({ l, variant = "full" }: { l: Listing; variant?: "full" | "
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
- * Tide AI — per-listing analyst note and the daily market brief
+ * AI Signal — per-listing analyst note and the daily market brief
  * ──────────────────────────────────────────────────────────────────────── */
 
 const VERDICT_STYLE: Record<Verdict, { color: string; bg: string }> = {
@@ -1322,7 +1322,7 @@ function AIMark({ size = 13, dark = false }: { size?: number; dark?: boolean }) 
         <span className={`absolute inset-0 animate-[ai-breathe_2.8s_ease-in-out_infinite] rounded-md motion-reduce:animate-none ${dark ? "bg-mint" : "bg-zinc-950"}`} />
         <Sparkles size={size - 2} strokeWidth={2} className="relative" />
       </span>
-      Tide AI
+      AI Signal
     </span>
   );
 }
@@ -1683,7 +1683,7 @@ function ActiveListings({
       <div className="mx-auto max-w-[1400px] px-4 sm:px-6">
       <div className="flex flex-wrap items-end justify-between gap-4 border-b border-white/10 py-6 sm:py-8">
         <div>
-          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500">Aruba · Read daily by Tide AI</p>
+          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500">Aruba · Read daily by AI Signal</p>
           <h1 className="mt-2 font-display text-[28px] font-bold tracking-tight text-white sm:text-[34px]">Active Listings</h1>
           <p className="mt-1 max-w-[72ch] text-[13px] leading-relaxed text-zinc-400">
             Every home, condo, piece of land and commercial property for sale in Aruba. Hover a pin for a quick look, click it
@@ -2249,7 +2249,7 @@ function Watchlist({ listings, marketYield, onOpenListing, onBrowse }: { listing
       <div className="mx-auto max-w-[1400px] px-4 pb-8 pt-8 sm:px-6 sm:pt-10">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500">Tracked by Tide AI every morning</p>
+          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500">Tracked by AI Signal every morning</p>
           <h1 className="mt-2 font-display text-[28px] font-bold tracking-tight text-white sm:text-[34px]">Watchlist</h1>
           <p className="mt-1 max-w-xl text-[13px] text-zinc-400">
             Properties you are keeping track of. Every daily scrape checks them for price changes and status updates.
@@ -2540,7 +2540,7 @@ function TerminalUpdates({
             <span className="relative inline-flex h-1.5 w-1.5 rounded-full" style={{ background: PRICE_UP }} />
           </span>
           <Sparkles size={13} strokeWidth={2} />
-          Tide AI
+          AI Signal
         </span>
         <span className="min-w-0 flex-1 basis-[260px] truncate text-zinc-200">
           {brief.data ? brief.data.headline : brief.loading ? <span className="text-zinc-500">Reading today&apos;s scrape…</span> : `Updated today ${fmtRunTime(latest.run_at)} AST`}
@@ -2573,7 +2573,7 @@ function TerminalUpdates({
       {open && (
         <div className="absolute right-0 top-full z-40 mt-2 w-full max-w-[640px] overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-[0_18px_40px_-12px_rgb(0_0_0/0.25)]">
           <div className="max-h-[min(72vh,620px)] overflow-y-auto overscroll-contain" data-lenis-prevent>
-          <section aria-label="Tide AI briefing" className="deck border-b border-zinc-200 px-4 py-4 [background-attachment:scroll] sm:px-5">
+          <section aria-label="AI Signal briefing" className="deck border-b border-zinc-200 px-4 py-4 [background-attachment:scroll] sm:px-5">
             <div className="flex items-center justify-between gap-2">
               <AIMark dark />
               <span className="text-[11px] text-zinc-500">

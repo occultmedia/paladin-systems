@@ -20,7 +20,7 @@ import {
 } from "@/lib/aruba-data";
 
 /* ─────────────────────────────────────────────────────────────────────────
- * Tide (powered by Sequence Data) — landing page.
+ * Signal (powered by Sequence Data) — landing page.
  * Every number is read from src/lib/aruba-data.ts, the same source as the
  * dashboard. Photos are Unsplash placeholders until real listing photos.
  * ──────────────────────────────────────────────────────────────────────── */
@@ -360,12 +360,12 @@ export default function Home() {
       {/* Nav */}
       <header className="sticky top-0 z-[1000] border-b border-zinc-200 bg-white/90 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-[1240px] items-center justify-between px-5 sm:px-6">
-          <Link href="/" aria-label="Tide home">
+          <Link href="/" aria-label="Signal home">
             <Wordmark tagline compactOnMobile />
           </Link>
           <nav className="hidden items-center gap-8 md:flex">
             {[
-              ["Tide AI", "#tide-ai"],
+              ["AI Signal", "#ai-signal"],
               ["Listings", "#listings"],
               ["Watchlist", "#watchlist"],
               ["Clients", "#clients"],
@@ -394,13 +394,13 @@ export default function Home() {
                   <span className="absolute inline-flex size-full animate-ping rounded-full bg-[#2E9E5B] opacity-60 motion-reduce:animate-none" />
                   <span className="relative inline-flex size-1.5 rounded-full bg-[#2E9E5B]" />
                 </span>
-                Tide AI read {MARKET_TOTAL} listings this morning · {PREVIEW.run.newCount} new
+                AI Signal read {MARKET_TOTAL} listings this morning · {PREVIEW.run.newCount} new
               </p>
               <h1 className="mt-5 font-display text-[40px] font-bold leading-[1.02] tracking-tight text-zinc-950 sm:text-[56px] lg:text-[60px]">
                 Aruba Real Estate Market Intelligence
               </h1>
               <p className="mt-5 max-w-[46ch] text-[16px] leading-relaxed text-zinc-600 sm:text-[17px]">
-                Every morning Tide&apos;s AI reads every home, land and commercial listing in Aruba, then tells you what
+                Every morning Signal&apos;s AI reads every home, land and commercial listing in Aruba, then tells you what
                 changed, what each property is worth a look for and who is selling it. Pin what you are watching and keep
                 track of the clients who asked.
               </p>
@@ -499,8 +499,8 @@ export default function Home() {
           <style>{`@keyframes ticker { from { transform: translateX(0) } to { transform: translateX(-50%) } }`}</style>
         </div>
 
-        {/* Tide AI */}
-        <section id="tide-ai" className="scroll-mt-16 bg-zinc-950 text-white">
+        {/* AI Signal */}
+        <section id="ai-signal" className="scroll-mt-16 bg-zinc-950 text-white">
           <Spotlight>
             <div
               aria-hidden
@@ -514,7 +514,7 @@ export default function Home() {
                     AI reads the whole Aruba market before you do.
                   </h2>
                   <p className="mt-5 max-w-[50ch] text-[16px] leading-relaxed text-zinc-400">
-                    Every morning Tide reads every listing on Aruba&apos;s agency websites, checks each one against its comps and
+                    Every morning Signal reads every listing on Aruba&apos;s agency websites, checks each one against its comps and
                     its own history, and tells you what changed and what it means.
                   </p>
                 </Reveal>
@@ -560,7 +560,7 @@ export default function Home() {
         {/* Overview bento */}
         <section className="mx-auto max-w-[1240px] px-5 py-16 sm:px-6 sm:py-24">
           <Reveal className="text-center">
-            <Eyebrow>The Tide platform</Eyebrow>
+            <Eyebrow>The Signal platform</Eyebrow>
             <h2 className="mx-auto mt-4 max-w-[22ch] font-display text-[30px] font-bold leading-[1.08] tracking-tight text-zinc-950 sm:text-[44px]">
               From first look to final offer
             </h2>
@@ -696,7 +696,7 @@ export default function Home() {
               <SectionHeading
                 eyebrow="Step 01 · Find"
                 title="Every high-value listing in Aruba, in one place."
-                body="Every morning Tide checks the websites of Aruba's agencies, brokers and developers for homes, condos, land and commercial property. New listings, price changes and sales show up in one feed, so you see them first."
+                body="Every morning Signal checks the websites of Aruba's agencies, brokers and developers for homes, condos, land and commercial property. New listings, price changes and sales show up in one feed, so you see them first."
               />
               <PrimaryCta>Browse all listings</PrimaryCta>
             </div>
@@ -926,7 +926,7 @@ export default function Home() {
                     "Agency and listing agent with call, WhatsApp and e-mail",
                     "Watchlist for the properties you are tracking",
                     "Interested clients with phone and notes on every listing",
-                    "Tide AI: a daily market briefing and an AI note on every listing",
+                    "AI Signal: a daily market briefing and an AI note on every listing",
                     "List and 3D map view · export to CSV",
                   ].map((f) => (
                     <li key={f} className="flex gap-3 text-[14px] text-zinc-700">
@@ -945,7 +945,7 @@ export default function Home() {
                   </p>
                 </div>
                 <a
-                  href={`mailto:${CONTACT_EMAIL}?subject=Tide%20Team%20Access`}
+                  href={`mailto:${CONTACT_EMAIL}?subject=Signal%20Team%20Access`}
                   className="mt-8 inline-flex items-center gap-2 self-start rounded-full border-2 border-zinc-950 px-5 py-3 font-display text-[14px] font-semibold text-zinc-950 transition-colors hover:bg-zinc-950 hover:text-white"
                 >
                   Contact us <ArrowUpRight size={15} strokeWidth={2} />
@@ -969,7 +969,7 @@ export default function Home() {
                 {NEW_THIS_WEEK} new listings this week
               </p>
               <h2 className="mt-5 max-w-[18ch] font-display text-[34px] font-bold leading-[1.05] tracking-tight text-white sm:text-[52px]">
-                The market moved this morning. Tide already read it.
+                The market moved this morning. Signal already read it.
               </h2>
             </Reveal>
             <div className="flex flex-wrap gap-3">
@@ -991,7 +991,7 @@ export default function Home() {
         <div className="mx-auto flex max-w-[1240px] flex-col gap-6 px-5 py-10 sm:px-6 md:flex-row md:items-center md:justify-between">
           <Wordmark tagline />
           <p className="max-w-[64ch] text-[12px] leading-relaxed text-zinc-500 md:text-right">
-            © 2026 Tide by Sequence Data · Oranjestad, Aruba · {CONTACT_EMAIL}
+            © 2026 Signal by Sequence Data · Oranjestad, Aruba · {CONTACT_EMAIL}
             <br />
             Data is for information only and is not investment advice. Photos: Unsplash.
           </p>

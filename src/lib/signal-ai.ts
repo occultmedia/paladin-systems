@@ -1,5 +1,5 @@
 /*
- * Tide AI: analysis of the daily scrape (the "message of the day") and a
+ * AI Signal: analysis of the daily scrape (the "message of the day") and a
  * short analyst note on every listing.
  *
  * This module is pure (no React, no fetch) so it runs on the server route and
