@@ -20,8 +20,11 @@ import { motion } from "framer-motion";
 import { Wordmark } from "@/components/logo";
 import { useWatchlist, type WatchEntry } from "@/lib/watchlist";
 import { useInterestedClients, type ClientInput, type InterestedClient } from "@/lib/clients";
+import { useListingNote, useMarketBrief } from "@/lib/use-signal";
+import type { AISource, Verdict } from "@/lib/signal-ai";
 import {
   COMMERCIAL_USES,
+  ALL_LISTINGS,
   MARKET_ID,
   RESIDENTIAL_TYPES,
   LISTING_STATUSES,
@@ -68,6 +71,7 @@ import {
   LogOut,
   Search,
   SlidersHorizontal,
+  Sparkles,
   User,
 } from "lucide-react";
 import {
@@ -1257,6 +1261,95 @@ function WatchButton({ l, variant = "full" }: { l: Listing; variant?: "full" | "
   );
 }
 
+/* ─────────────────────────────────────────────────────────────────────────
+ * AI Signal — per-listing analyst note and the daily market brief
+ * ──────────────────────────────────────────────────────────────────────── */
+
+const VERDICT_STYLE: Record<Verdict, { color: string; bg: string }> = {
+  Opportunity: { color: "#1F7A45", bg: "#E3F3E8" },
+  "Fair value": { color: "#3F3F46", bg: "#F1F1F2" },
+  Overpriced: { color: "#B23A3A", bg: "#FBE9E9" },
+  Watch: { color: "#B5650B", bg: "#FDF0DF" },
+};
+
+function AIMark({ size = 13 }: { size?: number }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-950">
+      <span className="grid size-5 place-items-center rounded-md bg-zinc-950 text-mint">
+        <Sparkles size={size - 2} strokeWidth={2} />
+      </span>
+      AI Signal
+    </span>
+  );
+}
+
+function AISourceLine({ source, className = "" }: { source: AISource; className?: string }) {
+  return (
+    <p className={`text-[10.5px] leading-snug text-zinc-400 ${className}`}>
+      {source === "claude" ? "Written by AI from today's scrape data. Check key facts before you advise a client." : "Computed from today's scrape data."}
+    </p>
+  );
+}
+
+function AIShimmer({ lines = 3 }: { lines?: number }) {
+  return (
+    <div className="space-y-2" aria-hidden>
+      {Array.from({ length: lines }).map((_, i) => (
+        <div key={i} className="h-3 animate-pulse rounded bg-zinc-950/[0.07]" style={{ width: `${92 - i * 14}%` }} />
+      ))}
+    </div>
+  );
+}
+
+function AINote({ l }: { l: Listing }) {
+  const { data, loading, error } = useListingNote(l.listing_id);
+  return (
+    <section aria-label="AI analysis" className="mb-6 rounded-xl border border-mint-deep/70 bg-gradient-to-br from-mint-soft to-white p-4 sm:p-5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <AIMark />
+        {data && (
+          <span
+            className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
+            style={{ color: VERDICT_STYLE[data.verdict].color, background: VERDICT_STYLE[data.verdict].bg }}
+          >
+            {data.verdict}
+          </span>
+        )}
+      </div>
+      {loading && (
+        <div className="mt-4">
+          <p className="mb-3 text-[12px] text-zinc-500">Reading comps and price history…</p>
+          <AIShimmer />
+        </div>
+      )}
+      {error && <p className="mt-3 text-[12px] text-zinc-500">The analysis could not load right now. Close and reopen the listing to try again.</p>}
+      {data && (
+        <>
+          <p className="mt-3 font-display text-[15px] font-semibold leading-snug tracking-tight text-zinc-950 sm:text-[16px]">{data.headline}</p>
+          <p className="mt-2 text-[13px] leading-relaxed text-zinc-700">{data.analysis}</p>
+          {data.points.length > 0 && (
+            <ul className="mt-3 space-y-1.5">
+              {data.points.map((p, i) => (
+                <li key={i} className="flex gap-2 text-[12.5px] leading-snug text-zinc-700">
+                  <span className="mt-[7px] size-1 shrink-0 rounded-full bg-zinc-400" />
+                  {p}
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="mt-4 flex items-start gap-2 rounded-lg bg-white/80 px-3 py-2.5 text-[12.5px] leading-snug text-zinc-900 ring-1 ring-zinc-950/5">
+            <ArrowRight size={14} strokeWidth={2} className="mt-px shrink-0" />
+            <span>
+              <b className="font-semibold">Next step:</b> {data.next_step}
+            </span>
+          </p>
+          <AISourceLine source={data.source} className="mt-3" />
+        </>
+      )}
+    </section>
+  );
+}
+
 function ListingDetails({ l, marketYield }: { l: Listing; marketYield?: number }) {
   const shared = (
     <>
@@ -1364,6 +1457,7 @@ function ListingDetails({ l, marketYield }: { l: Listing; marketYield?: number }
             </div>
             <WatchButton l={l} />
           </div>
+          <AINote l={l} />
           <dl className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-3 xl:grid-cols-4">
             {facts}
             {shared}
@@ -2334,18 +2428,21 @@ function runMessages(run: ScrapeRun): BoardMessage[] {
 
 function TerminalUpdates({
   runs,
+  allListings,
   open,
   onToggle,
   onOpenListing,
   onShowNew,
 }: {
   runs: ScrapeRun[];
+  allListings: Listing[];
   open: boolean;
   onToggle: () => void;
   onOpenListing: (id: string) => void;
   onShowNew: () => void;
 }) {
   const latest = runs[0];
+  const brief = useMarketBrief();
   const drops = latest.price_changes.filter((c) => c.change.event === "Price drop").length;
   const ups = latest.price_changes.length - drops;
   const boxRef = useRef<HTMLDivElement>(null);
@@ -2379,9 +2476,12 @@ function TerminalUpdates({
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-60" style={{ background: PRICE_UP }} />
             <span className="relative inline-flex h-1.5 w-1.5 rounded-full" style={{ background: PRICE_UP }} />
           </span>
-          Terminal updated
+          <Sparkles size={13} strokeWidth={2} />
+          AI Signal
         </span>
-        <span className="text-zinc-500">Today {fmtRunTime(latest.run_at)} AST</span>
+        <span className="min-w-0 flex-1 basis-[260px] truncate text-zinc-800">
+          {brief.data ? brief.data.headline : brief.loading ? <span className="text-zinc-500">Reading today&apos;s scrape…</span> : `Updated today ${fmtRunTime(latest.run_at)} AST`}
+        </span>
         <span className="flex items-center gap-3 text-zinc-700">
           <span>
             <b className={`${MONO} text-zinc-950`}>{latest.new_listings.length}</b> new
@@ -2401,15 +2501,76 @@ function TerminalUpdates({
           )}
         </span>
         <span className="ml-auto inline-flex items-center gap-1 font-medium text-zinc-700">
-          {open ? "Close" : "View updates"}
+          {open ? "Close" : "Today's briefing"}
           <ChevronDown size={13} strokeWidth={1.75} className={`transition-transform ${open ? "rotate-180" : ""}`} />
         </span>
       </button>
 
       {/* dropdown feed */}
       {open && (
-        <div className="absolute right-0 top-full z-40 mt-2 w-full max-w-[560px] overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-[0_18px_40px_-12px_rgb(0_0_0/0.25)]">
-          <div className="max-h-[360px] overflow-y-auto overscroll-contain" data-lenis-prevent role="log" aria-label="Terminal updates">
+        <div className="absolute right-0 top-full z-40 mt-2 w-full max-w-[640px] overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-[0_18px_40px_-12px_rgb(0_0_0/0.25)]">
+          <div className="max-h-[min(72vh,620px)] overflow-y-auto overscroll-contain" data-lenis-prevent>
+          <section aria-label="AI Signal briefing" className="border-b border-zinc-200 bg-gradient-to-br from-mint-soft to-white px-4 py-4 sm:px-5">
+            <div className="flex items-center justify-between gap-2">
+              <AIMark />
+              <span className="text-[11px] text-zinc-500">
+                {fmtRunDay(latest, 0)} · {fmtRunTime(latest.run_at)} AST
+              </span>
+            </div>
+            {brief.loading && (
+              <div className="mt-4">
+                <AIShimmer lines={4} />
+              </div>
+            )}
+            {brief.error && <p className="mt-3 text-[12px] text-zinc-500">The briefing could not load right now. The scrape log below is up to date.</p>}
+            {brief.data && (
+              <>
+                <p className="mt-3 font-display text-[16px] font-semibold leading-snug tracking-tight text-zinc-950">{brief.data.headline}</p>
+                <p className="mt-2 text-[13px] leading-relaxed text-zinc-700">{brief.data.summary}</p>
+                <ul className="mt-3 space-y-1.5">
+                  {brief.data.points.map((p, i) => (
+                    <li key={i} className="flex gap-2 text-[12.5px] leading-snug text-zinc-700">
+                      <span className="mt-[7px] size-1 shrink-0 rounded-full bg-zinc-400" />
+                      {p}
+                    </li>
+                  ))}
+                </ul>
+                {brief.data.watch.length > 0 && (
+                  <div className="mt-4">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">Worth a look today</p>
+                    <ul className="mt-2 space-y-1.5">
+                      {brief.data.watch.map((w) => {
+                        const wl = allListings.find((x) => x.listing_id === w.listing_id);
+                        if (!wl) return null;
+                        return (
+                          <li key={w.listing_id}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onOpenListing(w.listing_id);
+                                onToggle();
+                              }}
+                              className="flex w-full items-center gap-3 rounded-lg bg-white px-3 py-2 text-left ring-1 ring-zinc-950/5 transition-colors hover:bg-mint-soft"
+                            >
+                              <span className="min-w-0 flex-1">
+                                <span className="block truncate text-[12.5px] font-medium text-zinc-950">{wl.asset_name}</span>
+                                <span className="block text-[11.5px] leading-snug text-zinc-600">{w.reason}</span>
+                              </span>
+                              <span className={`${MONO} shrink-0 text-[12px] font-semibold text-zinc-950`}>{fmtUsdCompact(wl.asking_price_usd)}</span>
+                              <ArrowRight size={13} strokeWidth={1.75} className="shrink-0 text-zinc-400" />
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                )}
+                <AISourceLine source={brief.data.source} className="mt-3" />
+              </>
+            )}
+          </section>
+          <div role="log" aria-label="Scrape log">
+            <p className="px-4 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-950 sm:px-5">Scrape log</p>
             {runs.map((run, i) => (
               <div key={run.run_at}>
                 <p className="sticky top-0 z-10 flex justify-between border-b border-zinc-100 bg-white/95 px-4 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500 backdrop-blur">
@@ -2471,6 +2632,7 @@ function TerminalUpdates({
                 </ul>
               </div>
             ))}
+          </div>
           </div>
           {latest.new_listings.length > 0 && (
             <button
@@ -2544,7 +2706,7 @@ function Dashboard() {
           </div>
         ) : tab === "Listings" ? (
           <>
-            <TerminalUpdates runs={SCRAPE_RUNS} open={boardOpen} onToggle={toggleBoard} onOpenListing={openListing} onShowNew={showNewToday} />
+            <TerminalUpdates runs={SCRAPE_RUNS} allListings={ALL_LISTINGS} open={boardOpen} onToggle={toggleBoard} onOpenListing={openListing} onShowNew={showNewToday} />
             <ActiveListings
               key={listingsView.key}
               listings={data?.allListings}
