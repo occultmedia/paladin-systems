@@ -361,7 +361,7 @@ export default function Home() {
       <header className="sticky top-0 z-[1000] border-b border-zinc-200 bg-white/90 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-[1240px] items-center justify-between px-5 sm:px-6">
           <Link href="/" aria-label="Signal home">
-            <Wordmark tagline compactOnMobile />
+            <Wordmark />
           </Link>
           <nav className="hidden items-center gap-8 md:flex">
             {[

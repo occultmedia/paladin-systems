@@ -48,7 +48,7 @@ export function SignalGlyph({ tone = "black", className = "size-[22px]" }: { ton
 }
 
 /** "Signal" product wordmark, with an optional "Powered by Sequence Data" line. */
-export function Wordmark({ tone = "black", tagline = false, compactOnMobile = false }: { tone?: Tone; tagline?: boolean; compactOnMobile?: boolean }) {
+export function Wordmark({ tone = "black", tagline = false }: { tone?: Tone; tagline?: boolean }) {
   const text = tone === "black" ? "text-zinc-950" : "text-white";
   const muted = tone === "black" ? "text-zinc-500" : "text-zinc-400";
   return (
@@ -57,7 +57,7 @@ export function Wordmark({ tone = "black", tagline = false, compactOnMobile = fa
       <span className="leading-none">
         <span className={`block whitespace-nowrap font-display text-[19px] font-bold uppercase tracking-[0.2em] ${text}`}>Signal</span>
         {tagline && (
-          <span className={`mt-1 ${compactOnMobile ? "hidden sm:flex" : "flex"} items-center gap-1.5 whitespace-nowrap text-[8.5px] font-medium uppercase tracking-[0.14em] ${muted}`}>
+          <span className={`mt-1 flex items-center gap-1.5 whitespace-nowrap text-[8.5px] font-medium uppercase tracking-[0.14em] ${muted}`}>
             Powered by
             <SequenceMonogram tone={tone} className="h-[9px] w-auto" />
             <span className={tone === "black" ? "text-zinc-800" : "text-zinc-200"}>Sequence Data</span>

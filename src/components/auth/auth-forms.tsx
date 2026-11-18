@@ -30,7 +30,7 @@ export function AuthShell({
       <div className="flex flex-col px-5 py-5 sm:px-10">
         <div className="flex items-center justify-between">
           <Link href="/" aria-label="Signal home">
-            <Wordmark tagline compactOnMobile />
+            <Wordmark />
           </Link>
           <Link href="/" className="group inline-flex items-center gap-1.5 text-[13px] font-medium text-zinc-500 transition-colors hover:text-zinc-950">
             <ArrowLeft size={14} strokeWidth={2} className="transition-transform group-hover:-translate-x-0.5" />

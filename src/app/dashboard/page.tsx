@@ -194,7 +194,7 @@ function PriceMove({ pct, label = true, size = 12 }: { pct: number; label?: bool
 function Logo() {
   return (
     <Link href="/" className="select-none" aria-label="Signal home">
-      <Wordmark tagline tone="white" compactOnMobile />
+      <Wordmark tone="white" />
     </Link>
   );
 }
