@@ -252,7 +252,7 @@ export function LoginForm() {
     setResult(null);
     const r = mode === "login" ? await logIn(email, password) : await sendReset(email);
     setBusy(false);
-    if (r.ok) return mode === "login" ? router.push("/dashboard") : setMode("sent");
+    if (r.ok) return mode === "login" ? router.push("/dashboard?tab=listings&map=full") : setMode("sent");
     setResult(r);
   };
 
@@ -363,7 +363,7 @@ export function SignupForm({ initialPlan = "monthly" }: { initialPlan?: Billing 
     }
     const r = await signUp({ name, email, password, role, plan, company, title, whatsapp });
     setBusy(false);
-    if (r.ok) return r.message === "confirm-email" ? setSent(true) : router.push("/dashboard");
+    if (r.ok) return r.message === "confirm-email" ? setSent(true) : router.push("/dashboard?tab=listings&map=full");
     setResult(r);
   };
 

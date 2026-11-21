@@ -58,7 +58,7 @@ export async function signUp(input: SignUpInput): Promise<AuthResult> {
         title: input.title?.trim() ?? "",
         whatsapp: input.whatsapp?.trim() ?? "",
       },
-      emailRedirectTo: `${window.location.origin}/dashboard`,
+      emailRedirectTo: `${window.location.origin}/dashboard?tab=listings&map=full`,
     },
   });
   if (error) return { ok: false, error: error.message };

@@ -13,7 +13,7 @@
 
 import { Fragment, Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -22,13 +22,13 @@ import { FeedView } from "@/components/feed/feed-view";
 import { SettingsView } from "@/components/settings/settings-view";
 import { useProfile } from "@/lib/profile";
 import { Dialog } from "@/components/feed/profile-dialog";
-import { MapFullscreen } from "@/components/dashboard/map-fullscreen";
+import { MapFullscreen, type FullPanel } from "@/components/dashboard/map-fullscreen";
 import { BAND_COLOR, CONFIDENCE_RULES, confidenceBand, scoreConfidence } from "@/lib/confidence";
 import { FLAG_REASONS, UNDO_MINUTES, canUndo, useFlags, type FlagReason } from "@/lib/flags";
 import { useWatchlist, type WatchEntry } from "@/lib/watchlist";
 import { useInterestedClients, type ClientInput, type InterestedClient } from "@/lib/clients";
 import { useListingNote, useMarketBrief } from "@/lib/use-signal";
-import { displayName, logOut, useUser } from "@/lib/auth";
+import { authConfigured, displayName, logOut, useUser } from "@/lib/auth";
 import { PLANS } from "@/lib/site";
 import type { AISource, Verdict } from "@/lib/signal-ai";
 import {
@@ -1826,6 +1826,7 @@ function ActiveListings({
   initialOpenId,
   initialNewToday,
   initialFullMap,
+  onExitTo,
 }: {
   listings?: Listing[];
   initialDistrict?: string;
@@ -1833,6 +1834,8 @@ function ActiveListings({
   initialOpenId?: string;
   initialNewToday?: boolean;
   initialFullMap?: boolean;
+  /** Leaving full-screen mode from the Watchlist or Deals panel opens that tab. */
+  onExitTo?: (tab: FullPanel) => void;
 }) {
   const [query, setQuery] = useState(initialQuery ?? "");
   const [tenure, setTenure] = useState<Tenure | "All">("All");
@@ -1855,15 +1858,16 @@ function ActiveListings({
   const [openId, setOpenId] = useState<string | null>(initialOpenId ?? null);
   const [hoverId, setHoverId] = useState<string | null>(null);
   const [fullMap, setFullMap] = useState(Boolean(initialFullMap));
-  const closeFullMap = useCallback(() => {
+  const closeFullMap = useCallback((tab: FullPanel = "Listings") => {
     setFullMap(false);
+    if (tab !== "Listings") onExitTo?.(tab);
     // Opened from a "?map=full" link: drop the flag so it does not reopen.
     const url = new URL(window.location.href);
     if (url.searchParams.has("map")) {
       url.searchParams.delete("map");
       window.history.replaceState(null, "", url);
     }
-  }, []);
+  }, [onExitTo]);
 
   // The table scrolls sideways on narrower screens. An open listing's details
   // are pinned to the visible width so nothing is cut off on the right.
@@ -2233,11 +2237,12 @@ function ActiveListings({
       <MapFullscreen
         open={fullMap}
         listings={rows}
+        allListings={listings ?? []}
         selectedId={openId}
         hoveredId={hoverId}
         onSelect={(id) => setOpenId(id || null)}
         onHover={setHoverId}
-        onClose={closeFullMap}
+        onExit={closeFullMap}
         onOpenDetails={(id) => {
           setFullMap(false);
           setOpenId(id);
@@ -3091,6 +3096,14 @@ const SLUG_TAB = {
 
 function Dashboard() {
   const params = useSearchParams();
+  const router = useRouter();
+  const { user, ready } = useUser();
+  // The Terminal is for members: once accounts are live, signed-out visitors go to log in.
+  // (Until then the dashboard stays open as the demo.)
+  const locked = authConfigured && ready && !user;
+  useEffect(() => {
+    if (locked) router.replace("/login?next=terminal");
+  }, [locked, router]);
   const [tab, setTabState] = useState<Tab>(SLUG_TAB[params.get("tab") ?? ""] ?? "Listings");
   const [listingsView, setListingsView] = useState<{
     key: number;
@@ -3133,6 +3146,13 @@ function Dashboard() {
     requestAnimationFrame(() => document.getElementById("terminal-updates")?.scrollIntoView({ behavior: "smooth", block: "start" }));
   };
 
+  if (authConfigured && (!ready || locked))
+    return (
+      <div className="grid min-h-screen place-items-center bg-white">
+        <span className="size-5 animate-spin rounded-full border-2 border-zinc-950 border-t-transparent" aria-label="Loading" />
+      </div>
+    );
+
   return (
     <div className={`${inter.className} min-h-screen overflow-x-clip bg-white text-zinc-800 antialiased selection:bg-lime selection:text-zinc-950`}>
       <Header tab={tab} onTab={setTab} updates={updatesToday} onUpdates={openUpdates} watchCount={watchCount} onProfile={openProfile} />
@@ -3153,6 +3173,7 @@ function Dashboard() {
               initialOpenId={listingsView.openId}
               initialNewToday={listingsView.newToday}
               initialFullMap={params.get("map") === "full"}
+              onExitTo={(t) => setTab(t)}
             />
           </>
         ) : tab === "Deals" ? (

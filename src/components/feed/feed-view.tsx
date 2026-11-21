@@ -33,7 +33,7 @@ import { Avatar, Dialog } from "./profile-dialog";
 const EASE = [0.22, 1, 0.36, 1] as const;
 const DISTRICT_NAMES = Object.keys(DISTRICT_CENTERS);
 
-const KIND_STYLE: Record<PostKind, string> = {
+export const KIND_STYLE: Record<PostKind, string> = {
   Update: "bg-zinc-100 text-zinc-700",
   "Off-market": "bg-zinc-950 text-lime",
   "For sale": "bg-lime text-zinc-950",
@@ -44,12 +44,12 @@ const KIND_STYLE: Record<PostKind, string> = {
 
 const priceLabel = (k: PostKind) => (k === "Buyer request" ? "Budget" : k === "For rent" ? "Monthly rent" : k === "Partnership" ? "Capital needed" : "Asking price");
 
-function fmtPrice(n: number, kind: PostKind) {
+export function fmtPrice(n: number, kind: PostKind) {
   const v = n >= 1e6 ? `$${(n / 1e6).toFixed(n % 1e6 === 0 ? 0 : 2)}M` : `$${n.toLocaleString("en-US")}`;
   return kind === "For rent" ? `${v}/mo` : kind === "Buyer request" ? `Up to ${v}` : v;
 }
 
-function timeAgo(iso: string) {
+export function timeAgo(iso: string) {
   const m = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000));
   if (m < 1) return "Just now";
   if (m < 60) return `${m}m ago`;
@@ -123,7 +123,7 @@ function PostCard({ post, onDelete }: { post: FeedPost; onDelete: (id: string) =
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1.5">
           <span className={`rounded-full px-2.5 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide ${KIND_STYLE[post.kind]}`}>{post.kind}</span>
-          <span className="text-[11px] tabular-nums text-zinc-400" title={`Deleted automatically ${FEED_TTL_HOURS} hours after posting`}>
+          <span className="text-[11px] tabular-nums text-zinc-400" title={`Deleted automatically ${FEED_TTL_HOURS} hours after posting`} suppressHydrationWarning>
             {timeAgo(post.created_at)} · {expiresIn(post.created_at)}
           </span>
         </div>
@@ -150,7 +150,7 @@ function PostCard({ post, onDelete }: { post: FeedPost; onDelete: (id: string) =
       <footer className="mt-4 border-t border-zinc-100 pt-3">
         {post.mine ? (
           <div className="flex items-center justify-between">
-            <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-500">
+            <span className="inline-flex items-center gap-1.5 text-[12px] text-zinc-500" suppressHydrationWarning>
               <Clock size={12} /> Deletes itself in {expiresIn(post.created_at).replace(" left", "")}
             </span>
             <button
