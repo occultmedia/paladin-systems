@@ -9,7 +9,7 @@ import { Wordmark } from "@/components/logo";
 
 const LINKS: Array<[string, string]> = [
   ["AI", "#ai-signal"],
-  ["3D Map", "#map"],
+  ["3D Map", "/dashboard?tab=listings&map=full"],
   ["For agents", "#agents"],
   ["For investors", "#investors"],
   ["Pricing", "#pricing"],

@@ -372,7 +372,7 @@ export function SignupForm({ initialPlan = "monthly" }: { initialPlan?: Billing 
       <>
         <StepLabel step={2} />
         <h1 className="mt-3 font-display text-[32px] font-bold tracking-tight text-zinc-950">Your member profile</h1>
-        <p className="mt-2 text-[15px] text-zinc-500">This is how other agents and investors see you on the Feed, and how they reach you.</p>
+        <p className="mt-2 text-[15px] text-zinc-500">This is how other agents and investors see you on Deals, and how they reach you.</p>
         <form onSubmit={submit} className="mt-8 space-y-5">
           <div className="grid gap-4 sm:grid-cols-2">
             <ImagePick label="Your photo" hint="A clear headshot" value={photo} round onChange={setPhoto} onError={(m) => setResult({ ok: false, error: m })} />

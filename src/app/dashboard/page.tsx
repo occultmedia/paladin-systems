@@ -210,16 +210,16 @@ function Logo() {
   );
 }
 
-const TABS = ["Listings", "Watchlist", "Feed", "Settings"] as const;
+const TABS = ["Listings", "Watchlist", "Deals", "Settings"] as const;
 type Tab = (typeof TABS)[number];
 const TAB_SLUG: Record<Tab, string> = {
   Listings: "listings",
   Watchlist: "watchlist",
-  Feed: "feed",
+  Deals: "deals",
   Settings: "settings",
 };
 
-const TAB_ICON: Record<Tab, typeof Pin> = { Listings: LayoutList, Watchlist: Pin, Feed: Megaphone, Settings: SettingsIcon };
+const TAB_ICON: Record<Tab, typeof Pin> = { Listings: LayoutList, Watchlist: Pin, Deals: Megaphone, Settings: SettingsIcon };
 
 /** Pill switch between the dashboard tabs. */
 function TabSwitch({ tab, onTab, watchCount, full = false }: { tab: Tab; onTab: (t: Tab) => void; watchCount: number; full?: boolean }) {
@@ -3084,7 +3084,10 @@ function TerminalUpdates({
   );
 }
 
-const SLUG_TAB = Object.fromEntries(Object.entries(TAB_SLUG).map(([t, s]) => [s, t])) as Record<string, Tab>;
+const SLUG_TAB = {
+  ...(Object.fromEntries(Object.entries(TAB_SLUG).map(([t, s]) => [s, t])) as Record<string, Tab>),
+  feed: "Deals", // the tab was called Feed; keep old links working
+} as Record<string, Tab>;
 
 function Dashboard() {
   const params = useSearchParams();
@@ -3152,7 +3155,7 @@ function Dashboard() {
               initialFullMap={params.get("map") === "full"}
             />
           </>
-        ) : tab === "Feed" ? (
+        ) : tab === "Deals" ? (
           <FeedView profile={me.profile} profileLoading={me.loading} shared={me.shared} onEditProfile={openProfile} />
         ) : tab === "Settings" ? (
           <SettingsView profile={{ draft: me.draft, loading: me.loading }} onSaveProfile={me.save} shared={me.shared} />

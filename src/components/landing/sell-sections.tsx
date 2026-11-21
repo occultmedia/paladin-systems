@@ -157,7 +157,7 @@ export function AgentsSection({ m }: { m: AgentMorning }) {
             <Benefit n={1} title="Know first" text="Every new listing, price cut and contract on the island by 7:00, each with an AI note on what it means." />
             <Benefit n={2} title="Price with proof" text="Comparable $/ft² for the same kind of property in the same district. Show sellers exactly why your price is right." />
             <Benefit n={3} title="Never lose a lead" text="Keep every client on the property they asked about. When the price drops, Terminal tells you who to call." />
-            <Benefit n={4} title="Off-market deal flow" text="Post and find off-market deals and buyer requests on the members-only Feed, and co-broke with other agents." />
+            <Benefit n={4} title="Off-market deal flow" text="Post and find off-market deals and buyer requests on members-only Deals, and co-broke with other agents." />
           </Stagger>
           <Reveal className="mt-8">
             <Cta href="/signup">Start as an agent</Cta>
@@ -232,12 +232,12 @@ export function InvestorsSection({ ex }: { ex: InvestorExample }) {
   return (
     <section id="investors" className="scroll-mt-16 border-t border-zinc-200 bg-zinc-50">
       <div className="mx-auto grid max-w-[1240px] gap-12 px-5 py-20 sm:px-6 sm:py-28 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1fr)] lg:items-center lg:gap-16">
-        {/* the network: a partnership post on the members-only Feed */}
+        {/* the network: a partnership post on members-only Deals */}
         <Reveal y={24} className="order-2 lg:order-1">
           <div className="relative">
             <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-[0_30px_70px_-35px_rgb(10_10_10/0.35)] sm:p-6">
               <div className="flex items-center justify-between">
-                <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-zinc-500">Member Feed · Partnership</p>
+                <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-zinc-500">Deals · Partnership</p>
                 <span className="rounded-full bg-zinc-950 px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] text-lime">Members only</span>
               </div>
               <div className="mt-4 flex items-center gap-3">
@@ -282,9 +282,9 @@ export function InvestorsSection({ ex }: { ex: InvestorExample }) {
             </p>
           </Reveal>
           <Stagger className="mt-9" gap={0.1}>
-            <Benefit n={1} title="Find co-investors for projects" text="Post a partnership or a capital raise on the Member Feed. Members contact you directly, nothing goes public." />
+            <Benefit n={1} title="Find co-investors for projects" text="Post a partnership or a capital raise on Deals. Members contact you directly, nothing goes public." />
             <Benefit n={2} title="A high-value network" text="Members-only and paid. Every member has a real profile with name, photo and company: agents, brokerages and investors." />
-            <Benefit n={3} title="Deal flow first" text="AI flags undervalued listings every morning, and agents share off-market deals on the Feed before they hit the market." />
+            <Benefit n={3} title="Deal flow first" text="AI flags undervalued listings every morning, and agents share off-market deals on Deals before they hit the market." />
             <Benefit n={4} title="Diligence built in" text="Full price history, comparable $/ft² and a Confidence Score on every listing, so you only chase what is real." />
           </Stagger>
           <Reveal className="mt-8">

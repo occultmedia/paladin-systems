@@ -197,7 +197,7 @@ export function ProfileDialog({ open, onClose, initial, onSave, shared }: { open
           }
         }}
       >
-        <p className="text-[12.5px] leading-relaxed text-zinc-500">This is how other members see you on the Feed. They contact you using the details below.</p>
+        <p className="text-[12.5px] leading-relaxed text-zinc-500">This is how other members see you on Deals. They contact you using the details below.</p>
 
         <div className="grid gap-4 sm:grid-cols-2">
           <ImagePick label="Your photo" hint="A clear headshot. Square works best." value={p.photo} round onChange={(v) => set("photo", v)} onError={setError} />

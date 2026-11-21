@@ -1,7 +1,7 @@
 "use client";
 
 /*
- * Feed tab: updates and offers posted by members (agents, investors,
+ * Deals tab (formerly "Feed"): updates and offers posted by members (agents, investors,
  * brokerages). Every member sees every post; responding means contacting the
  * poster directly by WhatsApp, phone or email. There is no chat or comment
  * thread on purpose. Posts delete themselves after 48 hours. Profiles (photo,
@@ -307,7 +307,7 @@ function Composer({ open, onClose, onPost, author }: { open: boolean; onClose: (
             className="shine inline-flex items-center justify-center gap-2 rounded-full bg-zinc-950 px-6 py-2.5 font-display text-[13.5px] font-semibold text-lime transition-colors hover:bg-zinc-800 disabled:opacity-60"
           >
             {busy && <Loader2 size={14} className="animate-spin" />}
-            Post to the Feed
+            Post to Deals
           </button>
         </div>
       </form>
@@ -356,7 +356,7 @@ export function FeedView({ profile, profileLoading, shared, onEditProfile }: { p
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
               <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500">Members only · Posts last {FEED_TTL_HOURS} hours</p>
-              <h1 className="mt-2 font-display text-[28px] font-bold tracking-tight text-white sm:text-[34px]">Feed</h1>
+              <h1 className="mt-2 font-display text-[28px] font-bold tracking-tight text-white sm:text-[34px]">Deals</h1>
               <p className="mt-1 max-w-xl text-[13px] text-zinc-400">
                 Updates and offers from across the Aruba market: off-market deals, buyer requests, rentals, partnerships and news. See something you want? Contact the poster directly.
               </p>
@@ -397,7 +397,7 @@ export function FeedView({ profile, profileLoading, shared, onEditProfile }: { p
         <section aria-label="Posts" className="min-w-0">
           <label className="relative mb-4 block">
             <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
-            <span className="sr-only">Search the Feed</span>
+            <span className="sr-only">Search deals</span>
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
@@ -406,7 +406,7 @@ export function FeedView({ profile, profileLoading, shared, onEditProfile }: { p
             />
           </label>
 
-          {error && <p className="mb-4 rounded-lg bg-[#FBE9E9] px-3 py-2 text-[12.5px] text-[#B23A3A]">The Feed could not load: {error}</p>}
+          {error && <p className="mb-4 rounded-lg bg-[#FBE9E9] px-3 py-2 text-[12.5px] text-[#B23A3A]">Deals could not load: {error}</p>}
 
           {loading ? (
             <div className="space-y-3">
@@ -434,7 +434,7 @@ export function FeedView({ profile, profileLoading, shared, onEditProfile }: { p
         <aside className="lg:sticky lg:top-6 lg:self-start">
           <div className="deck rounded-2xl p-5 [background-attachment:scroll]">
             <p className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-400">
-              <ShieldCheck size={13} className="text-lime" /> How the Feed works
+              <ShieldCheck size={13} className="text-lime" /> How Deals works
             </p>
             <ul className="mt-3 space-y-2.5 text-[12.5px] leading-relaxed text-zinc-300">
               <li>Post updates and offers: a deal, a buyer, a rental, a partnership or market news.</li>
@@ -442,7 +442,7 @@ export function FeedView({ profile, profileLoading, shared, onEditProfile }: { p
               <li>Interested members contact you directly by WhatsApp, phone or email.</li>
               <li className="flex gap-2">
                 <Clock size={13} className="mt-[3px] shrink-0 text-lime" />
-                <span>Posts delete themselves {FEED_TTL_HOURS} hours after they go up, so the Feed is always fresh.</span>
+                <span>Posts delete themselves {FEED_TTL_HOURS} hours after they go up, so Deals is always fresh.</span>
               </li>
             </ul>
             {!profileLoading && !profile && (

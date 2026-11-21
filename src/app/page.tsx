@@ -4,9 +4,8 @@ import { ArrowRight, ArrowUpRight, MessageCircle, Phone, Pin, Users } from "luci
 import { SequenceLockup, Wordmark } from "@/components/logo";
 import { PlanPrice } from "@/components/landing/plan-price";
 import { AIBadge, AIMarketScan, Spotlight } from "@/components/ai/ai-visuals";
-import { Hero, type HeroEvent, type HeroFeature, type HeroPin, type HeroPlace } from "@/components/landing/hero";
+import { Hero, type HeroEvent, type HeroFeature } from "@/components/landing/hero";
 import { SiteHeader } from "@/components/landing/site-header";
-import { MapShowcase, MapShowcaseCta } from "@/components/landing/map-showcase";
 import { AgentsSection, AiCapabilities, InvestorsSection, type AgentMorning, type AiExamples, type InvestorExample } from "@/components/landing/sell-sections";
 import { computedListingNote, listingFacts } from "@/lib/signal-ai";
 import { scoreConfidence } from "@/lib/confidence";
@@ -228,9 +227,7 @@ const BRIEF = marketBrief();
 /* ── hero: real pins, real events from today's read, live figures ─────── */
 
 function heroData() {
-  const tone = (sig: Signal) => (sig === "UNDERVALUED" ? "up" : sig === "OVERPRICED" ? "down" : "flat") as HeroPin["tone"];
-  const pins: HeroPin[] = ALL_LISTINGS.map((l) => ({ id: l.listing_id, lat: l.lat, lng: l.lng, tone: tone(l.signal) }));
-  const at = (l: Listing) => ({ id: l.listing_id, lat: l.lat, lng: l.lng });
+  const at = (l: Listing) => ({ listingId: l.listing_id });
   const fresh = RUN.new_listings.filter((l) => l.category === "Property").slice(0, 2);
   const moves = RUN.price_changes.slice(0, 2);
   const status = RUN.status_changes.slice(0, 1);
@@ -260,16 +257,9 @@ function heroData() {
     { id: "price", name: "Price tracking", text: "Every cut and raise, with full history", stat: `${RUN.price_changes.length} moves today`, tone: "down", ids: RUN.price_changes.map((c) => c.listing.listing_id) },
     { id: "confidence", name: "Confidence Score", text: "Ghost listings flagged before you call", stat: `${lowConfidence.length} under 80%`, tone: "warn", ids: ids(lowConfidence) },
     { id: "status", name: "Contracts & sales", text: "Know the day a listing goes under contract", stat: `${RUN.status_changes.length} today`, tone: "warn", ids: ids(RUN.status_changes) },
-    { id: "feed", name: "Member Feed", text: "Off-market deals and buyer requests", stat: "48 h posts", tone: "mint", ids: [] },
+    { id: "deals", name: "Deals", text: "Off-market deals and buyer requests", stat: "48 h posts", tone: "mint", ids: [] },
   ];
-  const places: HeroPlace[] = [
-    { name: "Eagle Beach", lat: 12.5545, lng: -70.051 },
-    { name: "Oranjestad", lat: 12.521, lng: -70.0335 },
-    { name: "Santa Cruz", lat: 12.506, lng: -69.984, align: "right" },
-    { name: "Savaneta", lat: 12.4545, lng: -69.945 },
-    { name: "San Nicolas", lat: 12.433, lng: -69.905, align: "right" },
-  ];
-  return { pins, events, features, places, runLabel: `Read ${PREVIEW.run.time} · ${ALL_LISTINGS.length} listings · ${RUN.new_listings.length} new` };
+  return { events, features, runLabel: `Read ${PREVIEW.run.time} · ${ALL_LISTINGS.length} listings · ${RUN.new_listings.length} new` };
 }
 
 const HERO = heroData();
@@ -326,9 +316,6 @@ const INVESTOR: InvestorExample = {
 
 const AI_EX = aiExamples();
 const AGENT_AM = agentMorning();
-const MAP_TOUR = HOMES_FOR_SALE.filter((l) => l.photo_url)
-  .sort((a, b) => a.price_vs_comps_pct - b.price_vs_comps_pct)
-  .slice(0, 6);
 const SCAN = scanRows(12);
 
 
@@ -469,7 +456,7 @@ export default function Home() {
       <SiteHeader />
 
       <main id="main">
-        <Hero pins={HERO.pins} events={HERO.events} features={HERO.features} places={HERO.places} runLabel={HERO.runLabel} runTime={PREVIEW.run.time} total={ALL_LISTINGS.length} />
+        <Hero listings={ALL_LISTINGS} events={HERO.events} features={HERO.features} runLabel={HERO.runLabel} runTime={PREVIEW.run.time} total={ALL_LISTINGS.length} />
 
         {/* AI Signal */}
         <section id="ai-signal" className="scroll-mt-16 border-y border-zinc-200 bg-white text-zinc-950">
@@ -549,44 +536,6 @@ export default function Home() {
             </Reveal>
             <Reveal delay={0.1} y={28} className="mt-10 min-w-0 sm:mt-14">
               <TerminalPreview data={{ ...PREVIEW, headline: BRIEF.headline }} />
-            </Reveal>
-          </div>
-        </section>
-
-        {/* Full-screen map, 3D */}
-        <section id="map" className="scroll-mt-16 border-t border-zinc-200 bg-white">
-          <div className="mx-auto max-w-[1240px] px-5 py-20 sm:px-6 sm:py-28">
-            <Reveal className="flex flex-wrap items-end justify-between gap-6">
-              <div className="max-w-[660px]">
-                <p className="inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.16em] text-zinc-500">
-                  <span className="size-1.5 rounded-full bg-lime ring-1 ring-zinc-950/40" />
-                  Full-screen map · 3D
-                </p>
-                <h2 className="mt-4 font-display text-[34px] font-bold leading-[1.04] tracking-[-0.025em] text-zinc-950 sm:text-[52px]">
-                  Walk the island before you drive it.
-                </h2>
-              </div>
-              <p className="max-w-[44ch] text-[15.5px] leading-relaxed text-zinc-600">
-                Every listing on one full-screen map. Click a pin and Terminal flies in and tilts to 3D, so you see the street, the neighbours and the view before you book a viewing.
-              </p>
-            </Reveal>
-            <Reveal delay={0.1} y={28} className="mt-10 sm:mt-14">
-              <MapShowcase listings={FOR_SALE} tour={MAP_TOUR} />
-            </Reveal>
-            <Stagger className="mt-8 grid gap-6 sm:grid-cols-3" gap={0.08}>
-              {[
-                ["3D buildings and terrain", "Tilt any area to see height, density and sea view."],
-                ["Your filters come with you", "Price, area, type and AI Signal carry into the map."],
-                ["One click to the full story", "From a pin straight to price history, comps and the agent."],
-              ].map(([t, d]) => (
-                <StaggerItem key={t} className="border-t border-zinc-950 pt-4">
-                  <p className="font-display text-[16px] font-semibold text-zinc-950">{t}</p>
-                  <p className="mt-1 text-[13.5px] leading-relaxed text-zinc-600">{d}</p>
-                </StaggerItem>
-              ))}
-            </Stagger>
-            <Reveal className="mt-10">
-              <MapShowcaseCta />
             </Reveal>
           </div>
         </section>
@@ -941,7 +890,7 @@ export default function Home() {
                     "Watchlist for the properties you are tracking",
                     "Interested clients with phone and notes on every listing",
                     "AI Signal: a daily market briefing and an AI note on every listing",
-                    "Member Feed: post off-market deals, buyer requests and rentals every agent sees",
+                    "Deals: post off-market deals, buyer requests and rentals every member sees",
                     "List and 3D map view · export to CSV",
                   ].map((f) => (
                     <li key={f} className="flex gap-3 text-[14px] text-zinc-700">
