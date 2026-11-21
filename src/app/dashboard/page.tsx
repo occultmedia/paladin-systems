@@ -721,7 +721,7 @@ function InfoTip({ label, children, align = "right" }: { label: string; children
         <span
           role="tooltip"
           id={id}
-          className={`absolute top-full z-50 mt-2 block w-[min(300px,calc(100vw-48px))] rounded-xl bg-zinc-950 p-3.5 text-left text-[12px] font-normal normal-case leading-relaxed tracking-normal text-zinc-300 shadow-2xl shadow-zinc-950/30 ${
+          className={`absolute top-full z-50 mt-2 block w-[min(300px,calc(100vw-48px))] rounded-xl bg-zinc-950 p-3.5 whitespace-normal break-words text-left text-[12px] font-normal normal-case leading-relaxed tracking-normal text-zinc-300 shadow-2xl shadow-zinc-950/30 ${
             align === "right" ? "right-0" : "left-0"
           }`}
         >
