@@ -20,6 +20,7 @@ import { motion } from "framer-motion";
 import { Wordmark } from "@/components/logo";
 import { FeedView } from "@/components/feed/feed-view";
 import { SettingsView } from "@/components/settings/settings-view";
+import { GrainField } from "@/components/landing/grain-field";
 import { useProfile } from "@/lib/profile";
 import { Dialog } from "@/components/feed/profile-dialog";
 import { MapFullscreen, type FullPanel } from "@/components/dashboard/map-fullscreen";
@@ -382,7 +383,8 @@ function AccountMenu({ compact = false, onProfile }: { compact?: boolean; onProf
 
 function Header({ tab, onTab, updates, onUpdates, watchCount, onProfile }: { tab: Tab; onTab: (t: Tab) => void; updates: number; onUpdates: () => void; watchCount: number; onProfile: () => void }) {
   return (
-    <header className="deck border-b border-white/[0.08]">
+    <header className="deck relative isolate z-40 border-b border-white/[0.08]">
+      <GrainField variant="ink" className="-z-10" />
       <div className="mx-auto flex max-w-[1400px] flex-col px-4 pt-3 sm:px-6 lg:h-16 lg:flex-row lg:items-center lg:justify-between lg:pt-0">
         <div className="flex items-center justify-between gap-4 lg:justify-start lg:gap-12">
           <Logo />
@@ -2023,7 +2025,8 @@ function ActiveListings({
 
   return (
     <>
-      <div className="deck bleed">
+      <div className="deck bleed relative isolate">
+      <GrainField variant="band" className="-z-10" />
       <div className="mx-auto max-w-[1400px] px-4 sm:px-6">
       <div className="flex flex-wrap items-end justify-between gap-4 border-b border-white/10 py-6 sm:py-8">
         <div>
@@ -2622,7 +2625,8 @@ function Watchlist({ listings, onOpenListing, onBrowse }: { listings?: Listing[]
 
   return (
     <div className="pb-8 sm:pb-10">
-      <div className="deck bleed">
+      <div className="deck bleed relative isolate">
+      <GrainField variant="band" className="-z-10" />
       <div className="mx-auto max-w-[1400px] px-4 pb-8 pt-8 sm:px-6 sm:pt-10">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
@@ -2902,7 +2906,8 @@ function TerminalUpdates({
   }, [open, onToggle]);
 
   return (
-    <div ref={boxRef} id="terminal-updates" className="deck bleed relative z-30 scroll-mt-4">
+    <div ref={boxRef} id="terminal-updates" className="deck bleed relative isolate z-30 scroll-mt-4">
+      <GrainField variant="ink" className="-z-10" />
       <div className="relative mx-auto max-w-[1400px] px-4 pt-4 sm:px-6">
       {/* slim bar */}
       <button
@@ -2950,7 +2955,8 @@ function TerminalUpdates({
       {open && (
         <div className="absolute right-0 top-full z-40 mt-2 w-full max-w-[640px] overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-[0_18px_40px_-12px_rgb(0_0_0/0.25)]">
           <div className="max-h-[min(72vh,620px)] overflow-y-auto overscroll-contain" data-lenis-prevent>
-          <section aria-label="AI Signal briefing" className="deck border-b border-zinc-200 px-4 py-4 [background-attachment:scroll] sm:px-5">
+          <section aria-label="AI Signal briefing" className="deck relative isolate overflow-hidden border-b border-zinc-200 px-4 py-4 [background-attachment:scroll] sm:px-5">
+            <GrainField variant="ink" className="-z-10" />
             <div className="flex items-center justify-between gap-2">
               <AIMark dark />
               <span className="text-[11px] text-zinc-500">

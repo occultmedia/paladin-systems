@@ -13,6 +13,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Check, Loader2, LogOut, Mail } from "lucide-react";
 import { useId, useState, useSyncExternalStore } from "react";
 import { ImagePick } from "@/components/feed/profile-dialog";
+import { GrainField } from "@/components/landing/grain-field";
 import { ROLES, logOut, sendReset, useUser } from "@/lib/auth";
 import { DEFAULT_BILLING, PAY_METHODS, useBilling, type BillingPrefs, type PayMethod } from "@/lib/billing";
 import { profileComplete, type Profile } from "@/lib/profile";
@@ -347,7 +348,8 @@ export function SettingsView({ profile, onSaveProfile, shared }: { profile: { dr
 
   return (
     <div className="pb-16">
-      <div className="deck bleed">
+      <div className="deck bleed relative isolate">
+        <GrainField variant="band" className="-z-10" />
         <div className="mx-auto max-w-[1400px] px-4 pb-7 pt-8 sm:px-6 sm:pt-10">
           <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500">Your account</p>
           <h1 className="mt-2 font-display text-[28px] font-bold tracking-tight text-white sm:text-[34px]">Settings</h1>

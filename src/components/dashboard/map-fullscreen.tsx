@@ -16,6 +16,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "reac
 import { createPortal } from "react-dom";
 import { ArrowUpRight, LayoutList, Map as MapIcon, Megaphone, Minimize2, Pin, X, Plus, Search } from "lucide-react";
 import { Wordmark } from "@/components/logo";
+import { GrainField } from "@/components/landing/grain-field";
 import { PostCard } from "@/components/feed/feed-view";
 import { BAND_COLOR, confidenceBand } from "@/lib/confidence";
 import type { Listing } from "@/lib/aruba-data";
@@ -422,7 +423,8 @@ export function MapFullscreen({
           className="fixed inset-0 z-[1300] flex flex-col bg-white"
         >
           {/* top bar */}
-          <div className="flex h-14 shrink-0 items-center justify-between gap-3 bg-zinc-950 px-4 text-white sm:px-5">
+          <div className="relative isolate flex h-14 shrink-0 items-center justify-between gap-3 bg-zinc-950 px-4 text-white sm:px-5">
+            <GrainField variant="ink" className="-z-10" />
             <div className="flex min-w-0 items-center gap-4">
               <Wordmark tone="white" />
               <p className="hidden items-center gap-2 font-mono text-[11px] uppercase tracking-[0.14em] text-zinc-400 md:flex">

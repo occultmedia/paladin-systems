@@ -30,6 +30,7 @@ import {
 import { profileComplete, type Profile } from "@/lib/profile";
 import { Avatar, Dialog } from "./profile-dialog";
 import { AttachedListing, ListingPicker } from "./listing-attachment";
+import { GrainField } from "@/components/landing/grain-field";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 const DISTRICT_NAMES = Object.keys(DISTRICT_CENTERS);
@@ -381,7 +382,8 @@ export function FeedView({
 
   return (
     <div className="pb-10">
-      <div className="deck bleed">
+      <div className="deck bleed relative isolate">
+        <GrainField variant="band" className="-z-10" />
         <div className="mx-auto max-w-[1400px] px-4 pb-6 pt-8 sm:px-6 sm:pt-10">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
@@ -462,7 +464,8 @@ export function FeedView({
         </section>
 
         <aside className="lg:sticky lg:top-6 lg:self-start">
-          <div className="deck rounded-2xl p-5 [background-attachment:scroll]">
+          <div className="deck relative isolate overflow-hidden rounded-2xl p-5 [background-attachment:scroll]">
+            <GrainField variant="ink" className="-z-10" />
             <p className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-400">
               <ShieldCheck size={13} className="text-lime" /> How Deals works
             </p>

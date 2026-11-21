@@ -234,7 +234,7 @@ export function Hero({
         </motion.h1>
 
         <motion.p {...fade(0.16)} className="mt-6 max-w-[34rem] text-[16.5px] leading-relaxed text-zinc-500 sm:text-[17.5px]">
-          Every listing, price cut and contract on the island, read overnight and priced against its comps. Agents and investors see what moved before anyone else.
+          Every morning Terminal scrapes every real estate website in Aruba, tracks what changed and lets AI analyze it: new listings, price cuts and what each property is worth against its comps. Built for agents, brokers and investors.
         </motion.p>
 
         <motion.div {...fade(0.24)} className="mt-8 flex items-center gap-2.5">

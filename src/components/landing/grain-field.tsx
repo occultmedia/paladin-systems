@@ -11,7 +11,7 @@
 
 import { useEffect, useRef } from "react";
 
-type Variant = "rise" | "corner";
+type Variant = "rise" | "corner" | "band" | "ink";
 
 function Particles({ density = 0.00009 }: { density?: number }) {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -115,18 +115,24 @@ function Particles({ density = 0.00009 }: { density?: number }) {
 }
 
 export function GrainField({ variant = "rise", className = "" }: { variant?: Variant; className?: string }) {
-  const glow =
-    variant === "rise"
-      ? // lime rising from the bottom centre, ink at the top
-        "radial-gradient(150% 115% at 50% 100%, #ACFA68 0%, #8ED653 16%, #4C7F24 34%, #1D2C10 56%, #0B0D08 82%)"
-      : // lime from the bottom-right corner
-        "radial-gradient(90% 120% at 100% 110%, #ACFA68 0%, #5E9A33 20%, #22380F 42%, #0F140A 66%, #0A0B08 100%)";
+  const glow = {
+    // lime rising from the bottom centre, ink at the top (hero window backdrop)
+    rise: "radial-gradient(150% 115% at 50% 100%, #ACFA68 0%, #8ED653 16%, #4C7F24 34%, #1D2C10 56%, #0B0D08 82%)",
+    // lime from the bottom-right corner (closing band)
+    corner: "radial-gradient(90% 120% at 100% 110%, #ACFA68 0%, #5E9A33 20%, #22380F 42%, #0F140A 66%, #0A0B08 100%)",
+    // a wide, low lime light under a dark band; text on top stays white-on-dark (dashboard page headers)
+    band: "radial-gradient(70% 140% at 78% 135%, #ACFA68 0%, #6BAE3B 18%, #2A4515 40%, #111709 64%, #0A0B08 88%)",
+    // no lime, just ink with grain and particles (top bars, panels, small cards)
+    ink: "linear-gradient(#0A0B08, #0A0B08)",
+  }[variant];
   return (
     <div aria-hidden className={`pointer-events-none absolute inset-0 overflow-hidden ${className}`}>
       <div className="absolute inset-0" style={{ background: glow }} />
       {/* a second, softer light so the gradient never looks flat */}
-      <div className="absolute inset-0 opacity-60 mix-blend-screen" style={{ background: "radial-gradient(60% 50% at 18% 0%, rgb(172 250 104 / 0.16), transparent 70%)" }} />
-      <Particles />
+      {variant !== "ink" && (
+        <div className="absolute inset-0 opacity-60 mix-blend-screen" style={{ background: "radial-gradient(60% 50% at 18% 0%, rgb(172 250 104 / 0.16), transparent 70%)" }} />
+      )}
+      <Particles density={variant === "ink" ? 0.00006 : 0.00009} />
       {/* film grain over everything */}
       <div className="hero-grain absolute inset-0 opacity-[0.55] mix-blend-overlay" />
       <div className="hero-grain absolute inset-0 opacity-[0.12]" />
