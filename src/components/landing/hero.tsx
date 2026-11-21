@@ -233,11 +233,10 @@ export function Hero({
               </span>
             </Link>
             <Link
-              href="/dashboard?tab=listings&map=full"
+              href="/login"
               className="inline-flex h-11 items-center gap-2 rounded-full border border-zinc-300 bg-white px-5 font-display text-[15px] font-semibold text-zinc-950 transition-colors hover:border-zinc-950 sm:h-12 sm:px-6"
             >
-              <span className="sm:hidden">Open the map</span>
-              <span className="hidden sm:inline">Open the 3D map</span>
+              Log in
             </Link>
           </motion.div>
 

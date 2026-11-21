@@ -66,7 +66,7 @@ export default function ArubaMapLeaflet(props: ArubaMapProps) {
   const points: Array<[number, number]> = useMemo(() => source.map((x) => [x.lat, x.lng] as [number, number]), [source]);
 
   return (
-    <div className={`relative ${interactive && !fill ? "border border-zinc-200" : ""}`} style={{ height: fill ? "100%" : interactiveHeight(height) }}>
+    <div className={`relative overflow-hidden ${interactive && !fill ? "rounded-2xl border border-zinc-200 [&_.leaflet-container]:rounded-2xl" : ""}`} style={{ height: fill ? "100%" : interactiveHeight(height) }}>
       <MapContainer
         center={ARUBA_CENTER}
         zoom={11}

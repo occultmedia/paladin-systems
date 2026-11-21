@@ -131,7 +131,7 @@ export default function ArubaMapMapbox(props: ArubaMapProps) {
   if (!TOKEN) return null;
 
   return (
-    <div className={`relative overflow-hidden ${interactive && !fill ? "border border-zinc-200" : ""}`} style={{ height: fill ? "100%" : interactiveHeight(height) }}>
+    <div className={`relative overflow-hidden ${interactive && !fill ? "rounded-2xl border border-zinc-200" : ""}`} style={{ height: fill ? "100%" : interactiveHeight(height) }}>
       <Map
         ref={mapRef}
         mapboxAccessToken={TOKEN}
