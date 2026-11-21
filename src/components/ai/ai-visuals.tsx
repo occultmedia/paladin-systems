@@ -26,7 +26,7 @@ const TONE: Record<ScanRow["tone"], string> = {
   up: "text-[#1F7A45] bg-[#E3F3E8]",
   down: "text-[#B23A3A] bg-[#FBE9E9]",
   flat: "text-zinc-600 bg-zinc-100",
-  new: "text-mint bg-zinc-950",
+  new: "text-lime bg-zinc-950",
 };
 
 /** Text that types itself in once it is on screen. */
@@ -75,8 +75,8 @@ export function TypeText({ text, speed = 18, className = "", delay = 0, caret = 
 export function AIBadge({ dark = false, label = "AI Signal" }: { dark?: boolean; label?: string }) {
   return (
     <span className={`inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] ${dark ? "text-white" : "text-zinc-950"}`}>
-      <span className={`relative grid size-6 place-items-center rounded-lg ${dark ? "bg-mint text-zinc-950" : "bg-zinc-950 text-mint"}`}>
-        <span className={`absolute inset-0 animate-[ai-breathe_2.8s_ease-in-out_infinite] rounded-lg motion-reduce:animate-none ${dark ? "bg-mint" : "bg-zinc-950"}`} />
+      <span className={`relative grid size-6 place-items-center rounded-lg ${dark ? "bg-lime text-zinc-950" : "bg-zinc-950 text-lime"}`}>
+        <span className={`absolute inset-0 animate-[ai-breathe_2.8s_ease-in-out_infinite] rounded-lg motion-reduce:animate-none ${dark ? "bg-lime" : "bg-zinc-950"}`} />
         <Sparkles size={12} strokeWidth={2.2} className="relative" />
       </span>
       {label}
@@ -139,7 +139,7 @@ export function AIMarketScan({
       {/* progress */}
       <div className={`h-[2px] ${dark ? "bg-white/5" : "bg-zinc-100"}`}>
         <motion.div
-          className={dark ? "h-full bg-mint" : "h-full bg-zinc-950"}
+          className={dark ? "h-full bg-lime" : "h-full bg-zinc-950"}
           animate={{ width: `${(read / Math.max(total, 1)) * 100}%` }}
           transition={{ duration: 0.8, ease: EASE }}
         />
@@ -171,7 +171,7 @@ export function AIMarketScan({
                   className={`flex items-center gap-3 rounded-xl px-2.5 py-2 ${reading ? (dark ? "bg-white/5" : "bg-mint-soft") : ""}`}
                 >
                   <span
-                    className={`grid size-6 shrink-0 place-items-center rounded-full ${reading ? (dark ? "bg-white/10" : "bg-white") : dark ? "bg-mint text-zinc-950" : "bg-zinc-950 text-mint"}`}
+                    className={`grid size-6 shrink-0 place-items-center rounded-full ${reading ? (dark ? "bg-white/10" : "bg-white") : dark ? "bg-lime text-zinc-950" : "bg-zinc-950 text-lime"}`}
                   >
                     {reading ? (
                       <span className={`size-3 animate-spin rounded-full border-[1.5px] border-t-transparent ${dark ? "border-mint" : "border-zinc-950"}`} />
@@ -192,7 +192,7 @@ export function AIMarketScan({
                       initial={{ opacity: 0, scale: 0.85 }}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ duration: 0.35, ease: EASE }}
-                      className={`shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-semibold ${dark && r.tone === "new" ? "bg-mint text-zinc-950" : TONE[r.tone]}`}
+                      className={`shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-semibold ${dark && r.tone === "new" ? "bg-lime text-zinc-950" : TONE[r.tone]}`}
                     >
                       {r.tag}
                     </motion.span>

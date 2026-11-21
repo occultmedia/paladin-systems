@@ -12,7 +12,7 @@ export function NavAuth({ tone = "light" }: { tone?: "light" | "dark" } = {}) {
     return (
       <Link
         href="/dashboard"
-        className={`shine inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-4 py-2 font-display text-[13px] font-semibold transition-colors ${dark ? "bg-mint text-zinc-950 hover:bg-white" : "bg-zinc-950 text-mint hover:bg-zinc-800"}`}
+        className={`shine inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-4 py-2 font-display text-[13px] font-semibold transition-colors ${dark ? "bg-lime text-zinc-950 hover:bg-white" : "bg-zinc-950 text-lime hover:bg-zinc-800"}`}
       >
         Open dashboard
         <ArrowUpRight size={14} strokeWidth={2} />
@@ -25,7 +25,7 @@ export function NavAuth({ tone = "light" }: { tone?: "light" | "dark" } = {}) {
       </Link>
       <Link
         href="/signup"
-        className={`shine group inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-4 py-2 font-display text-[13px] font-semibold transition-colors ${dark ? "bg-mint text-zinc-950 hover:bg-white" : "bg-zinc-950 text-mint hover:bg-zinc-800"}`}
+        className={`shine group inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-4 py-2 font-display text-[13px] font-semibold transition-colors ${dark ? "bg-lime text-zinc-950 hover:bg-white" : "bg-zinc-950 text-lime hover:bg-zinc-800"}`}
       >
         Sign up
         <ArrowUpRight size={14} strokeWidth={2} className="transition-transform group-hover:-translate-y-px group-hover:translate-x-px" />

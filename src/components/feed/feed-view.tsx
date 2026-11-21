@@ -35,8 +35,8 @@ const DISTRICT_NAMES = Object.keys(DISTRICT_CENTERS);
 
 const KIND_STYLE: Record<PostKind, string> = {
   Update: "bg-zinc-100 text-zinc-700",
-  "Off-market": "bg-zinc-950 text-mint",
-  "For sale": "bg-mint text-zinc-950",
+  "Off-market": "bg-zinc-950 text-lime",
+  "For sale": "bg-lime text-zinc-950",
   "Buyer request": "bg-[#E6EEF9] text-[#24508F]",
   "For rent": "bg-[#FBF1DE] text-[#8A5A12]",
   Partnership: "bg-[#EFE9F8] text-[#5B3E91]",
@@ -87,7 +87,7 @@ function ContactRow({ post }: { post: FeedPost }) {
           target={label === "WhatsApp" ? "_blank" : undefined}
           rel="noreferrer"
           className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-[12.5px] font-semibold transition-colors ${
-            primary ? "bg-zinc-950 text-mint hover:bg-zinc-800" : "border border-zinc-300 text-zinc-800 hover:border-zinc-950 hover:text-zinc-950"
+            primary ? "bg-zinc-950 text-lime hover:bg-zinc-800" : "border border-zinc-300 text-zinc-800 hover:border-zinc-950 hover:text-zinc-950"
           }`}
         >
           <Icon size={14} strokeWidth={1.8} />
@@ -175,7 +175,7 @@ function PostCard({ post, onDelete }: { post: FeedPost; onDelete: (id: string) =
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="inline-flex items-center gap-2 rounded-full bg-zinc-950 px-4 py-2 text-[12.5px] font-semibold text-mint transition-colors hover:bg-zinc-800"
+                className="inline-flex items-center gap-2 rounded-full bg-zinc-950 px-4 py-2 text-[12.5px] font-semibold text-lime transition-colors hover:bg-zinc-800"
               >
                 <MessageCircle size={14} strokeWidth={1.8} />
                 Contact {a.name.split(" ")[0]}
@@ -251,7 +251,7 @@ function Composer({ open, onClose, onPost, author }: { open: boolean; onClose: (
                 aria-checked={kind === k}
                 onClick={() => setKind(k)}
                 className={`rounded-full border px-3.5 py-1.5 text-[12.5px] font-semibold transition-colors ${
-                  kind === k ? "border-zinc-950 bg-zinc-950 text-mint" : "border-zinc-300 text-zinc-700 hover:border-zinc-950 hover:text-zinc-950"
+                  kind === k ? "border-zinc-950 bg-zinc-950 text-lime" : "border-zinc-300 text-zinc-700 hover:border-zinc-950 hover:text-zinc-950"
                 }`}
               >
                 {k}
@@ -304,7 +304,7 @@ function Composer({ open, onClose, onPost, author }: { open: boolean; onClose: (
           <button
             type="submit"
             disabled={busy}
-            className="shine inline-flex items-center justify-center gap-2 rounded-full bg-zinc-950 px-6 py-2.5 font-display text-[13.5px] font-semibold text-mint transition-colors hover:bg-zinc-800 disabled:opacity-60"
+            className="shine inline-flex items-center justify-center gap-2 rounded-full bg-zinc-950 px-6 py-2.5 font-display text-[13.5px] font-semibold text-lime transition-colors hover:bg-zinc-800 disabled:opacity-60"
           >
             {busy && <Loader2 size={14} className="animate-spin" />}
             Post to the Feed
@@ -364,7 +364,7 @@ export function FeedView({ profile, profileLoading, shared, onEditProfile }: { p
             <button
               type="button"
               onClick={startPost}
-              className="shine inline-flex items-center gap-2 rounded-full bg-mint px-5 py-2.5 font-display text-[13.5px] font-semibold text-zinc-950 transition-colors hover:bg-white"
+              className="shine inline-flex items-center gap-2 rounded-full bg-lime px-5 py-2.5 font-display text-[13.5px] font-semibold text-zinc-950 transition-colors hover:bg-white"
             >
               <Plus size={15} strokeWidth={2.2} />
               New post
@@ -381,7 +381,7 @@ export function FeedView({ profile, profileLoading, shared, onEditProfile }: { p
                   onClick={() => setKind(k)}
                   aria-pressed={on}
                   className={`inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3.5 py-1.5 text-[12.5px] font-medium transition-colors ${
-                    on ? "bg-mint text-zinc-950" : "bg-white/[0.06] text-zinc-300 ring-1 ring-white/10 hover:bg-white/[0.12] hover:text-white"
+                    on ? "bg-lime text-zinc-950" : "bg-white/[0.06] text-zinc-300 ring-1 ring-white/10 hover:bg-white/[0.12] hover:text-white"
                   }`}
                 >
                   {k === "Update" ? "Updates" : k}
@@ -434,19 +434,19 @@ export function FeedView({ profile, profileLoading, shared, onEditProfile }: { p
         <aside className="lg:sticky lg:top-6 lg:self-start">
           <div className="deck rounded-2xl p-5 [background-attachment:scroll]">
             <p className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-400">
-              <ShieldCheck size={13} className="text-mint" /> How the Feed works
+              <ShieldCheck size={13} className="text-lime" /> How the Feed works
             </p>
             <ul className="mt-3 space-y-2.5 text-[12.5px] leading-relaxed text-zinc-300">
               <li>Post updates and offers: a deal, a buyer, a rental, a partnership or market news.</li>
               <li>Every Terminal member sees every post.</li>
               <li>Interested members contact you directly by WhatsApp, phone or email.</li>
               <li className="flex gap-2">
-                <Clock size={13} className="mt-[3px] shrink-0 text-mint" />
+                <Clock size={13} className="mt-[3px] shrink-0 text-lime" />
                 <span>Posts delete themselves {FEED_TTL_HOURS} hours after they go up, so the Feed is always fresh.</span>
               </li>
             </ul>
             {!profileLoading && !profile && (
-              <Link href="/signup" className="mt-4 inline-flex items-center gap-2 rounded-full bg-mint px-4 py-2 text-[12.5px] font-semibold text-zinc-950 transition-colors hover:bg-white">
+              <Link href="/signup" className="mt-4 inline-flex items-center gap-2 rounded-full bg-lime px-4 py-2 text-[12.5px] font-semibold text-zinc-950 transition-colors hover:bg-white">
                 Create an account to post
               </Link>
             )}

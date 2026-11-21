@@ -48,8 +48,8 @@ const CONTOURS = [1.07, 1.16, 1.28, 1.43].map((k) =>
 const GRID_LATS = [12.6, 12.55, 12.5, 12.45];
 const GRID_LNGS = [-70.05, -70.0, -69.95, -69.9];
 
-const TONE: Record<HeroPin["tone"], string> = { up: "#6FCF97", flat: "#C9D3C8", down: "#F28B82" };
-const ACCENT: Record<HeroEvent["tone"], string> = { up: "#6FCF97", down: "#F28B82", warn: "#F2B45A", mint: "#DDE5DC" };
+const TONE: Record<HeroPin["tone"], string> = { up: "#ACFA68", flat: "#D4DACB", down: "#F28B82" };
+const ACCENT: Record<HeroEvent["tone"], string> = { up: "#ACFA68", down: "#F28B82", warn: "#F2B45A", mint: "#E4FCC9" };
 
 /* ── the map ─────────────────────────────────────────────────────────── */
 
@@ -78,17 +78,17 @@ function IslandMap({
             <circle cx="5" cy="5" r="1.55" fill="#DDE5DC" opacity="0.42" />
           </pattern>
           <radialGradient id="hero-land" cx="45%" cy="40%" r="70%">
-            <stop offset="0" stopColor="#1F7A5C" stopOpacity="0.45" />
-            <stop offset="1" stopColor="#0F2E26" stopOpacity="0.15" />
+            <stop offset="0" stopColor="#5C8C28" stopOpacity="0.42" />
+            <stop offset="1" stopColor="#1C2A0C" stopOpacity="0.18" />
           </radialGradient>
           <radialGradient id="hero-sea" cx="50%" cy="50%" r="55%">
-            <stop offset="0" stopColor="#1B5E57" stopOpacity="0.35" />
-            <stop offset="1" stopColor="#1B5E57" stopOpacity="0" />
+            <stop offset="0" stopColor="#3E6420" stopOpacity="0.38" />
+            <stop offset="1" stopColor="#3E6420" stopOpacity="0" />
           </radialGradient>
           <linearGradient id="hero-scan" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0" stopColor="#DDE5DC" stopOpacity="0" />
-            <stop offset="0.85" stopColor="#B8F0D2" stopOpacity="0.22" />
-            <stop offset="1" stopColor="#E9FFF3" stopOpacity="0.75" />
+            <stop offset="0.85" stopColor="#ACFA68" stopOpacity="0.22" />
+            <stop offset="1" stopColor="#E4FCC9" stopOpacity="0.8" />
           </linearGradient>
           <filter id="hero-glow" x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur stdDeviation="6" />
@@ -101,7 +101,7 @@ function IslandMap({
         {/* sea: soft light and depth contours */}
         <circle cx={CENTROID.x} cy={CENTROID.y} r="620" fill="url(#hero-sea)" />
         {CONTOURS.map((d, i) => (
-          <path key={d} d={d} fill="none" stroke="#7FD1B9" strokeOpacity={0.3 - i * 0.06} strokeWidth="1" strokeDasharray={i % 2 ? "3 7" : undefined} />
+          <path key={d} d={d} fill="none" stroke="#ACFA68" strokeOpacity={0.26 - i * 0.05} strokeWidth="1" strokeDasharray={i % 2 ? "3 7" : undefined} />
         ))}
 
         {/* graticule with real coordinates */}
@@ -131,8 +131,8 @@ function IslandMap({
         {/* island: tint, dot matrix, glowing coast */}
         <path d={COAST_PATH} fill="url(#hero-land)" />
         <path d={COAST_PATH} fill="url(#hero-dots)" />
-        <path d={COAST_PATH} fill="none" stroke="#9BE8C7" strokeOpacity="0.55" strokeWidth="6" filter="url(#hero-glow)" />
-        <path d={COAST_PATH} fill="none" stroke="#E4F7EC" strokeOpacity="0.8" strokeWidth="1.4" strokeLinejoin="round" />
+        <path d={COAST_PATH} fill="none" stroke="#ACFA68" strokeOpacity="0.5" strokeWidth="6" filter="url(#hero-glow)" />
+        <path d={COAST_PATH} fill="none" stroke="#EEFBDD" strokeOpacity="0.85" strokeWidth="1.4" strokeLinejoin="round" />
 
         {/* scan sweep, clipped to the island */}
         {!still && (
@@ -169,7 +169,7 @@ function IslandMap({
             <g key={p.id} transform={`translate(${x} ${y})`} style={{ opacity: on ? 1 : 0.18, transition: "opacity 300ms ease" }}>
               <circle r={lit && on ? 16 : 11} fill={color} opacity="0.35" filter="url(#hero-glow)" />
               {!still && <circle r="10" fill="none" stroke={color} strokeWidth="1.6" className="hero-hit" style={{ animationDelay: delay, animationDuration: `${SCAN_S}s` }} />}
-              <circle r={lit && on ? 7 : 5.2} fill={color} stroke="#06110E" strokeWidth="1.6" />
+              <circle r={lit && on ? 7 : 5.2} fill={color} stroke="#0A0D05" strokeWidth="1.6" />
             </g>
           );
         })}
@@ -206,7 +206,7 @@ function IslandMap({
               ...(at.x > 480 ? { right: `${100 - (at.x / 1000) * 100}%`, marginRight: 30 } : { left: `${(at.x / 1000) * 100}%`, marginLeft: 30 }),
             }}
           >
-            <div className="w-[280px] -translate-y-1/2 overflow-hidden rounded-xl border border-white/12 bg-[#0B1512]/85 shadow-2xl shadow-black/60 backdrop-blur-md">
+            <div className="w-[280px] -translate-y-1/2 overflow-hidden rounded-xl border border-white/12 bg-[#0E1208]/85 shadow-2xl shadow-black/60 backdrop-blur-md">
               <div className="h-px w-full" style={{ background: `linear-gradient(90deg, transparent, ${ACCENT[event.tone]}, transparent)` }} />
               <div className="p-3.5">
                 <p className="flex items-center justify-between font-mono text-[10.5px] uppercase tracking-[0.16em]" style={{ color: ACCENT[event.tone] }}>
@@ -229,7 +229,7 @@ function IslandMap({
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            className="pointer-events-none absolute right-[6%] top-[9%] hidden rounded-full border border-white/10 bg-[#0B1512]/80 px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-zinc-300 backdrop-blur lg:block"
+            className="pointer-events-none absolute right-[6%] top-[9%] hidden rounded-full border border-white/10 bg-[#0E1208]/80 px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-zinc-300 backdrop-blur lg:block"
           >
             <span className="mr-2 inline-block size-2 rounded-full align-middle" style={{ background: ACCENT[focus.tone] }} />
             {focus.name} · {focus.stat}
@@ -304,15 +304,15 @@ export function Hero({
     <section
       ref={ref}
       onPointerMove={onMove}
-      className="relative isolate flex min-h-[100svh] w-full flex-col overflow-hidden bg-[#06100D] text-white"
+      className="relative isolate flex min-h-[100svh] w-full flex-col overflow-hidden bg-[#080B04] text-white"
       aria-label="Terminal: Aruba real estate market intelligence"
     >
       {/* light: aurora, pointer spotlight, fine grid, grain */}
       <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
-        <div className="absolute inset-0 bg-[radial-gradient(1200px_700px_at_78%_38%,rgb(31_122_92/0.42),transparent_62%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(900px_600px_at_8%_100%,rgb(43_92_122/0.30),transparent_65%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(700px_420px_at_30%_0%,rgb(221_229_220/0.10),transparent_70%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(520px_circle_at_var(--hx,70%)_var(--hy,40%),rgb(184_240_210/0.10),transparent_60%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(1200px_700px_at_78%_38%,rgb(92_140_40/0.34),transparent_62%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(900px_600px_at_8%_100%,rgb(40_70_90/0.28),transparent_65%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(700px_420px_at_30%_0%,rgb(172_250_104/0.07),transparent_70%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(520px_circle_at_var(--hx,70%)_var(--hy,40%),rgb(172_250_104/0.09),transparent_60%)]" />
         <div className="absolute inset-0 opacity-50 [background-image:linear-gradient(rgb(255_255_255/0.035)_1px,transparent_1px),linear-gradient(90deg,rgb(255_255_255/0.035)_1px,transparent_1px)] [background-size:72px_72px] [mask-image:radial-gradient(ellipse_at_65%_40%,black,transparent_72%)]" />
         <div className="hero-grain absolute inset-0 opacity-[0.06] mix-blend-overlay" />
       </div>
@@ -339,8 +339,8 @@ export function Hero({
               className="inline-flex items-center gap-2.5 rounded-full border border-white/12 bg-white/[0.05] py-1.5 pl-2.5 pr-3.5 font-mono text-[11px] uppercase tracking-[0.14em] text-zinc-200 backdrop-blur"
             >
               <span className="relative flex size-2">
-                <span className="absolute inline-flex size-full animate-ping rounded-full bg-[#6FCF97] opacity-70 motion-reduce:animate-none" />
-                <span className="relative inline-flex size-2 rounded-full bg-[#6FCF97]" />
+                <span className="absolute inline-flex size-full animate-ping rounded-full bg-lime opacity-70 motion-reduce:animate-none" />
+                <span className="relative inline-flex size-2 rounded-full bg-lime" />
               </span>
               <span className="sm:hidden">Live · {runTime}</span>
               <span className="hidden sm:inline">Live · {runLabel}</span>
@@ -350,7 +350,7 @@ export function Hero({
               {LINES.map((line, i) => (
                 <span key={line} className="block overflow-hidden pb-[0.06em]">
                   <motion.span
-                    className={`block whitespace-nowrap ${i === 1 ? "bg-gradient-to-r from-[#E9FFF3] via-[#B8F0D2] to-[#6FCF97] bg-clip-text text-transparent" : ""}`}
+                    className={`block whitespace-nowrap ${i === 1 ? "bg-gradient-to-r from-white via-[#D9FCB2] to-lime bg-clip-text text-transparent" : ""}`}
                     initial={{ y: "105%" }}
                     animate={{ y: 0 }}
                     transition={{ duration: 0.9, ease: EASE, delay: 0.1 + i * 0.12 }}
@@ -378,11 +378,11 @@ export function Hero({
             >
               <Link
                 href="/signup"
-                className="group relative inline-flex h-11 items-center gap-2 overflow-hidden rounded-full bg-mint pl-5 pr-3.5 font-display text-[15px] font-semibold text-zinc-950 shadow-[0_0_40px_-8px_rgb(184_240_210/0.6)] transition-transform active:scale-[0.98] sm:h-12 sm:pl-6 sm:pr-5"
+                className="group relative inline-flex h-11 items-center gap-2 overflow-hidden rounded-full bg-lime pl-5 pr-3.5 font-display text-[15px] font-semibold text-zinc-950 shadow-[0_0_44px_-6px_rgb(172_250_104/0.55)] transition-transform active:scale-[0.98] sm:h-12 sm:pl-6 sm:pr-5"
               >
                 <span className="absolute inset-0 -translate-x-full bg-white transition-transform duration-500 ease-out group-hover:translate-x-0" aria-hidden />
                 <span className="relative">Get access</span>
-                <span className="relative grid size-6 place-items-center rounded-full bg-zinc-950 text-mint transition-transform duration-300 group-hover:translate-x-0.5">
+                <span className="relative grid size-6 place-items-center rounded-full bg-zinc-950 text-lime transition-transform duration-300 group-hover:translate-x-0.5">
                   <svg viewBox="0 0 12 12" className="size-3" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
                     <path d="M2 6h8M6.5 2.5 10 6l-3.5 3.5" strokeLinecap="square" />
                   </svg>
@@ -403,9 +403,9 @@ export function Hero({
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.7, ease: EASE, delay: 0.6 }}
-              className="mt-5 flex max-w-[460px] items-center gap-3 rounded-xl border border-white/12 bg-white/[0.04] px-4 py-3 backdrop-blur transition-colors focus-within:border-[#B8F0D2]/60 hover:border-white/25 sm:mt-6"
+              className="mt-5 flex max-w-[460px] items-center gap-3 rounded-xl border border-white/12 bg-white/[0.04] px-4 py-3 backdrop-blur transition-colors focus-within:border-lime/60 hover:border-white/25 sm:mt-6"
             >
-              <span className="font-mono text-[13px] text-[#B8F0D2]" aria-hidden>
+              <span className="font-mono text-[13px] text-lime" aria-hidden>
                 &gt;
               </span>
               <label className="sr-only" htmlFor="hero-q">
@@ -443,7 +443,7 @@ export function Hero({
                 onBlur={() => setFocusId(null)}
                 onClick={() => setFocusId(on ? null : f.ids.length ? f.id : null)}
                 aria-pressed={on}
-                className={`group relative block h-full w-full overflow-hidden px-5 py-4 text-left transition-colors sm:px-6 sm:py-5 ${on ? "bg-[#0E1E19]" : "bg-[#06100D]/95 hover:bg-[#0B1714]"}`}
+                className={`group relative block h-full w-full overflow-hidden px-5 py-4 text-left transition-colors sm:px-6 sm:py-5 ${on ? "bg-[#141B0A]" : "bg-[#080B04]/95 hover:bg-[#0F1408]"}`}
               >
                 <span
                   aria-hidden

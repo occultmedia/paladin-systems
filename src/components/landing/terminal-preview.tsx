@@ -168,7 +168,7 @@ function ScrapePane({ data }: { data: PreviewData }) {
             <span className="min-w-0 flex-1">
               <span className="flex items-center gap-1.5">
                 <span className="truncate text-[12px] font-semibold text-zinc-950">{l.name}</span>
-                {l.isNew && <span className="shrink-0 rounded bg-zinc-950 px-1 py-px text-[8px] font-bold tracking-wide text-mint">NEW</span>}
+                {l.isNew && <span className="shrink-0 rounded bg-zinc-950 px-1 py-px text-[8px] font-bold tracking-wide text-lime">NEW</span>}
                 {l.priceToday && (
                   <span
                     className="shrink-0 rounded px-1 py-px text-[8px] font-bold tracking-wide text-white"
@@ -335,7 +335,7 @@ export function ClientsPane({ data }: { data: PreviewData }) {
             {c.listing.agent && <> · Agent {c.listing.agent}</>}
           </span>
         </span>
-        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-mint px-2 py-0.5 text-[10px] font-semibold text-zinc-950">
+        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-lime px-2 py-0.5 text-[10px] font-semibold text-zinc-950">
           <Users size={10} strokeWidth={2} /> {c.people.length} interested
         </span>
       </div>
@@ -349,7 +349,7 @@ export function ClientsPane({ data }: { data: PreviewData }) {
             className="rounded-lg border border-zinc-100 bg-zinc-50/80 p-2.5"
           >
             <div className="flex items-center gap-2.5">
-              <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-zinc-950 text-[9px] font-semibold text-mint" aria-hidden>
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-zinc-950 text-[9px] font-semibold text-lime" aria-hidden>
                 {initials(p.name)}
               </span>
               <span className="min-w-0 flex-1">
@@ -485,7 +485,7 @@ export function TerminalPreview({ data }: { data: PreviewData }) {
           </span>
           <span className="relative hidden size-6 items-center justify-center rounded-full border border-zinc-950/15 bg-white/70 sm:flex" aria-hidden>
             <Bell size={11} strokeWidth={1.75} />
-            <span className="absolute -right-1 -top-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-zinc-950 px-0.5 text-[8px] font-semibold text-mint">
+            <span className="absolute -right-1 -top-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-zinc-950 px-0.5 text-[8px] font-semibold text-lime">
               {data.run.newCount + data.run.drops + data.run.ups + data.run.statusChanges}
             </span>
           </span>

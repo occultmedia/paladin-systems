@@ -11,7 +11,7 @@ export default function NotFound() {
       </div>
       <Link
         href="/"
-        className="rounded-full bg-zinc-950 px-6 py-3 font-display text-[14px] font-semibold text-mint transition-colors hover:bg-zinc-800"
+        className="rounded-full bg-zinc-950 px-6 py-3 font-display text-[14px] font-semibold text-lime transition-colors hover:bg-zinc-800"
       >
         Back to the homepage
       </Link>

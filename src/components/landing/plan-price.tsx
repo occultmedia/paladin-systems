@@ -23,7 +23,7 @@ export function PlanPrice() {
           >
             {b === "monthly" ? "Monthly" : "Yearly"}
             {b === "yearly" && (
-              <span className={`rounded-full px-1.5 py-px text-[10.5px] ${billing === b ? "bg-mint text-zinc-950" : "bg-zinc-950 text-mint"}`}>
+              <span className={`rounded-full px-1.5 py-px text-[10.5px] ${billing === b ? "bg-lime text-zinc-950" : "bg-zinc-950 text-lime"}`}>
                 Save ${YEARLY_SAVINGS_USD}
               </span>
             )}
@@ -41,7 +41,7 @@ export function PlanPrice() {
       </p>
       <Link
         href={`/signup?plan=${billing}`}
-        className="shine group mt-6 inline-flex items-center gap-2.5 rounded-full bg-zinc-950 px-6 py-3.5 font-display text-[14px] font-semibold text-mint transition-[background-color,transform] duration-300 hover:bg-zinc-800 active:scale-[0.97]"
+        className="shine group mt-6 inline-flex items-center gap-2.5 rounded-full bg-zinc-950 px-6 py-3.5 font-display text-[14px] font-semibold text-lime transition-[background-color,transform] duration-300 hover:bg-zinc-800 active:scale-[0.97]"
       >
         Start with {billing === "monthly" ? "monthly" : "yearly"}
         <ArrowRight size={16} strokeWidth={2} className="transition-transform duration-300 group-hover:translate-x-1" />

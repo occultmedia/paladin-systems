@@ -61,11 +61,12 @@ const interactiveHeight = (h: number) => `min(${h}px, 70svh)`;
 export default function ArubaMapLeaflet(props: ArubaMapProps) {
   const height = props.height ?? 520;
   const interactive = props.interactive ?? true;
+  const fill = props.mode === "listings" && Boolean(props.fill);
   const source = props.mode === "listings" ? props.listings : props.mode === "rentals" ? props.rentals : props.districts;
   const points: Array<[number, number]> = useMemo(() => source.map((x) => [x.lat, x.lng] as [number, number]), [source]);
 
   return (
-    <div className={`relative ${interactive ? "border border-zinc-200" : ""}`} style={{ height: interactiveHeight(height) }}>
+    <div className={`relative ${interactive && !fill ? "border border-zinc-200" : ""}`} style={{ height: fill ? "100%" : interactiveHeight(height) }}>
       <MapContainer
         center={ARUBA_CENTER}
         zoom={11}

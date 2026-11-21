@@ -62,6 +62,7 @@ const interactiveHeight = (h: number) => `min(${h}px, 70svh)`;
 export default function ArubaMapMapbox(props: ArubaMapProps) {
   const height = props.height ?? 520;
   const interactive = props.interactive ?? true;
+  const fill = props.mode === "listings" && Boolean(props.fill);
   const mapRef = useRef<MapRef>(null);
   const [loaded, setLoaded] = useState(false);
   const [localHover, setLocalHover] = useState<string | null>(null);
@@ -130,7 +131,7 @@ export default function ArubaMapMapbox(props: ArubaMapProps) {
   if (!TOKEN) return null;
 
   return (
-    <div className={`relative overflow-hidden ${interactive ? "border border-zinc-200" : ""}`} style={{ height: interactiveHeight(height) }}>
+    <div className={`relative overflow-hidden ${interactive && !fill ? "border border-zinc-200" : ""}`} style={{ height: fill ? "100%" : interactiveHeight(height) }}>
       <Map
         ref={mapRef}
         mapboxAccessToken={TOKEN}
@@ -292,7 +293,7 @@ export default function ArubaMapMapbox(props: ArubaMapProps) {
             onClick={toggle3d}
             aria-pressed={is3d}
             className={`rounded-md px-3 py-1.5 text-[12px] font-semibold shadow-sm ring-1 transition-colors ${
-              is3d ? "bg-zinc-950 text-mint ring-zinc-950" : "bg-white text-zinc-900 ring-zinc-300 hover:bg-zinc-50"
+              is3d ? "bg-zinc-950 text-lime ring-zinc-950" : "bg-white text-zinc-900 ring-zinc-300 hover:bg-zinc-50"
             }`}
           >
             {is3d ? "2D view" : "3D view"}

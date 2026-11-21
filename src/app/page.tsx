@@ -303,7 +303,7 @@ function PrimaryCta({ href = DASHBOARD, children, light }: { href?: string; chil
     <Link
       href={href}
       className={`shine group inline-flex items-center gap-2.5 rounded-full px-6 py-3.5 font-display text-[14px] font-semibold transition-[background-color,transform] duration-300 active:scale-[0.97] ${
-        light ? "bg-mint text-zinc-950 hover:bg-white" : "bg-zinc-950 text-mint hover:bg-zinc-800"
+        light ? "bg-lime text-zinc-950 hover:bg-white" : "bg-zinc-950 text-lime hover:bg-zinc-800"
       }`}
     >
       {children}
@@ -403,7 +403,7 @@ export default function Home() {
 
   return (
     <MotionRoot>
-    <div className="min-h-screen bg-white font-sans text-zinc-800 antialiased selection:bg-mint selection:text-zinc-950">
+    <div className="min-h-screen bg-white font-sans text-zinc-800 antialiased selection:bg-lime selection:text-zinc-950">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
       <SiteHeader />
@@ -475,7 +475,7 @@ export default function Home() {
                     ["Explain", "A daily market briefing, plus a plain-English note on every listing with a verdict and the next step to take."],
                   ].map(([k, v], i) => (
                     <StaggerItem key={k} className="relative flex gap-5">
-                      <span className="relative grid size-[35px] shrink-0 place-items-center rounded-full border border-mint/30 bg-zinc-950 font-display text-[13px] font-bold text-mint">
+                      <span className="relative grid size-[35px] shrink-0 place-items-center rounded-full border border-mint/30 bg-zinc-950 font-display text-[13px] font-bold text-lime">
                         {i + 1}
                       </span>
                       <div>
@@ -495,7 +495,7 @@ export default function Home() {
                   <Stagger className="mt-3 space-y-2" gap={0.1}>
                     {BRIEF.points.slice(0, 3).map((pt) => (
                       <StaggerItem key={pt} className="flex gap-2.5 text-[13px] leading-snug text-zinc-400">
-                        <span className="mt-[7px] size-1 shrink-0 rounded-full bg-mint" />
+                        <span className="mt-[7px] size-1 shrink-0 rounded-full bg-lime" />
                         {pt}
                       </StaggerItem>
                     ))}
@@ -577,7 +577,7 @@ export default function Home() {
                   <p className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-zinc-500">
                     <Pin size={12} strokeWidth={2} fill="currentColor" /> Your watchlist
                   </p>
-                  <span className="rounded-full bg-zinc-950 px-2.5 py-1 text-[11px] font-semibold text-mint">
+                  <span className="rounded-full bg-zinc-950 px-2.5 py-1 text-[11px] font-semibold text-lime">
                     {PREVIEW.watchlist.updatesToday} updates today
                   </span>
                 </div>
@@ -610,14 +610,14 @@ export default function Home() {
               <div className="h-[240px] bg-white p-6">
                 <div className="flex items-center justify-between">
                   <p className="text-[12px] font-semibold text-zinc-500">Interested clients</p>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-mint px-2.5 py-1 text-[11px] font-semibold text-zinc-950">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-lime px-2.5 py-1 text-[11px] font-semibold text-zinc-950">
                     <Users size={12} strokeWidth={2} /> {PREVIEW.clients.people.length} interested
                   </span>
                 </div>
                 <div className="mt-4 divide-y divide-zinc-100">
                   {PREVIEW.clients.people.map((c) => (
                     <div key={c.name} className="flex items-center gap-3 py-2.5">
-                      <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-zinc-950 text-[11px] font-semibold text-mint">
+                      <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-zinc-950 text-[11px] font-semibold text-lime">
                         {c.name.split(" ").filter((w) => /^[A-Z]/.test(w)).map((w) => w[0]).join("").slice(0, 2)}
                       </span>
                       <span className="min-w-0 flex-1">
@@ -724,7 +724,7 @@ export default function Home() {
             <Reveal className="order-2 overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-xl shadow-zinc-900/5 lg:order-1">
               <div className="flex items-center justify-between border-b border-zinc-100 px-5 py-4">
                 <p className="inline-flex items-center gap-2 font-display text-[16px] font-bold text-zinc-950">
-                  <span className="flex size-7 items-center justify-center rounded-full bg-zinc-950 text-mint">
+                  <span className="flex size-7 items-center justify-center rounded-full bg-zinc-950 text-lime">
                     <Pin size={13} strokeWidth={2} fill="currentColor" />
                   </span>
                   Watchlist
@@ -915,7 +915,7 @@ export default function Home() {
             </div>
             <Reveal className="md:flex-1">
               <p className="flex items-center gap-2.5 text-[14px] font-semibold text-white/80">
-                <span className="size-2 rounded-full bg-mint" />
+                <span className="size-2 rounded-full bg-lime" />
                 {NEW_THIS_WEEK} new listings this week
               </p>
               <h2 className="mt-5 max-w-[18ch] font-display text-[34px] font-bold leading-[1.05] tracking-tight text-white sm:text-[52px]">

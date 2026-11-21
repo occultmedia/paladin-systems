@@ -6,7 +6,7 @@ import Image from "next/image";
  *  - sd-monogram-*.png : the SD monogram alone
  *  - sd-icon.png       : white SD on black square (favicon / app icon)
  *  - sd-head-*.png / sd-logo-*.png : older head silhouette marks (still used on 404 / error)
- * Brand accent: mint #DDE5DC (Tailwind: bg-mint / text-mint), always paired with black.
+ * Brand accent: mint #DDE5DC (Tailwind: bg-lime / text-lime), always paired with black.
  */
 
 type Tone = "black" | "white";
@@ -38,7 +38,7 @@ export function SequenceMonogram({ className = "h-6 w-auto", tone = "black" }: {
 export function Wordmark({ tone = "black", tagline = false }: { tone?: Tone; tagline?: boolean }) {
   const text = tone === "black" ? "text-zinc-950" : "text-white";
   const muted = tone === "black" ? "text-zinc-500" : "text-zinc-400";
-  const cursor = tone === "black" ? "bg-zinc-950" : "bg-mint";
+  const cursor = tone === "black" ? "bg-zinc-950" : "bg-lime";
   return (
     <span className="inline-block leading-none">
       <span className={`flex items-end whitespace-nowrap font-display text-[19px] font-bold uppercase tracking-[0.24em] ${text}`}>

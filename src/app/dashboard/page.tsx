@@ -19,9 +19,10 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { Wordmark } from "@/components/logo";
 import { FeedView } from "@/components/feed/feed-view";
-import { ProfileDialog } from "@/components/feed/profile-dialog";
+import { SettingsView } from "@/components/settings/settings-view";
 import { useProfile } from "@/lib/profile";
 import { Dialog } from "@/components/feed/profile-dialog";
+import { MapFullscreen } from "@/components/dashboard/map-fullscreen";
 import { BAND_COLOR, CONFIDENCE_RULES, confidenceBand, scoreConfidence } from "@/lib/confidence";
 import { FLAG_REASONS, UNDO_MINUTES, canUndo, useFlags, type FlagReason } from "@/lib/flags";
 import { useWatchlist, type WatchEntry } from "@/lib/watchlist";
@@ -65,6 +66,8 @@ import {
   ChevronDown,
   Flag,
   Info,
+  Settings as SettingsIcon,
+  Maximize2,
   ShieldCheck,
   Undo2,
   LayoutList,
@@ -81,7 +84,6 @@ import {
   Mail,
   MessageCircle,
   Phone,
-  KeyRound,
   LogOut,
   Search,
   SlidersHorizontal,
@@ -208,20 +210,21 @@ function Logo() {
   );
 }
 
-const TABS = ["Listings", "Watchlist", "Feed"] as const;
+const TABS = ["Listings", "Watchlist", "Feed", "Settings"] as const;
 type Tab = (typeof TABS)[number];
 const TAB_SLUG: Record<Tab, string> = {
   Listings: "listings",
   Watchlist: "watchlist",
   Feed: "feed",
+  Settings: "settings",
 };
 
-const TAB_ICON: Record<Tab, typeof Pin> = { Listings: LayoutList, Watchlist: Pin, Feed: Megaphone };
+const TAB_ICON: Record<Tab, typeof Pin> = { Listings: LayoutList, Watchlist: Pin, Feed: Megaphone, Settings: SettingsIcon };
 
 /** Pill switch between the dashboard tabs. */
 function TabSwitch({ tab, onTab, watchCount, full = false }: { tab: Tab; onTab: (t: Tab) => void; watchCount: number; full?: boolean }) {
   return (
-    <div className={`${full ? "grid w-full grid-cols-3" : "inline-flex"} gap-1 rounded-full bg-white/[0.06] p-1 ring-1 ring-white/10`} role="tablist">
+    <div className={`${full ? "grid w-full grid-cols-4" : "inline-flex"} gap-1 rounded-full bg-white/[0.06] p-1 ring-1 ring-white/10`} role="tablist">
       {TABS.map((t) => {
         const on = tab === t;
         const Icon = TAB_ICON[t];
@@ -236,14 +239,14 @@ function TabSwitch({ tab, onTab, watchCount, full = false }: { tab: Tab; onTab: 
               on ? "text-zinc-950" : "text-zinc-400 hover:text-white"
             }`}
           >
-            {on && <motion.span layoutId={full ? "tab-pill-mobile" : "tab-pill"} className="absolute inset-0 rounded-full bg-mint" transition={{ type: "spring", stiffness: 500, damping: 40 }} />}
+            {on && <motion.span layoutId={full ? "tab-pill-mobile" : "tab-pill"} className="absolute inset-0 rounded-full bg-lime" transition={{ type: "spring", stiffness: 500, damping: 40 }} />}
             <span className="relative inline-flex items-center gap-2">
               <Icon size={14} strokeWidth={1.75} fill={t === "Watchlist" && on ? "currentColor" : "none"} />
               {t}
               {t === "Watchlist" && watchCount > 0 && (
                 <span
                   className={`${MONO} inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-semibold ${
-                    on ? "bg-zinc-950 text-mint" : "bg-white/10 text-zinc-300"
+                    on ? "bg-zinc-950 text-lime" : "bg-white/10 text-zinc-300"
                   }`}
                 >
                   {watchCount}
@@ -278,8 +281,10 @@ function AccountMenu({ compact = false, onProfile }: { compact?: boolean; onProf
 
   const items = [
     { icon: User, label: "Profile", onClick: onProfile },
-    { icon: KeyRound, label: "API Keys", onClick: undefined },
-    { icon: CreditCard, label: "Billing", onClick: undefined },
+    { icon: CreditCard, label: "Billing & payment", onClick: () => {
+      onProfile();
+      window.setTimeout(() => document.getElementById("settings-billing")?.scrollIntoView({ behavior: "smooth", block: "start" }), 120);
+    } },
   ];
 
   if (!user)
@@ -290,7 +295,7 @@ function AccountMenu({ compact = false, onProfile }: { compact?: boolean; onProf
         </Link>
         <Link
           href="/signup"
-          className="shine inline-flex shrink-0 items-center whitespace-nowrap rounded-full bg-mint px-3.5 py-1.5 font-display text-[12.5px] font-semibold text-zinc-950 transition-colors hover:bg-white"
+          className="shine inline-flex shrink-0 items-center whitespace-nowrap rounded-full bg-lime px-3.5 py-1.5 font-display text-[12.5px] font-semibold text-zinc-950 transition-colors hover:bg-white"
         >
           Sign up
         </Link>
@@ -318,7 +323,7 @@ function AccountMenu({ compact = false, onProfile }: { compact?: boolean; onProf
           compact ? "size-9 justify-center" : "py-1 pl-1 pr-3"
         }`}
       >
-        <span className="grid size-7 place-items-center rounded-full bg-mint font-display text-[11px] font-bold text-zinc-950">{initials}</span>
+        <span className="grid size-7 place-items-center rounded-full bg-lime font-display text-[11px] font-bold text-zinc-950">{initials}</span>
         {!compact && (
           <>
             <span className="max-w-[120px] truncate font-medium">{name}</span>
@@ -338,7 +343,7 @@ function AccountMenu({ compact = false, onProfile }: { compact?: boolean; onProf
           <div className="border-b border-zinc-100 px-4 py-3">
             <p className="truncate text-[13px] font-semibold text-zinc-950">{name}</p>
             <p className="truncate text-[12px] text-zinc-500">{user.email}</p>
-            <p className="mt-2 inline-flex rounded-full bg-mint px-2 py-0.5 text-[11px] font-semibold text-zinc-950">
+            <p className="mt-2 inline-flex rounded-full bg-lime px-2 py-0.5 text-[11px] font-semibold text-zinc-950">
               Aruba · ${PLANS[plan].price.toLocaleString("en-US")}/{PLANS[plan].per}
             </p>
           </div>
@@ -390,7 +395,7 @@ function Header({ tab, onTab, updates, onUpdates, watchCount, onProfile }: { tab
             >
               <Bell size={15} strokeWidth={1.75} />
               {updates > 0 && (
-                <span className={`${MONO} absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-mint px-1 text-[10px] font-semibold text-zinc-950`}>
+                <span className={`${MONO} absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-lime px-1 text-[10px] font-semibold text-zinc-950`}>
                   {updates}
                 </span>
               )}
@@ -420,7 +425,7 @@ function Header({ tab, onTab, updates, onUpdates, watchCount, onProfile }: { tab
           >
             <Bell size={15} strokeWidth={1.75} />
             {updates > 0 && (
-              <span className={`${MONO} absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-mint px-1 text-[10px] font-semibold text-zinc-950`}>
+              <span className={`${MONO} absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-lime px-1 text-[10px] font-semibold text-zinc-950`}>
                 {updates}
               </span>
             )}
@@ -870,12 +875,12 @@ function FlagDialog({ l, open, onClose }: { l: Listing; open: boolean; onClose: 
               <label
                 key={k}
                 className={`flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 text-[13px] transition-colors ${
-                  reason === k ? "border-zinc-950 bg-zinc-950 text-mint" : "border-zinc-300 text-zinc-800 hover:border-zinc-500"
+                  reason === k ? "border-zinc-950 bg-zinc-950 text-lime" : "border-zinc-300 text-zinc-800 hover:border-zinc-500"
                 }`}
               >
                 <input type="radio" name="flag-reason" className="sr-only" checked={reason === k} onChange={() => setReason(k)} />
                 <span className={`grid size-4 place-items-center rounded-full border ${reason === k ? "border-mint" : "border-zinc-400"}`}>
-                  {reason === k && <span className="size-2 rounded-full bg-mint" />}
+                  {reason === k && <span className="size-2 rounded-full bg-lime" />}
                 </span>
                 {FLAG_REASONS[k]}
               </label>
@@ -902,7 +907,7 @@ function FlagDialog({ l, open, onClose }: { l: Listing; open: boolean; onClose: 
             Cancel
           </button>
           {needsAccount ? (
-            <Link href="/login" className="rounded-full bg-zinc-950 px-5 py-2 text-[13px] font-semibold text-mint">
+            <Link href="/login" className="rounded-full bg-zinc-950 px-5 py-2 text-[13px] font-semibold text-lime">
               Log in to flag
             </Link>
           ) : (
@@ -944,7 +949,7 @@ function FlagToast({ listings }: { listings?: Listing[] }) {
   const name = listings?.find((l) => l.listing_id === id)?.asset_name ?? id;
   return (
     <div role="status" className="fixed inset-x-4 bottom-4 z-[1100] mx-auto flex max-w-md items-center gap-3 rounded-xl bg-zinc-950 px-4 py-3 text-[13px] text-white shadow-2xl">
-      <Flag size={14} className="shrink-0 text-mint" />
+      <Flag size={14} className="shrink-0 text-lime" />
       <span className="min-w-0 flex-1">
         <b className="font-semibold">{name}</b> removed for every member · {FLAG_REASONS[f.reason]}
       </span>
@@ -955,7 +960,7 @@ function FlagToast({ listings }: { listings?: Listing[] }) {
             setToast(null);
             void undo(id).catch((e) => window.alert(e instanceof Error ? e.message : "Could not undo."));
           }}
-          className="inline-flex shrink-0 items-center gap-1 font-semibold text-mint hover:underline"
+          className="inline-flex shrink-0 items-center gap-1 font-semibold text-lime hover:underline"
         >
           <Undo2 size={13} /> Undo
         </button>
@@ -986,7 +991,7 @@ function ListedBy({ l }: { l: Listing }) {
           target="_blank"
           rel="noopener noreferrer"
           onClick={(e) => e.stopPropagation()}
-          className="inline-flex items-center gap-1.5 rounded-md border border-zinc-950 px-3 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-zinc-950 hover:text-mint"
+          className="inline-flex items-center gap-1.5 rounded-md border border-zinc-950 px-3 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-zinc-950 hover:text-lime"
         >
           View on their site <ExternalLink size={12} strokeWidth={1.75} />
         </a>
@@ -1016,7 +1021,7 @@ const initialsOf = (name: string) =>
 function ListingAgentRow({ l }: { l: Listing }) {
   const a = l.agent;
   const btn =
-    "inline-flex items-center gap-1.5 rounded-md border border-zinc-300 px-2.5 py-1.5 text-[12px] text-zinc-800 transition-colors hover:border-zinc-950 hover:bg-zinc-950 hover:text-mint";
+    "inline-flex items-center gap-1.5 rounded-md border border-zinc-300 px-2.5 py-1.5 text-[12px] text-zinc-800 transition-colors hover:border-zinc-950 hover:bg-zinc-950 hover:text-lime";
   if (!a)
     return (
       <div className="border-t border-zinc-100 px-3 py-2.5 text-[12px] text-zinc-500">
@@ -1120,7 +1125,7 @@ function ScrapeTags({ l }: { l: Listing }) {
   const moved = l.last_price_change && l.last_price_change.date === SCRAPE_RUNS[0].date ? l.last_price_change : null;
   return (
     <>
-      {l.is_new && <span className="rounded bg-zinc-950 px-1.5 py-0.5 text-[9px] font-semibold tracking-wide text-mint">NEW</span>}
+      {l.is_new && <span className="rounded bg-zinc-950 px-1.5 py-0.5 text-[9px] font-semibold tracking-wide text-lime">NEW</span>}
       {moved && (
         <span
           className="rounded px-1.5 py-0.5 text-[9px] font-semibold tracking-wide text-white"
@@ -1385,7 +1390,7 @@ function ClientForm({
         <button type="button" onClick={onCancel} className="rounded-lg px-3 py-2 text-[12px] font-medium text-zinc-600 transition-colors hover:bg-zinc-200/60 hover:text-zinc-950">
           Cancel
         </button>
-        <button type="submit" className="rounded-lg bg-zinc-950 px-4 py-2 text-[12px] font-semibold text-mint transition-all hover:bg-zinc-800 active:scale-95">
+        <button type="submit" className="rounded-lg bg-zinc-950 px-4 py-2 text-[12px] font-semibold text-lime transition-all hover:bg-zinc-800 active:scale-95">
           {submitLabel}
         </button>
       </div>
@@ -1412,7 +1417,7 @@ function InterestedClients({ l }: { l: Listing }) {
     <section className="rounded-xl border border-zinc-200 bg-white" aria-label={`Interested clients for ${l.asset_name}`}>
       <div className="flex items-center justify-between gap-3 px-3 py-2.5">
         <div className="flex items-center gap-2">
-          <span className="flex size-7 items-center justify-center rounded-lg bg-mint text-zinc-950">
+          <span className="flex size-7 items-center justify-center rounded-lg bg-lime text-zinc-950">
             <Users size={14} strokeWidth={1.75} />
           </span>
           <span>
@@ -1426,7 +1431,7 @@ function InterestedClients({ l }: { l: Listing }) {
           <button
             type="button"
             onClick={() => setMode({ kind: "add" })}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-950 px-3 py-1.5 text-[12px] font-semibold text-mint transition-all hover:bg-zinc-800 active:scale-95"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-950 px-3 py-1.5 text-[12px] font-semibold text-lime transition-all hover:bg-zinc-800 active:scale-95"
           >
             <Plus size={13} strokeWidth={2} /> Add
           </button>
@@ -1469,7 +1474,7 @@ function InterestedClients({ l }: { l: Listing }) {
               ) : (
                 <li key={c.id} className="group rounded-xl border border-zinc-100 bg-zinc-50/70 p-3 transition-colors hover:border-zinc-200">
                   <div className="flex items-start gap-2.5">
-                    <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-zinc-950 text-[11px] font-semibold text-mint" aria-hidden>
+                    <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-zinc-950 text-[11px] font-semibold text-lime" aria-hidden>
                       {initialsOf(c.name) || "?"}
                     </span>
                     <div className="min-w-0 flex-1">
@@ -1532,7 +1537,7 @@ function InterestedClients({ l }: { l: Listing }) {
                 restore(removed);
                 setRemoved(null);
               }}
-              className="shrink-0 font-semibold text-mint hover:underline"
+              className="shrink-0 font-semibold text-lime hover:underline"
             >
               Undo
             </button>
@@ -1549,7 +1554,7 @@ function ClientCount({ id }: { id: string }) {
   const n = useInterestedClients().countFor(id);
   if (!n) return null;
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-mint px-1.5 py-px text-[10px] font-semibold text-zinc-950" title={`${n} interested ${n === 1 ? "client" : "clients"}`}>
+    <span className="inline-flex items-center gap-1 rounded-full bg-lime px-1.5 py-px text-[10px] font-semibold text-zinc-950" title={`${n} interested ${n === 1 ? "client" : "clients"}`}>
       <Users size={10} strokeWidth={2} />
       {n} interested
     </span>
@@ -1574,7 +1579,7 @@ function WatchButton({ l, variant = "full" }: { l: Listing; variant?: "full" | "
         aria-label={label}
         title={pinned ? "On your watchlist" : "Add to watchlist"}
         className={`inline-flex size-8 shrink-0 items-center justify-center rounded-full transition-all active:scale-90 ${
-          pinned ? "bg-zinc-950 text-mint" : "text-zinc-400 hover:bg-white hover:text-zinc-950"
+          pinned ? "bg-zinc-950 text-lime" : "text-zinc-400 hover:bg-white hover:text-zinc-950"
         }`}
       >
         <Pin size={14} strokeWidth={1.75} fill={pinned ? "currentColor" : "none"} />
@@ -1587,7 +1592,7 @@ function WatchButton({ l, variant = "full" }: { l: Listing; variant?: "full" | "
       onClick={onClick}
       aria-pressed={pinned}
       className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-[12px] font-medium transition-all active:scale-95 ${
-        pinned ? "bg-zinc-950 text-mint hover:bg-zinc-800" : "border border-zinc-950/20 bg-white text-zinc-900 hover:border-zinc-950"
+        pinned ? "bg-zinc-950 text-lime hover:bg-zinc-800" : "border border-zinc-950/20 bg-white text-zinc-900 hover:border-zinc-950"
       }`}
     >
       <Pin size={13} strokeWidth={1.75} fill={pinned ? "currentColor" : "none"} />
@@ -1610,8 +1615,8 @@ const VERDICT_STYLE: Record<Verdict, { color: string; bg: string }> = {
 function AIMark({ size = 13, dark = false }: { size?: number; dark?: boolean }) {
   return (
     <span className={`inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] ${dark ? "text-white" : "text-zinc-950"}`}>
-      <span className={`relative grid size-5 place-items-center rounded-md ${dark ? "bg-mint text-zinc-950" : "bg-zinc-950 text-mint"}`}>
-        <span className={`absolute inset-0 animate-[ai-breathe_2.8s_ease-in-out_infinite] rounded-md motion-reduce:animate-none ${dark ? "bg-mint" : "bg-zinc-950"}`} />
+      <span className={`relative grid size-5 place-items-center rounded-md ${dark ? "bg-lime text-zinc-950" : "bg-zinc-950 text-lime"}`}>
+        <span className={`absolute inset-0 animate-[ai-breathe_2.8s_ease-in-out_infinite] rounded-md motion-reduce:animate-none ${dark ? "bg-lime" : "bg-zinc-950"}`} />
         <Sparkles size={size - 2} strokeWidth={2} className="relative" />
       </span>
       AI Signal
@@ -1667,13 +1672,13 @@ function AINote({ l }: { l: Listing }) {
             <ul className="mt-3 space-y-1.5">
               {data.points.map((p, i) => (
                 <li key={i} className="flex gap-2 text-[12.5px] leading-snug text-zinc-400">
-                  <span className="mt-[7px] size-1 shrink-0 rounded-full bg-mint" />
+                  <span className="mt-[7px] size-1 shrink-0 rounded-full bg-lime" />
                   {p}
                 </li>
               ))}
             </ul>
           )}
-          <p className="mt-4 flex items-start gap-2 rounded-lg bg-mint px-3 py-2.5 text-[12.5px] leading-snug text-zinc-950">
+          <p className="mt-4 flex items-start gap-2 rounded-lg bg-lime px-3 py-2.5 text-[12.5px] leading-snug text-zinc-950">
             <ArrowRight size={14} strokeWidth={2} className="mt-px shrink-0" />
             <span>
               <b className="font-semibold">Next step:</b> {data.next_step}
@@ -1847,6 +1852,8 @@ function ActiveListings({
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "listed", dir: "asc" });
   const [openId, setOpenId] = useState<string | null>(initialOpenId ?? null);
   const [hoverId, setHoverId] = useState<string | null>(null);
+  const [fullMap, setFullMap] = useState(false);
+  const closeFullMap = useCallback(() => setFullMap(false), []);
 
   // The table scrolls sideways on narrower screens. An open listing's details
   // are pinned to the visible width so nothing is cut off on the right.
@@ -1981,14 +1988,14 @@ function ActiveListings({
 
   const selectCls = `${MONO} rounded-md border border-zinc-300 bg-white px-3 py-2 text-[12px] text-zinc-800 outline-none transition-colors hover:border-zinc-500 focus:border-zinc-950`;
   const segBtn = (on: boolean) =>
-    `shrink-0 whitespace-nowrap px-3 py-2 text-[12px] font-medium transition-colors ${on ? "bg-zinc-950 text-mint" : "text-zinc-600 hover:text-zinc-950"}`;
+    `shrink-0 whitespace-nowrap px-3 py-2 text-[12px] font-medium transition-colors ${on ? "bg-zinc-950 text-lime" : "text-zinc-600 hover:text-zinc-950"}`;
   const chip = (on: boolean) =>
     `rounded-full border px-3 py-1.5 text-[12px] font-medium transition-[colors,transform] active:scale-[0.96] ${
-      on ? "border-zinc-950 bg-zinc-950 text-mint" : "border-zinc-300 bg-white text-zinc-700 hover:border-zinc-500"
+      on ? "border-zinc-950 bg-zinc-950 text-lime" : "border-zinc-300 bg-white text-zinc-700 hover:border-zinc-500"
     }`;
   const toggleCls = (on: boolean) =>
     `inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-md border px-3 py-2 text-[12px] font-medium transition-colors active:scale-[0.97] ${
-      on ? "border-zinc-950 bg-zinc-950 text-mint" : "border-zinc-300 bg-white text-zinc-700 hover:border-zinc-500"
+      on ? "border-zinc-950 bg-zinc-950 text-lime" : "border-zinc-300 bg-white text-zinc-700 hover:border-zinc-500"
     }`;
   const td = "px-2.5 py-4 border-b border-zinc-200 align-top";
   const num = `${td} ${MONO} text-right text-[13px] text-zinc-800`;
@@ -2012,7 +2019,7 @@ function ActiveListings({
           type="button"
           onClick={() => downloadCsv(rows)}
           disabled={!rows.length}
-          className="shine inline-flex items-center gap-2 rounded-full bg-mint px-4 py-2 text-[12px] font-semibold tracking-wide text-zinc-950 transition-colors hover:bg-white disabled:opacity-40"
+          className="shine inline-flex items-center gap-2 rounded-full bg-lime px-4 py-2 text-[12px] font-semibold tracking-wide text-zinc-950 transition-colors hover:bg-white disabled:opacity-40"
         >
           <Download size={13} strokeWidth={1.5} />
           Export CSV
@@ -2078,7 +2085,7 @@ function ActiveListings({
               <button key={st} type="button" onClick={() => setStatus(st)} aria-pressed={status === st} className={segBtn(status === st)}>
                 {st === "All" ? "Any status" : st}
                 {st !== "All" && listings && (
-                  <span className={`${MONO} ml-1.5 text-[10px] ${status === st ? "text-mint/70" : "text-zinc-400"}`}>
+                  <span className={`${MONO} ml-1.5 text-[10px] ${status === st ? "text-lime/70" : "text-zinc-400"}`}>
                     {listings.filter((l) => l.status === st).length}
                   </span>
                 )}
@@ -2102,7 +2109,7 @@ function ActiveListings({
           <button type="button" onClick={() => setNewToday((v) => !v)} aria-pressed={newToday} className={toggleCls(newToday)}>
             New today
             {listings && (
-              <span className={`${MONO} rounded-full px-1.5 text-[10px] ${newToday ? "bg-mint text-zinc-950" : "bg-zinc-950 text-mint"}`}>
+              <span className={`${MONO} rounded-full px-1.5 text-[10px] ${newToday ? "bg-lime text-zinc-950" : "bg-zinc-950 text-lime"}`}>
                 {listings.filter((l) => l.is_new).length}
               </span>
             )}
@@ -2195,14 +2202,37 @@ function ActiveListings({
       </div>
 
       {/* map */}
-      <ArubaMap
-        mode="listings"
+      <div className="relative">
+        <ArubaMap
+          mode="listings"
+          listings={rows}
+          selectedId={openId}
+          hoveredId={hoverId}
+          onSelect={selectFromMap}
+          onHover={setHoverId}
+          height={560}
+        />
+        <button
+          type="button"
+          onClick={() => setFullMap(true)}
+          className="absolute bottom-3 right-3 z-[3] inline-flex items-center gap-2 rounded-full bg-zinc-950 px-3.5 py-2 text-[12px] font-semibold text-lime shadow-lg ring-1 ring-black/10 transition-transform hover:-translate-y-px active:scale-[0.98] max-sm:bottom-auto max-sm:top-3"
+        >
+          <Maximize2 size={13} strokeWidth={2.2} /> Full-screen map
+        </button>
+      </div>
+      <MapFullscreen
+        open={fullMap}
         listings={rows}
         selectedId={openId}
         hoveredId={hoverId}
-        onSelect={selectFromMap}
+        onSelect={(id) => setOpenId(id || null)}
         onHover={setHoverId}
-        height={560}
+        onClose={closeFullMap}
+        onOpenDetails={(id) => {
+          setFullMap(false);
+          setOpenId(id);
+          window.setTimeout(() => scrollToRow(`row-${id}`, "start"), 350);
+        }}
       />
 
       {/* list */}
@@ -2631,7 +2661,7 @@ function Watchlist({ listings, onOpenListing, onBrowse }: { listings?: Listing[]
 
       {rows.length === 0 ? (
         <div className="mt-8 flex flex-col items-center rounded-3xl border border-dashed border-zinc-300 bg-mint-soft/60 px-6 py-16 text-center">
-          <span className="flex size-12 items-center justify-center rounded-full bg-zinc-950 text-mint">
+          <span className="flex size-12 items-center justify-center rounded-full bg-zinc-950 text-lime">
             <Pin size={18} strokeWidth={1.75} />
           </span>
           <h2 className="mt-5 font-display text-[20px] font-bold text-zinc-950">Nothing pinned yet</h2>
@@ -2642,7 +2672,7 @@ function Watchlist({ listings, onOpenListing, onBrowse }: { listings?: Listing[]
           <button
             type="button"
             onClick={onBrowse}
-            className="mt-6 inline-flex items-center gap-2 rounded-full bg-zinc-950 px-5 py-2.5 text-[13px] font-medium text-mint transition-all hover:bg-zinc-800 active:scale-95"
+            className="mt-6 inline-flex items-center gap-2 rounded-full bg-zinc-950 px-5 py-2.5 text-[13px] font-medium text-lime transition-all hover:bg-zinc-800 active:scale-95"
           >
             Browse listings <ArrowRight size={14} strokeWidth={1.75} />
           </button>
@@ -2890,7 +2920,7 @@ function TerminalUpdates({
             </span>
           )}
         </span>
-        <span className="ml-auto inline-flex items-center gap-1 font-medium text-mint">
+        <span className="ml-auto inline-flex items-center gap-1 font-medium text-lime">
           {open ? "Close" : "Today's briefing"}
           <ChevronDown size={13} strokeWidth={1.75} className={`transition-transform ${open ? "rotate-180" : ""}`} />
         </span>
@@ -2920,7 +2950,7 @@ function TerminalUpdates({
                 <ul className="mt-3 space-y-1.5">
                   {brief.data.points.map((p, i) => (
                     <li key={i} className="flex gap-2 text-[12.5px] leading-snug text-zinc-400">
-                      <span className="mt-[7px] size-1 shrink-0 rounded-full bg-mint" />
+                      <span className="mt-[7px] size-1 shrink-0 rounded-full bg-lime" />
                       {p}
                     </li>
                   ))}
@@ -2987,7 +3017,7 @@ function TerminalUpdates({
                           >
                             <span className="w-[52px] shrink-0">
                               {m.kind === "new" ? (
-                                <span className="rounded bg-zinc-950 px-1.5 py-0.5 text-[9px] font-semibold tracking-wide text-mint">NEW</span>
+                                <span className="rounded bg-zinc-950 px-1.5 py-0.5 text-[9px] font-semibold tracking-wide text-lime">NEW</span>
                               ) : m.kind === "status" ? (
                                 <span
                                   className="rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide"
@@ -3031,7 +3061,7 @@ function TerminalUpdates({
                 onShowNew();
                 onToggle();
               }}
-              className="flex w-full items-center justify-center gap-2 border-t border-zinc-200 bg-zinc-950 px-3 py-2.5 text-[12px] font-medium text-mint transition-colors hover:bg-zinc-800"
+              className="flex w-full items-center justify-center gap-2 border-t border-zinc-200 bg-zinc-950 px-3 py-2.5 text-[12px] font-medium text-lime transition-colors hover:bg-zinc-800"
             >
               Show the {latest.new_listings.length} new listings
               <ArrowRight size={13} strokeWidth={1.75} />
@@ -3069,14 +3099,12 @@ function Dashboard() {
   const market = useMemo(() => data?.allListings.filter((l) => l.confidence_score > 0 && !flags[l.listing_id]), [data, flags]);
   const watchCount = useWatchlist().entries.length;
   const me = useProfile();
-  const [profileOpen, setProfileOpen] = useState(false);
-  const openProfile = useCallback(() => setProfileOpen(true), []);
-
-  const setTab = (t: Tab) => {
+  const setTab = useCallback((t: Tab) => {
     setTabState(t);
     window.history.replaceState(null, "", `?tab=${TAB_SLUG[t]}`);
     window.scrollTo({ top: 0 });
-  };
+  }, []);
+  const openProfile = useCallback(() => setTab("Settings"), [setTab]);
   const openListing = (id: string) => {
     setListingsView((v) => ({ key: v.key + 1, openId: id }));
     setTabState("Listings");
@@ -3093,7 +3121,7 @@ function Dashboard() {
   };
 
   return (
-    <div className={`${inter.className} min-h-screen overflow-x-clip bg-white text-zinc-800 antialiased selection:bg-mint selection:text-zinc-950`}>
+    <div className={`${inter.className} min-h-screen overflow-x-clip bg-white text-zinc-800 antialiased selection:bg-lime selection:text-zinc-950`}>
       <Header tab={tab} onTab={setTab} updates={updatesToday} onUpdates={openUpdates} watchCount={watchCount} onProfile={openProfile} />
 
       <main className="mx-auto max-w-[1400px] px-4 pb-20 sm:px-6">
@@ -3107,7 +3135,6 @@ function Dashboard() {
             <ActiveListings
               key={listingsView.key}
               listings={market}
-              
               initialDistrict={listingsView.district}
               initialQuery={listingsView.query}
               initialOpenId={listingsView.openId}
@@ -3116,13 +3143,14 @@ function Dashboard() {
           </>
         ) : tab === "Feed" ? (
           <FeedView profile={me.profile} profileLoading={me.loading} shared={me.shared} onEditProfile={openProfile} />
+        ) : tab === "Settings" ? (
+          <SettingsView profile={{ draft: me.draft, loading: me.loading }} onSaveProfile={me.save} shared={me.shared} />
         ) : (
-          <Watchlist listings={market}  onOpenListing={openListing} onBrowse={() => setTab("Listings")} />
+          <Watchlist listings={market} onOpenListing={openListing} onBrowse={() => setTab("Listings")} />
         )}
       </main>
 
       <FlagToast listings={data?.allListings} />
-      <ProfileDialog open={profileOpen} onClose={() => setProfileOpen(false)} initial={me.draft} onSave={me.save} shared={me.shared} />
 
       <footer className="border-t border-zinc-200">
         <div className={`${MONO} mx-auto flex max-w-[1400px] flex-wrap justify-between gap-2 px-6 py-5 text-[10px] tracking-wider text-zinc-500`}>

@@ -68,7 +68,7 @@ export function AuthShell({
           <ul className="mt-10 grid max-w-[520px] grid-cols-3 gap-4 border-t border-white/10 pt-6 text-[12.5px] text-zinc-400">
             {["Daily market briefing", "AI note on every listing", "Watchlist and client leads"].map((t) => (
               <li key={t} className="flex gap-2">
-                <Check size={14} strokeWidth={2.5} className="mt-0.5 shrink-0 text-mint" />
+                <Check size={14} strokeWidth={2.5} className="mt-0.5 shrink-0 text-lime" />
                 {t}
               </li>
             ))}
@@ -160,7 +160,7 @@ function SubmitButton({ busy, children }: { busy: boolean; children: React.React
     <button
       type="submit"
       disabled={busy}
-      className="shine group flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-zinc-950 font-display text-[15px] font-semibold text-mint transition-[background-color,transform] hover:bg-zinc-800 active:scale-[0.99] disabled:cursor-wait disabled:opacity-80"
+      className="shine group flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-zinc-950 font-display text-[15px] font-semibold text-lime transition-[background-color,transform] hover:bg-zinc-800 active:scale-[0.99] disabled:cursor-wait disabled:opacity-80"
     >
       {busy ? (
         <span className="size-4 animate-spin rounded-full border-2 border-mint border-t-transparent" />
@@ -209,7 +209,7 @@ function Done({ title, body }: { title: string; body: React.ReactNode }) {
         initial={{ scale: 0 }}
         animate={{ scale: 1 }}
         transition={{ type: "spring", stiffness: 260, damping: 16, delay: 0.1 }}
-        className="mx-auto grid size-14 place-items-center rounded-2xl bg-zinc-950 text-mint"
+        className="mx-auto grid size-14 place-items-center rounded-2xl bg-zinc-950 text-lime"
       >
         <Mail size={24} strokeWidth={1.75} />
       </motion.span>
@@ -452,7 +452,7 @@ export function SignupForm({ initialPlan = "monthly" }: { initialPlan?: Billing 
                   <span className="flex items-center justify-between">
                     <span className="text-[13px] font-semibold text-zinc-950">{b === "monthly" ? "Monthly" : "Yearly"}</span>
                     <span className={`grid size-4 place-items-center rounded-full border ${on ? "border-zinc-950 bg-zinc-950" : "border-zinc-300"}`}>
-                      {on && <Check size={10} strokeWidth={3.5} className="text-mint" />}
+                      {on && <Check size={10} strokeWidth={3.5} className="text-lime" />}
                     </span>
                   </span>
                   <span className="mt-2 block font-display text-[22px] font-bold leading-none tracking-tight text-zinc-950">

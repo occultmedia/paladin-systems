@@ -69,7 +69,7 @@ export function Avatar({ name, photo, logo, size = 44 }: { name: string; photo?:
         // eslint-disable-next-line @next/next/no-img-element
         <img src={photo} alt={name} className="size-full rounded-full object-cover ring-1 ring-zinc-200" />
       ) : (
-        <span className="grid size-full place-items-center rounded-full bg-zinc-950 font-display font-bold text-mint" style={{ fontSize: size * 0.36 }}>
+        <span className="grid size-full place-items-center rounded-full bg-zinc-950 font-display font-bold text-lime" style={{ fontSize: size * 0.36 }}>
           {initialsOf(name)}
         </span>
       )}
@@ -248,7 +248,7 @@ export function ProfileDialog({ open, onClose, initial, onSave, shared }: { open
           <button
             type="submit"
             disabled={saving}
-            className="shine inline-flex items-center justify-center gap-2 rounded-full bg-zinc-950 px-6 py-2.5 font-display text-[13.5px] font-semibold text-mint transition-colors hover:bg-zinc-800 disabled:opacity-60"
+            className="shine inline-flex items-center justify-center gap-2 rounded-full bg-zinc-950 px-6 py-2.5 font-display text-[13.5px] font-semibold text-lime transition-colors hover:bg-zinc-800 disabled:opacity-60"
           >
             {saving && <Loader2 size={14} className="animate-spin" />}
             Save profile

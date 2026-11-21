@@ -163,6 +163,8 @@ export type ArubaMapProps =
       onSelect?: (id: string) => void;
       onHover?: (id: string | null) => void;
       height?: number;
+      /** Fill the parent's height (full-screen map) instead of using `height`. */
+      fill?: boolean;
       /** false = static decorative map (no pan/zoom/legend/hover), e.g. on the landing page */
       interactive?: boolean;
     }
