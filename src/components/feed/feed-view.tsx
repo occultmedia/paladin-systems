@@ -99,7 +99,7 @@ function ContactRow({ post }: { post: FeedPost }) {
   );
 }
 
-function PostCard({ post, onDelete, onOpenListing }: { post: FeedPost; onDelete: (id: string) => void; onOpenListing?: (id: string) => void }) {
+export function PostCard({ post, onDelete, onOpenListing }: { post: FeedPost; onDelete: (id: string) => void; onOpenListing?: (id: string) => void }) {
   const [contact, setContact] = useState(false);
   const a = post.author;
   return (

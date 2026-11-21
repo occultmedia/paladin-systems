@@ -14,22 +14,12 @@ import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
-import {
-  ArrowUpRight,
-  LayoutList,
-  Map as MapIcon,
-  Megaphone,
-  MessageCircle,
-  Minimize2,
-  Pin,
-  X,
-} from "lucide-react";
+import { ArrowUpRight, LayoutList, Map as MapIcon, Megaphone, Minimize2, Pin, X, Plus, Search } from "lucide-react";
 import { Wordmark } from "@/components/logo";
-import { KIND_STYLE, fmtPrice, timeAgo } from "@/components/feed/feed-view";
-import { AttachedListing } from "@/components/feed/listing-attachment";
+import { PostCard } from "@/components/feed/feed-view";
 import { BAND_COLOR, confidenceBand } from "@/lib/confidence";
 import type { Listing } from "@/lib/aruba-data";
-import { useFeed } from "@/lib/feed";
+import { POST_KINDS, useFeed, type PostKind } from "@/lib/feed";
 import { useWatchlist } from "@/lib/watchlist";
 import { AgencyLogo, SIGNAL_COLOR, SIGNAL_LABEL } from "./map-shared";
 
@@ -56,7 +46,6 @@ const kindOf = (l: Listing) =>
     : l.category === "Land"
       ? `Land · ${l.zoning}`
       : `Commercial · ${l.commercial_use}`;
-const digits = (s: string) => s.replace(/[^\d]/g, "");
 
 /* ── rows ────────────────────────────────────────────────────────────── */
 
@@ -214,79 +203,83 @@ function WatchPanel({
   );
 }
 
-function DealsPanel({ onOpenDeals, onPick }: { onOpenDeals: () => void; onPick: (id: string) => void }) {
-  const { posts, loading } = useFeed(null);
-  if (loading)
-    return <div className="m-2 h-40 animate-pulse rounded-xl bg-zinc-100" />;
-  if (!posts.length)
-    return (
-      <Empty
-        title="No deals in the last 48 hours"
-        text="Be the first to post one."
-      />
+/** Deals in full-screen mode: no map, just the deal and offer cards. */
+function DealsBoard({ onPick, onNewPost, tabs }: { onPick: (id: string) => void; onNewPost: () => void; tabs?: React.ReactNode }) {
+  const { posts, remove, loading } = useFeed(null);
+  const [kind, setKind] = useState<PostKind | "All">("All");
+  const [q, setQ] = useState("");
+  const shown = useMemo(() => {
+    const t = q.trim().toLowerCase();
+    return posts.filter(
+      (p) =>
+        (kind === "All" || p.kind === kind) &&
+        (!t || [p.title, p.body, p.district, p.author.name, p.author.company, p.listing_id].some((x) => x?.toLowerCase().includes(t))),
     );
+  }, [posts, kind, q]);
+
   return (
-    <>
-      {posts.map((p) => {
-        const wa =
-          !p.sample && p.author.whatsapp
-            ? `https://wa.me/${digits(p.author.whatsapp)}?text=${encodeURIComponent(`Hi ${p.author.name.split(" ")[0]}, I saw your post on Terminal: "${p.title}".`)}`
-            : null;
-        return (
-          <article
-            key={p.id}
-            className="rounded-xl border border-zinc-200 bg-white p-3"
+    <div className="flex h-full flex-col bg-zinc-50">
+      <div className="shrink-0 border-b border-zinc-200 bg-white px-4 py-3 sm:px-6">
+        <div className="flex flex-wrap items-center gap-3">
+          {tabs && <div className="w-[360px] max-w-full">{tabs}</div>}
+          <label className="relative min-w-[200px] flex-1">
+            <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+            <span className="sr-only">Search deals</span>
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search deals, areas, members or a listing ID"
+              className="w-full rounded-full border border-zinc-300 bg-white py-2 pl-9 pr-4 text-[13px] outline-none placeholder:text-zinc-400 focus:border-zinc-950"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={onNewPost}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-zinc-950 px-4 py-2 text-[13px] font-semibold text-lime transition-colors hover:bg-zinc-800"
           >
-            <p className="flex items-center justify-between gap-2">
-              <span
-                className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${KIND_STYLE[p.kind]}`}
+            <Plus size={14} strokeWidth={2.2} /> New post
+          </button>
+        </div>
+        <div className="no-scrollbar -mx-4 mt-3 flex gap-1.5 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+          {(["All", ...POST_KINDS] as const).map((k) => {
+            const on = kind === k;
+            const n = k === "All" ? posts.length : posts.filter((p) => p.kind === k).length;
+            return (
+              <button
+                key={k}
+                type="button"
+                aria-pressed={on}
+                onClick={() => setKind(k)}
+                className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-[12px] font-medium transition-colors ${
+                  on ? "bg-zinc-950 text-lime" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 hover:text-zinc-950"
+                }`}
               >
-                {p.kind}
-              </span>
-              <span className="text-[10.5px] tabular-nums text-zinc-400">
-                {timeAgo(p.created_at)}
-              </span>
-            </p>
-            <p className="mt-2 text-[13px] font-semibold leading-snug text-zinc-950">
-              {p.title}
-            </p>
-            <p className="mt-1 truncate text-[11.5px] text-zinc-500">
-              {p.author.name}
-              {p.author.company && ` · ${p.author.company}`}
-            </p>
-            <AttachedListing id={p.listing_id} onOpen={onPick} compact />
-            <div className="mt-2 flex items-center justify-between gap-2 border-t border-zinc-100 pt-2 text-[12px]">
-              <span className="text-zinc-600">
-                {p.price_usd !== null && p.kind !== "Update" && (
-                  <b className="font-display text-zinc-950">
-                    {fmtPrice(p.price_usd, p.kind)}
-                  </b>
-                )}
-                {p.district && <span className="ml-1.5">{p.district}</span>}
-              </span>
-              {wa ? (
-                <a
-                  href={wa}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1 rounded-full bg-zinc-950 px-2.5 py-1 text-[11px] font-semibold text-lime"
-                >
-                  <MessageCircle size={12} /> WhatsApp
-                </a>
-              ) : (
-                <button
-                  type="button"
-                  onClick={onOpenDeals}
-                  className="text-[11.5px] font-semibold text-zinc-950 underline-offset-2 hover:underline"
-                >
-                  Open
-                </button>
-              )}
-            </div>
-          </article>
-        );
-      })}
-    </>
+                {k === "Update" ? "Updates" : k}
+                <span className={`tabular-nums text-[11px] ${on ? "text-zinc-400" : "text-zinc-400"}`}>{n}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div data-lenis-prevent className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6">
+        {loading ? (
+          <div className="grid gap-4 md:grid-cols-2">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="h-48 animate-pulse rounded-2xl bg-zinc-200/60" />
+            ))}
+          </div>
+        ) : shown.length ? (
+          <div className="mx-auto max-w-[1600px] columns-1 gap-4 md:columns-2 2xl:columns-3 [&>*]:mb-4 [&>*]:break-inside-avoid">
+            {shown.map((p) => (
+              <PostCard key={p.id} post={p} onOpenListing={onPick} onDelete={(id) => void remove(id).catch((e) => window.alert(e instanceof Error ? e.message : "Could not delete."))} />
+            ))}
+          </div>
+        ) : (
+          <Empty title={posts.length ? "No deals match" : "No deals in the last 48 hours"} text={posts.length ? "Try another type or search." : "Be the first to post one."} />
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -380,6 +373,10 @@ export function MapFullscreen({
     onSelect(id);
     setMobileView("Map");
   };
+  const openFromDeal = (id: string) => {
+    setPanel("Listings");
+    pick(id);
+  };
   if (!mounted) return null;
 
   const list = (p: FullPanel) =>
@@ -408,7 +405,7 @@ export function MapFullscreen({
         onHover={onHover}
       />
     ) : (
-      <DealsPanel onOpenDeals={() => onExit("Deals")} onPick={pick} />
+      <DealsBoard onPick={openFromDeal} onNewPost={() => onExit("Deals")} />
     );
 
   return createPortal(
@@ -453,7 +450,7 @@ export function MapFullscreen({
 
           <div className="relative flex min-h-0 flex-1">
             {/* side panel (desktop) */}
-            <aside className="hidden w-[390px] shrink-0 flex-col border-r border-zinc-200 lg:flex">
+            <aside className={`hidden w-[390px] shrink-0 flex-col border-r border-zinc-200 ${panel === "Deals" ? "" : "lg:flex"}`}>
               <div className="border-b border-zinc-200 p-3">
                 <PanelTabs value={panel} onChange={setPanel} />
               </div>
@@ -562,9 +559,16 @@ export function MapFullscreen({
                 data-lenis-prevent
                 className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain p-2"
               >
-                {list(panel)}
+                {panel !== "Deals" && list(panel)}
               </div>
             </aside>
+
+            {/* Deals (desktop): the board takes the whole screen, no map */}
+            {panel === "Deals" && mobileView === "Map" && (
+              <div className="absolute inset-0 z-[5] hidden lg:block">
+                <DealsBoard onPick={openFromDeal} onNewPost={() => onExit("Deals")} tabs={<PanelTabs value={panel} onChange={setPanel} />} />
+              </div>
+            )}
 
             {/* map */}
             <div className="relative min-w-0 flex-1">
