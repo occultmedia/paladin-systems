@@ -29,6 +29,7 @@ import {
 } from "@/lib/feed";
 import { profileComplete, type Profile } from "@/lib/profile";
 import { Avatar, Dialog } from "./profile-dialog";
+import { AttachedListing, ListingPicker } from "./listing-attachment";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 const DISTRICT_NAMES = Object.keys(DISTRICT_CENTERS);
@@ -98,7 +99,7 @@ function ContactRow({ post }: { post: FeedPost }) {
   );
 }
 
-function PostCard({ post, onDelete }: { post: FeedPost; onDelete: (id: string) => void }) {
+function PostCard({ post, onDelete, onOpenListing }: { post: FeedPost; onDelete: (id: string) => void; onOpenListing?: (id: string) => void }) {
   const [contact, setContact] = useState(false);
   const a = post.author;
   return (
@@ -131,6 +132,7 @@ function PostCard({ post, onDelete }: { post: FeedPost; onDelete: (id: string) =
 
       <h3 className="mt-4 font-display text-[16.5px] font-bold leading-snug text-zinc-950">{post.title}</h3>
       <p className="mt-1.5 whitespace-pre-line text-[13.5px] leading-relaxed text-zinc-600">{post.body}</p>
+      <AttachedListing id={post.listing_id} onOpen={onOpenListing} />
 
       {((isOffer(post.kind) && post.price_usd !== null) || post.district) && (
         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12.5px]">
@@ -198,6 +200,7 @@ function Composer({ open, onClose, onPost, author }: { open: boolean; onClose: (
   const [body, setBody] = useState("");
   const [price, setPrice] = useState("");
   const [district, setDistrict] = useState("");
+  const [listingId, setListingId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -206,6 +209,7 @@ function Composer({ open, onClose, onPost, author }: { open: boolean; onClose: (
     setBody("");
     setPrice("");
     setDistrict("");
+    setListingId(null);
     setError(null);
   };
 
@@ -222,7 +226,7 @@ function Composer({ open, onClose, onPost, author }: { open: boolean; onClose: (
           setBusy(true);
           setError(null);
           try {
-            await onPost({ kind, title: title.trim(), body: body.trim(), price_usd: n, district: district || null });
+            await onPost({ kind, title: title.trim(), body: body.trim(), price_usd: n, district: district || null, listing_id: listingId });
             reset();
             onClose();
           } catch (err) {
@@ -275,6 +279,20 @@ function Composer({ open, onClose, onPost, author }: { open: boolean; onClose: (
           <textarea id="feed-body" className={`${input} min-h-[120px] resize-y`} value={body} maxLength={BODY_MAX} onChange={(e) => setBody(e.target.value)} placeholder="Size, condition, terms, commission split, timing…" />
         </div>
 
+        <div>
+          <p className="mb-1.5 text-[12.5px] font-medium text-zinc-700">Attach a listing (optional)</p>
+          <ListingPicker
+            value={listingId}
+            onChange={(l) => {
+              setListingId(l?.listing_id ?? null);
+              // Fill the blanks from the listing; members can still edit them.
+              if (l && !district) setDistrict(l.district);
+              if (l && !price && isOffer(kind) && kind !== "For rent" && kind !== "Buyer request") setPrice(String(l.asking_price_usd));
+            }}
+          />
+          <p className="mt-1 text-[11.5px] text-zinc-500">Members see its photo, price, AI Signal and comps, and can open it in the Terminal.</p>
+        </div>
+
         <div className={`grid gap-4 ${isOffer(kind) ? "sm:grid-cols-2" : ""}`}>
           {isOffer(kind) && (
           <div>
@@ -317,7 +335,19 @@ function Composer({ open, onClose, onPost, author }: { open: boolean; onClose: (
 
 /* ── tab ───────────────────────────────────────────────────────────────── */
 
-export function FeedView({ profile, profileLoading, shared, onEditProfile }: { profile: Profile | null; profileLoading: boolean; shared: boolean; onEditProfile: () => void }) {
+export function FeedView({
+  profile,
+  profileLoading,
+  shared,
+  onEditProfile,
+  onOpenListing,
+}: {
+  profile: Profile | null;
+  profileLoading: boolean;
+  shared: boolean;
+  onEditProfile: () => void;
+  onOpenListing?: (id: string) => void;
+}) {
   const router = useRouter();
   const ready = profileComplete(profile);
   const { posts, create, remove, loading, error } = useFeed(ready ? profile : null);
@@ -330,7 +360,7 @@ export function FeedView({ profile, profileLoading, shared, onEditProfile }: { p
     return posts.filter(
       (p) =>
         (kind === "All" || p.kind === kind) &&
-        (!t || [p.title, p.body, p.district, p.author.name, p.author.company].some((s) => s?.toLowerCase().includes(t))),
+        (!t || [p.title, p.body, p.district, p.author.name, p.author.company, p.listing_id].some((s) => s?.toLowerCase().includes(t))),
     );
   }, [posts, kind, q]);
 
@@ -424,7 +454,7 @@ export function FeedView({ profile, profileLoading, shared, onEditProfile }: { p
             <div className="space-y-3">
               <AnimatePresence initial={false}>
                 {shown.map((p) => (
-                  <PostCard key={p.id} post={p} onDelete={(id) => void remove(id).catch((e) => window.alert(e instanceof Error ? e.message : "Could not delete."))} />
+                  <PostCard key={p.id} post={p} onOpenListing={onOpenListing} onDelete={(id) => void remove(id).catch((e) => window.alert(e instanceof Error ? e.message : "Could not delete."))} />
                 ))}
               </AnimatePresence>
             </div>

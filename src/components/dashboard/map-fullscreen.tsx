@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { Wordmark } from "@/components/logo";
 import { KIND_STYLE, fmtPrice, timeAgo } from "@/components/feed/feed-view";
+import { AttachedListing } from "@/components/feed/listing-attachment";
 import { BAND_COLOR, confidenceBand } from "@/lib/confidence";
 import type { Listing } from "@/lib/aruba-data";
 import { useFeed } from "@/lib/feed";
@@ -213,7 +214,7 @@ function WatchPanel({
   );
 }
 
-function DealsPanel({ onOpenDeals }: { onOpenDeals: () => void }) {
+function DealsPanel({ onOpenDeals, onPick }: { onOpenDeals: () => void; onPick: (id: string) => void }) {
   const { posts, loading } = useFeed(null);
   if (loading)
     return <div className="m-2 h-40 animate-pulse rounded-xl bg-zinc-100" />;
@@ -253,6 +254,7 @@ function DealsPanel({ onOpenDeals }: { onOpenDeals: () => void }) {
               {p.author.name}
               {p.author.company && ` · ${p.author.company}`}
             </p>
+            <AttachedListing id={p.listing_id} onOpen={onPick} compact />
             <div className="mt-2 flex items-center justify-between gap-2 border-t border-zinc-100 pt-2 text-[12px]">
               <span className="text-zinc-600">
                 {p.price_usd !== null && p.kind !== "Update" && (
@@ -406,7 +408,7 @@ export function MapFullscreen({
         onHover={onHover}
       />
     ) : (
-      <DealsPanel onOpenDeals={() => onExit("Deals")} />
+      <DealsPanel onOpenDeals={() => onExit("Deals")} onPick={pick} />
     );
 
   return createPortal(

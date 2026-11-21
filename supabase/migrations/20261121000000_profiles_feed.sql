@@ -69,6 +69,7 @@ create table if not exists public.feed_posts (
   body        text not null check (char_length(body) between 20 and 600),
   price_usd   numeric check (price_usd > 0),
   district    text check (char_length(district) <= 60),
+  listing_id  text check (char_length(listing_id) <= 40), -- a Terminal listing attached to the post
   created_at  timestamptz not null default now()
 );
 

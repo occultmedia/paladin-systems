@@ -3177,7 +3177,7 @@ function Dashboard() {
             />
           </>
         ) : tab === "Deals" ? (
-          <FeedView profile={me.profile} profileLoading={me.loading} shared={me.shared} onEditProfile={openProfile} />
+          <FeedView profile={me.profile} profileLoading={me.loading} shared={me.shared} onEditProfile={openProfile} onOpenListing={openListing} />
         ) : tab === "Settings" ? (
           <SettingsView profile={{ draft: me.draft, loading: me.loading }} onSaveProfile={me.save} shared={me.shared} />
         ) : (

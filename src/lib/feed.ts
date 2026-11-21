@@ -46,6 +46,7 @@ export interface FeedPost {
   body: string;
   price_usd: number | null; // asking price, or budget for buyer requests
   district: string | null;
+  listing_id?: string | null; // a Terminal listing attached to the post
   author: FeedAuthor;
   mine?: boolean;
   sample?: boolean; // demo content: contact details are hidden
@@ -57,6 +58,7 @@ export interface NewPost {
   body: string;
   price_usd: number | null;
   district: string | null;
+  listing_id?: string | null;
 }
 
 export const TITLE_MAX = 90;
@@ -119,6 +121,7 @@ const SAMPLES: FeedPost[] = [
     body: "Agents welcome to bring clients. Corner unit, 2 bed, pool view. Coffee and floor plans on site.",
     price_usd: null,
     district: "Palm Beach",
+    listing_id: "AW-0611",
     author: { name: "Daniela Ruiz", role: "Agent", company: "Brightwater Realty", title: "Senior agent" },
     sample: true,
   },
@@ -185,7 +188,7 @@ function subscribe(cb: () => void) {
 /* ── Supabase ─────────────────────────────────────────────────────────── */
 
 const SELECT =
-  "id, created_at, kind, title, body, price_usd, district, author_id, author:profiles(name, role, company, title, email, phone, whatsapp, photo_url, logo_url)";
+  "id, created_at, kind, title, body, price_usd, district, listing_id, author_id, author:profiles(name, role, company, title, email, phone, whatsapp, photo_url, logo_url)";
 
 interface PostRow {
   id: string;
@@ -195,6 +198,7 @@ interface PostRow {
   body: string;
   price_usd: number | null;
   district: string | null;
+  listing_id: string | null;
   author_id: string;
   author: Parameters<typeof rowToProfile>[0] | null;
 }
@@ -207,6 +211,7 @@ const fromRow = (r: PostRow, uid: string): FeedPost => ({
   body: r.body,
   price_usd: r.price_usd === null ? null : Number(r.price_usd),
   district: r.district,
+  listing_id: r.listing_id,
   author: r.author ? rowToProfile(r.author) : { name: "Member", role: "Agent", company: "" },
   mine: r.author_id === uid,
 });
