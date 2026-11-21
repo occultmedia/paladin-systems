@@ -72,7 +72,7 @@ function ContactRow({ post }: { post: FeedPost }) {
   const a = post.author;
   if (post.sample)
     return <p className="rounded-lg bg-zinc-50 px-3 py-2.5 text-[12px] text-zinc-500">Sample post. Contact details appear on real member posts.</p>;
-  const msg = `Hi ${a.name.split(" ")[0]}, I saw your post on Sequence Terminal: "${post.title}".`;
+  const msg = `Hi ${a.name.split(" ")[0]}, I saw your post on Terminal: "${post.title}".`;
   const links = [
     a.whatsapp && { href: `https://wa.me/${digits(a.whatsapp)}?text=${encodeURIComponent(msg)}`, label: "WhatsApp", icon: MessageCircle, primary: true },
     a.phone && { href: `tel:${a.phone.replace(/[^\d+]/g, "")}`, label: "Call", icon: Phone },
@@ -438,7 +438,7 @@ export function FeedView({ profile, profileLoading, shared, onEditProfile }: { p
             </p>
             <ul className="mt-3 space-y-2.5 text-[12.5px] leading-relaxed text-zinc-300">
               <li>Post updates and offers: a deal, a buyer, a rental, a partnership or market news.</li>
-              <li>Every Sequence Terminal member sees every post.</li>
+              <li>Every Terminal member sees every post.</li>
               <li>Interested members contact you directly by WhatsApp, phone or email.</li>
               <li className="flex gap-2">
                 <Clock size={13} className="mt-[3px] shrink-0 text-mint" />

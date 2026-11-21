@@ -20,7 +20,7 @@ import {
 } from "@/lib/aruba-data";
 
 /* ─────────────────────────────────────────────────────────────────────────
- * Sequence Terminal (powered by Sequence Data) — landing page.
+ * Terminal (powered by Sequence Data) — landing page.
  * Every number is read from src/lib/aruba-data.ts, the same source as the
  * dashboard. Photos are Unsplash placeholders until real listing photos.
  * ──────────────────────────────────────────────────────────────────────── */
@@ -360,7 +360,7 @@ export default function Home() {
       {/* Nav */}
       <header className="sticky top-0 z-[1000] border-b border-zinc-200 bg-white/90 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-[1240px] items-center justify-between px-5 sm:px-6">
-          <Link href="/" aria-label="Sequence Terminal home">
+          <Link href="/" aria-label="Terminal home">
             <Wordmark />
           </Link>
           <nav className="hidden items-center gap-8 md:flex">
@@ -400,7 +400,7 @@ export default function Home() {
                 Aruba Real Estate Market Intelligence
               </h1>
               <p className="mt-5 max-w-[46ch] text-[16px] leading-relaxed text-zinc-600 sm:text-[17px]">
-                Every morning Sequence Terminal&apos;s AI reads every home, land and commercial listing in Aruba, then tells you what
+                Every morning Terminal&apos;s AI reads every home, land and commercial listing in Aruba, then tells you what
                 changed, what each property is worth a look for and who is selling it. Pin what you are watching and keep
                 track of the clients who asked.
               </p>
@@ -514,7 +514,7 @@ export default function Home() {
                     AI reads the whole Aruba market before you do.
                   </h2>
                   <p className="mt-5 max-w-[50ch] text-[16px] leading-relaxed text-zinc-400">
-                    Every morning Sequence Terminal reads every listing on Aruba&apos;s agency websites, checks each one against its comps and
+                    Every morning Terminal reads every listing on Aruba&apos;s agency websites, checks each one against its comps and
                     its own history, and tells you what changed and what it means.
                   </p>
                 </Reveal>
@@ -560,7 +560,7 @@ export default function Home() {
         {/* Overview bento */}
         <section className="mx-auto max-w-[1240px] px-5 py-16 sm:px-6 sm:py-24">
           <Reveal className="text-center">
-            <Eyebrow>The Sequence Terminal platform</Eyebrow>
+            <Eyebrow>The Terminal platform</Eyebrow>
             <h2 className="mx-auto mt-4 max-w-[22ch] font-display text-[30px] font-bold leading-[1.08] tracking-tight text-zinc-950 sm:text-[44px]">
               From first look to final offer
             </h2>
@@ -696,7 +696,7 @@ export default function Home() {
               <SectionHeading
                 eyebrow="Step 01 · Find"
                 title="Every high-value listing in Aruba, in one place."
-                body="Every morning Sequence Terminal checks the websites of Aruba's agencies, brokers and developers for homes, condos, land and commercial property. New listings, price changes and sales show up in one feed, so you see them first."
+                body="Every morning Terminal checks the websites of Aruba's agencies, brokers and developers for homes, condos, land and commercial property. New listings, price changes and sales show up in one feed, so you see them first."
               />
               <PrimaryCta>Browse all listings</PrimaryCta>
             </div>
@@ -946,7 +946,7 @@ export default function Home() {
                   </p>
                 </div>
                 <a
-                  href={`mailto:${CONTACT_EMAIL}?subject=Sequence%20Terminal%20Team%20Access`}
+                  href={`mailto:${CONTACT_EMAIL}?subject=Terminal%20Team%20Access`}
                   className="mt-8 inline-flex items-center gap-2 self-start rounded-full border-2 border-zinc-950 px-5 py-3 font-display text-[14px] font-semibold text-zinc-950 transition-colors hover:bg-zinc-950 hover:text-white"
                 >
                   Contact us <ArrowUpRight size={15} strokeWidth={2} />
@@ -970,7 +970,7 @@ export default function Home() {
                 {NEW_THIS_WEEK} new listings this week
               </p>
               <h2 className="mt-5 max-w-[18ch] font-display text-[34px] font-bold leading-[1.05] tracking-tight text-white sm:text-[52px]">
-                The market moved this morning. Sequence Terminal already read it.
+                The market moved this morning. Terminal already read it.
               </h2>
             </Reveal>
             <div className="flex flex-wrap gap-3">
@@ -992,7 +992,7 @@ export default function Home() {
         <div className="mx-auto flex max-w-[1240px] flex-col gap-6 px-5 py-10 sm:px-6 md:flex-row md:items-center md:justify-between">
           <Wordmark tagline />
           <p className="max-w-[64ch] text-[12px] leading-relaxed text-zinc-500 md:text-right">
-            © 2026 Sequence Terminal by Sequence Data · Oranjestad, Aruba · {CONTACT_EMAIL}
+            © 2026 Terminal by Sequence Data · Oranjestad, Aruba · {CONTACT_EMAIL}
             <br />
             Data is for information only and is not investment advice. Photos: Unsplash.
           </p>

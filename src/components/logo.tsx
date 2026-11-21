@@ -1,7 +1,7 @@
 import Image from "next/image";
 
 /*
- * Brand: the product is "Sequence Terminal", powered by Sequence Data.
+ * Brand: the product is "Terminal", powered by Sequence Data.
  *  - sd-lockup-*.png   : "SD | Sequence Data" lockup (from public/brand/sequence-data-logo-2026.webp)
  *  - sd-monogram-*.png : the SD monogram alone
  *  - sd-icon.png       : white SD on black square (favicon / app icon)
@@ -32,39 +32,26 @@ export function SequenceMonogram({ className = "h-6 w-auto", tone = "black" }: {
 }
 
 /**
- * Sequence Terminal mark: a command prompt chevron with a block cursor.
- * Hard angles, square caps, mitred joins. The cursor blinks slowly
- * (motion-safe only).
+ * "Terminal" wordmark: the name in bold caps with a blinking block cursor
+ * (motion-safe only), plus an optional "Powered by Sequence Data" line.
  */
-export function TerminalGlyph({ tone = "black", className = "size-[22px]", blink = true }: { tone?: Tone; className?: string; blink?: boolean }) {
-  const fg = tone === "black" ? "#0A0A0A" : "#FFFFFF";
-  const cursor = tone === "black" ? "#0A0A0A" : "#DDE5DC";
-  return (
-    <svg viewBox="0 0 24 24" className={`${className} shrink-0`} aria-hidden fill="none" strokeLinecap="square" strokeLinejoin="miter">
-      <path d="M3 5.5l7 6.5-7 6.5" stroke={fg} strokeWidth="2.6" />
-      <rect x="12.5" y="16.2" width="9" height="2.8" fill={cursor} className={blink ? "motion-safe:animate-[st-cursor_1.2s_steps(1)_infinite]" : undefined} />
-    </svg>
-  );
-}
-
-/** "Sequence Terminal" wordmark (stacked), with an optional "Powered by Sequence Data" line. */
 export function Wordmark({ tone = "black", tagline = false }: { tone?: Tone; tagline?: boolean }) {
   const text = tone === "black" ? "text-zinc-950" : "text-white";
   const muted = tone === "black" ? "text-zinc-500" : "text-zinc-400";
+  const cursor = tone === "black" ? "bg-zinc-950" : "bg-mint";
   return (
-    <span className="flex items-center gap-2.5">
-      <TerminalGlyph tone={tone} />
-      <span className="leading-none">
-        <span className={`block whitespace-nowrap font-display text-[17px] font-bold uppercase tracking-[0.2em] ${text}`}>Sequence</span>
-        <span className={`mt-[3px] block whitespace-nowrap font-display text-[9.5px] font-semibold uppercase tracking-[0.62em] ${muted}`}>Terminal</span>
-        {tagline && (
-          <span className={`mt-1.5 flex items-center gap-1.5 whitespace-nowrap text-[8.5px] font-medium uppercase tracking-[0.14em] ${muted}`}>
-            Powered by
-            <SequenceMonogram tone={tone} className="h-[9px] w-auto" />
-            <span className={tone === "black" ? "text-zinc-800" : "text-zinc-200"}>Sequence Data</span>
-          </span>
-        )}
+    <span className="inline-block leading-none">
+      <span className={`flex items-end whitespace-nowrap font-display text-[19px] font-bold uppercase tracking-[0.24em] ${text}`}>
+        Terminal
+        <span aria-hidden className={`mb-[2px] ml-[3px] inline-block h-[3px] w-[11px] ${cursor} motion-safe:animate-[st-cursor_1.2s_steps(1)_infinite]`} />
       </span>
+      {tagline && (
+        <span className={`mt-2 flex items-center gap-1.5 whitespace-nowrap text-[8.5px] font-medium uppercase tracking-[0.14em] ${muted}`}>
+          Powered by
+          <SequenceMonogram tone={tone} className="h-[9px] w-auto" />
+          <span className={tone === "black" ? "text-zinc-800" : "text-zinc-200"}>Sequence Data</span>
+        </span>
+      )}
     </span>
   );
 }

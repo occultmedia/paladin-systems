@@ -197,7 +197,7 @@ function PriceMove({ pct, label = true, size = 12 }: { pct: number; label?: bool
 
 function Logo() {
   return (
-    <Link href="/" className="select-none" aria-label="Sequence Terminal home">
+    <Link href="/" className="select-none" aria-label="Terminal home">
       <Wordmark tone="white" />
     </Link>
   );
@@ -2804,7 +2804,7 @@ function Dashboard() {
 
       <footer className="border-t border-zinc-200">
         <div className={`${MONO} mx-auto flex max-w-[1400px] flex-wrap justify-between gap-2 px-6 py-5 text-[10px] tracking-wider text-zinc-500`}>
-          <span>© 2026 SEQUENCE TERMINAL · POWERED BY SEQUENCE DATA · PROPRIETARY & CONFIDENTIAL</span>
+          <span>© 2026 TERMINAL · POWERED BY SEQUENCE DATA · PROPRIETARY & CONFIDENTIAL</span>
           <span>NOT INVESTMENT ADVICE · FOR LICENSED SUBSCRIBERS ONLY</span>
         </div>
       </footer>

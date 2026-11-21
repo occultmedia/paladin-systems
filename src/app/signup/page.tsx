@@ -3,8 +3,8 @@ import { AuthShell, SignupForm } from "@/components/auth/auth-forms";
 import { MARKET_TOTAL, marketBrief, scanRows } from "@/lib/scan-data";
 
 export const metadata: Metadata = {
-  title: "Create your account | Sequence Terminal",
-  description: "Sign up for Sequence Terminal: the whole Aruba real estate market, read by AI every morning.",
+  title: "Create your account | Terminal",
+  description: "Sign up for Terminal: the whole Aruba real estate market, read by AI every morning.",
 };
 
 export default async function SignupPage({ searchParams }: { searchParams: Promise<{ plan?: string }> }) {
