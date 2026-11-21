@@ -4,7 +4,7 @@ import { ArrowRight, ArrowUpRight, MessageCircle, Phone, Pin, Users } from "luci
 import { SequenceLockup, Wordmark } from "@/components/logo";
 import { PlanPrice } from "@/components/landing/plan-price";
 import { AIBadge, AIMarketScan, Spotlight } from "@/components/ai/ai-visuals";
-import { Hero, type HeroEvent, type HeroFeature } from "@/components/landing/hero";
+import { Hero, type HeroEvent, type HeroKpi } from "@/components/landing/hero";
 import { SiteHeader } from "@/components/landing/site-header";
 import { AgentsSection, AiCapabilities, InvestorsSection, type AgentMorning, type AiExamples, type InvestorExample } from "@/components/landing/sell-sections";
 import { computedListingNote, listingFacts } from "@/lib/signal-ai";
@@ -248,18 +248,14 @@ function heroData() {
   if (doubt && doubt.confidence_score < 80)
     events.push({ ...at(doubt), id: `cf-${doubt.listing_id}`, kind: `Confidence ${doubt.confidence_score}%`, tone: "warn", title: doubt.asset_name, detail: "Missing from the agency site, price unchanged", value: "Possible ghost listing" });
 
-  const ids = (ls: Listing[]) => ls.map((l) => l.listing_id);
   const undervalued = ALL_LISTINGS.filter((l) => l.signal === "UNDERVALUED");
-  const lowConfidence = ALL_LISTINGS.filter((l) => l.confidence_score < 80);
-  const features: HeroFeature[] = [
-    { id: "read", name: "Daily market read", text: "Every agency site in Aruba, read overnight", stat: `${RUN.new_listings.length} new today`, tone: "mint", ids: ids(RUN.new_listings) },
-    { id: "signal", name: "AI Signal", text: "Every listing priced against its comps", stat: `${undervalued.length} undervalued`, tone: "up", ids: ids(undervalued) },
-    { id: "price", name: "Price tracking", text: "Every cut and raise, with full history", stat: `${RUN.price_changes.length} moves today`, tone: "down", ids: RUN.price_changes.map((c) => c.listing.listing_id) },
-    { id: "confidence", name: "Confidence Score", text: "Ghost listings flagged before you call", stat: `${lowConfidence.length} under 80%`, tone: "warn", ids: ids(lowConfidence) },
-    { id: "status", name: "Contracts & sales", text: "Know the day a listing goes under contract", stat: `${RUN.status_changes.length} today`, tone: "warn", ids: ids(RUN.status_changes) },
-    { id: "deals", name: "Deals", text: "Off-market deals and buyer requests", stat: "48 h posts", tone: "mint", ids: [] },
+  const kpis: HeroKpi[] = [
+    { label: "Listings", value: ALL_LISTINGS.length },
+    { label: "New today", value: RUN.new_listings.length },
+    { label: "Price moves", value: RUN.price_changes.length },
+    { label: "Undervalued", value: undervalued.length },
   ];
-  return { events, features, runLabel: `Read ${PREVIEW.run.time} · ${ALL_LISTINGS.length} listings · ${RUN.new_listings.length} new` };
+  return { events, kpis, runLabel: `Read ${PREVIEW.run.time} · ${ALL_LISTINGS.length} listings · ${RUN.new_listings.length} new` };
 }
 
 const HERO = heroData();
@@ -456,7 +452,7 @@ export default function Home() {
       <SiteHeader />
 
       <main id="main">
-        <Hero listings={ALL_LISTINGS} events={HERO.events} features={HERO.features} runLabel={HERO.runLabel} runTime={PREVIEW.run.time} total={ALL_LISTINGS.length} />
+        <Hero listings={ALL_LISTINGS} events={HERO.events} kpis={HERO.kpis} brief={BRIEF.headline} backdrop={ARUBA_PHOTOS.aerial} runLabel={HERO.runLabel} runTime={PREVIEW.run.time} total={ALL_LISTINGS.length} />
 
         {/* AI Signal */}
         <section id="ai-signal" className="scroll-mt-16 border-y border-zinc-200 bg-white text-zinc-950">

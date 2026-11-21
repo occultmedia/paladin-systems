@@ -1827,6 +1827,7 @@ function ActiveListings({
   initialNewToday,
   initialFullMap,
   onExitTo,
+  onFullClosed,
 }: {
   listings?: Listing[];
   initialDistrict?: string;
@@ -1836,6 +1837,8 @@ function ActiveListings({
   initialFullMap?: boolean;
   /** Leaving full-screen mode from the Watchlist or Deals panel opens that tab. */
   onExitTo?: (tab: FullPanel) => void;
+  /** Full-screen mode was left; do not open it again on the next visit to this tab. */
+  onFullClosed?: () => void;
 }) {
   const [query, setQuery] = useState(initialQuery ?? "");
   const [tenure, setTenure] = useState<Tenure | "All">("All");
@@ -1860,14 +1863,16 @@ function ActiveListings({
   const [fullMap, setFullMap] = useState(Boolean(initialFullMap));
   const closeFullMap = useCallback((tab: FullPanel = "Listings") => {
     setFullMap(false);
+    onFullClosed?.();
     if (tab !== "Listings") onExitTo?.(tab);
     // Opened from a "?map=full" link: drop the flag so it does not reopen.
     const url = new URL(window.location.href);
-    if (url.searchParams.has("map")) {
+    if (url.searchParams.has("map") || !url.searchParams.has("tab")) {
       url.searchParams.delete("map");
+      if (!url.searchParams.has("tab")) url.searchParams.set("tab", tab === "Listings" ? "listings" : tab.toLowerCase());
       window.history.replaceState(null, "", url);
     }
-  }, [onExitTo]);
+  }, [onExitTo, onFullClosed]);
 
   // The table scrolls sideways on narrower screens. An open listing's details
   // are pinned to the visible width so nothing is cut off on the right.
@@ -3096,6 +3101,8 @@ const SLUG_TAB = {
 
 function Dashboard() {
   const params = useSearchParams();
+  // Coming into the Terminal from outside (plain /dashboard, or a "?map=full" link) opens full-screen mode.
+  const [enterFull, setEnterFull] = useState(() => params.get("map") === "full" || params.toString() === "");
   const router = useRouter();
   const { user, ready } = useUser();
   // The Terminal is for members: once accounts are live, signed-out visitors go to log in.
@@ -3172,7 +3179,8 @@ function Dashboard() {
               initialQuery={listingsView.query}
               initialOpenId={listingsView.openId}
               initialNewToday={listingsView.newToday}
-              initialFullMap={params.get("map") === "full"}
+              initialFullMap={enterFull && listingsView.key === 0}
+              onFullClosed={() => setEnterFull(false)}
               onExitTo={(t) => setTab(t)}
             />
           </>
