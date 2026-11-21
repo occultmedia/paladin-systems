@@ -11,7 +11,7 @@
  * `repository` to it. Nothing in the UI layer needs to change.
  */
 
-import { Fragment, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
@@ -64,6 +64,7 @@ import {
   Bell,
   ChevronDown,
   Flag,
+  Info,
   ShieldCheck,
   Undo2,
   LayoutList,
@@ -627,18 +628,20 @@ function SortHeader({
   sort,
   onSort,
   align = "right",
+  tip,
 }: {
   label: string;
   k: SortKey;
   sort: { key: SortKey; dir: "asc" | "desc" };
   onSort: (k: SortKey) => void;
   align?: "left" | "right";
+  tip?: React.ReactNode;
 }) {
   const active = sort.key === k;
   return (
     <th
       aria-sort={active ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}
-      className={`border-b border-zinc-300 px-3 py-3 text-[10px] font-medium uppercase tracking-[0.14em] first:pl-4 ${align === "right" ? "text-right" : "text-left"}`}
+      className={`whitespace-nowrap border-b border-zinc-300 px-2.5 py-3 text-[10px] font-medium uppercase tracking-[0.14em] first:pl-4 ${align === "right" ? "text-right" : "text-left"}`}
     >
       <button
         type="button"
@@ -648,6 +651,7 @@ function SortHeader({
         {label}
         <span className="text-[9px]">{active ? (sort.dir === "asc" ? "▲" : "▼") : ""}</span>
       </button>
+      {tip && <span className="ml-1 inline-flex align-middle">{tip}</span>}
     </th>
   );
 }
@@ -655,7 +659,7 @@ function SortHeader({
 function PlainHeader({ label, align = "right" }: { label: string; align?: "left" | "right" }) {
   return (
     <th
-      className={`border-b border-zinc-300 px-3 py-3 text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-500 ${align === "right" ? "text-right" : "text-left"}`}
+      className={`whitespace-nowrap border-b border-zinc-300 px-2.5 py-3 text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-500 ${align === "right" ? "text-right" : "text-left"}`}
     >
       {label}
     </th>
@@ -691,6 +695,66 @@ function DetailItem({ label, value, color }: { label: string; value: React.React
 
 /* ── Confidence Score + Kill Switch ───────────────────────────────────── */
 
+/** Small (i) button with a tooltip: opens on hover, focus or tap; Escape closes. */
+function InfoTip({ label, children, align = "right" }: { label: string; children: React.ReactNode; align?: "left" | "right" }) {
+  const [open, setOpen] = useState(false);
+  const id = useId();
+  return (
+    <span className="relative inline-flex" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
+      <button
+        type="button"
+        aria-label={label}
+        aria-expanded={open}
+        aria-describedby={open ? id : undefined}
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((o) => !o);
+        }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+        onKeyDown={(e) => e.key === "Escape" && setOpen(false)}
+        className="grid size-[18px] place-items-center rounded-full text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-zinc-950"
+      >
+        <Info size={12} strokeWidth={2} />
+      </button>
+      {open && (
+        <span
+          role="tooltip"
+          id={id}
+          className={`absolute top-full z-50 mt-2 block w-[min(300px,calc(100vw-48px))] rounded-xl bg-zinc-950 p-3.5 text-left text-[12px] font-normal normal-case leading-relaxed tracking-normal text-zinc-300 shadow-2xl shadow-zinc-950/30 ${
+            align === "right" ? "right-0" : "left-0"
+          }`}
+        >
+          {children}
+        </span>
+      )}
+    </span>
+  );
+}
+
+function ConfidenceTip() {
+  return (
+    <>
+      <span className="block font-semibold text-white">What is the Confidence Score?</span>
+      <span className="mt-1 block">
+        How likely it is that this listing is really still for sale. Agency sites often leave sold or withdrawn homes online (&quot;ghost listings&quot;), so Terminal scores every listing from 0 to 100% instead of trusting the site.
+      </span>
+      <span className="mt-2 block text-white">It goes down when:</span>
+      <span className="block">· the listing disappears from the agency&apos;s site (−{CONFIDENCE_RULES.missingPerWeek} per week)</span>
+      <span className="block">· it sits on the market for 6+ months</span>
+      <span className="block">· the price never moves for 4+ months</span>
+      <span className="mt-2 block">
+        Rescored every night. If a member flags it as delisted it drops to 0% and is removed for everyone.
+      </span>
+      <span className="mt-2 flex gap-3 text-[11px]">
+        <span style={{ color: "#6FCF97" }}>80+ High</span>
+        <span style={{ color: "#F2B45A" }}>50–79 Medium</span>
+        <span style={{ color: "#F28B82" }}>Under 50 Low</span>
+      </span>
+    </>
+  );
+}
+
 function confidenceReasons(l: Listing) {
   const lastMove = l.price_history[l.price_history.length - 1]?.date ?? l.first_seen;
   return scoreConfidence({
@@ -712,8 +776,8 @@ function ConfidenceBadge({ l, align = "end" }: { l: Listing; align?: "start" | "
       className={`inline-flex flex-col gap-1 ${align === "end" ? "items-end" : "items-start"}`}
       title={`Confidence ${s}/100 (${band}). ${why.length ? why.map((r) => `${r.label} (${r.points})`).join("; ") : "Found on its source site in the latest scrape, price active."}`}
     >
-      <span className={`${MONO} inline-flex items-center gap-1.5 text-[12px] font-semibold`} style={{ color }}>
-        <span className="relative h-1.5 w-10 overflow-hidden rounded-full bg-zinc-100">
+      <span className={`${MONO} inline-flex items-center gap-1.5 whitespace-nowrap text-[12px] font-semibold`} style={{ color }}>
+        <span className="relative h-1.5 w-8 overflow-hidden rounded-full bg-zinc-100">
           <span className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${s}%`, background: color }} />
         </span>
         {s}%
@@ -734,6 +798,9 @@ function ConfidencePanel({ l }: { l: Listing }) {
         <div className="min-w-0">
           <p className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-500">
             <ShieldCheck size={12} /> Confidence score
+            <InfoTip label="What is the Confidence Score?" align="left">
+              <ConfidenceTip />
+            </InfoTip>
           </p>
           <p className="mt-1.5 flex items-baseline gap-2">
             <span className={`${MONO} font-display text-[22px] font-bold`} style={{ color: BAND_COLOR[band] }}>
@@ -1778,6 +1845,28 @@ function ActiveListings({
   const [openId, setOpenId] = useState<string | null>(initialOpenId ?? null);
   const [hoverId, setHoverId] = useState<string | null>(null);
 
+  // The table scrolls sideways on narrower screens. An open listing's details
+  // are pinned to the visible width so nothing is cut off on the right.
+  const tableRef = useRef<HTMLDivElement>(null);
+  const [paneW, setPaneW] = useState(0);
+  const [edge, setEdge] = useState({ left: false, right: false });
+  useEffect(() => {
+    const el = tableRef.current;
+    if (!el) return;
+    const update = () => {
+      setPaneW(el.clientWidth);
+      setEdge({ left: el.scrollLeft > 4, right: el.scrollLeft + el.clientWidth < el.scrollWidth - 4 });
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    el.addEventListener("scroll", update, { passive: true });
+    return () => {
+      ro.disconnect();
+      el.removeEventListener("scroll", update);
+    };
+  }, []);
+
   useEffect(() => {
     if (!initialOpenId || !listings) return;
     const t = window.setTimeout(
@@ -1898,10 +1987,10 @@ function ActiveListings({
     `inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-md border px-3 py-2 text-[12px] font-medium transition-colors active:scale-[0.97] ${
       on ? "border-zinc-950 bg-zinc-950 text-mint" : "border-zinc-300 bg-white text-zinc-700 hover:border-zinc-500"
     }`;
-  const td = "px-3 py-4 border-b border-zinc-200 align-top";
+  const td = "px-2.5 py-4 border-b border-zinc-200 align-top";
   const num = `${td} ${MONO} text-right text-[13px] text-zinc-800`;
   // listing, district, status, asking, $/sqft, signal, listed, chevron + the category-dependent columns
-  const colCount = 9 + (nonResidential ? 1 : 2) + (landOnly ? 1 : 2) + 1;
+  const colCount = 9 + 1 + (landOnly ? 1 : 2) + 1;
 
   return (
     <>
@@ -2216,8 +2305,11 @@ function ActiveListings({
         })}
       </ul>
 
-      <div className="relative mt-3 hidden overflow-x-auto border-t border-zinc-950 md:block">
-        <table className="w-full min-w-[1320px] border-collapse text-left">
+      <div className="relative mt-3 hidden md:block">
+      <div aria-hidden className={`pointer-events-none absolute inset-y-0 left-0 z-20 w-4 bg-gradient-to-r from-white to-transparent transition-opacity ${edge.left ? "opacity-100" : "opacity-0"}`} />
+      <div aria-hidden className={`pointer-events-none absolute inset-y-0 right-0 z-20 w-4 bg-gradient-to-l from-white to-transparent transition-opacity ${edge.right ? "opacity-100" : "opacity-0"}`} />
+      <div ref={tableRef} className="overflow-x-auto border-t border-zinc-950">
+        <table className="w-full min-w-[1180px] border-collapse text-left">
           <thead>
             <tr>
               <SortHeader label={landOnly ? "Parcel" : "Listing"} k="name" sort={sort} onSort={onSort} align="left" />
@@ -2227,25 +2319,33 @@ function ActiveListings({
               ) : commercialOnly ? (
                 <PlainHeader label="Use" />
               ) : (
-                <>
-                  <SortHeader label="Beds" k="beds" sort={sort} onSort={onSort} />
-                  <SortHeader label="Baths" k="baths" sort={sort} onSort={onSort} />
-                </>
+                <SortHeader label="Bd / Ba" k="beds" sort={sort} onSort={onSort} />
               )}
-              {!landOnly && <SortHeader label="Built-up (sq ft)" k="built" sort={sort} onSort={onSort} />}
-              <SortHeader label="Lot (sq ft)" k="lot" sort={sort} onSort={onSort} />
+              {!landOnly && <SortHeader label="Built ft²" k="built" sort={sort} onSort={onSort} />}
+              <SortHeader label="Lot ft²" k="lot" sort={sort} onSort={onSort} />
               <SortHeader label="Asking" k="asking" sort={sort} onSort={onSort} />
-              <SortHeader label="$ / sq ft" k="psf" sort={sort} onSort={onSort} />
+              <SortHeader label="$ / ft²" k="psf" sort={sort} onSort={onSort} />
               {nonResidential ? (
                 <SortHeader label="Vs. District" k="vsDistrict" sort={sort} onSort={onSort} />
               ) : (
                 <SortHeader label="Proj. Yield" k="yield" sort={sort} onSort={onSort} />
               )}
               <SortHeader label="Status" k="status" sort={sort} onSort={onSort} />
-              <SortHeader label="Confidence" k="confidence" sort={sort} onSort={onSort} />
+              <SortHeader
+                label="Confidence"
+                k="confidence"
+                sort={sort}
+                onSort={onSort}
+                align="right"
+                tip={
+                  <InfoTip label="What is the Confidence Score?">
+                    <ConfidenceTip />
+                  </InfoTip>
+                }
+              />
               <PlainHeader label="Value" />
               <SortHeader label="Listed" k="listed" sort={sort} onSort={onSort} />
-              <th className="w-20 border-b border-zinc-300 pr-4" aria-label="Watch and details" />
+              <th className="w-14 border-b border-zinc-300 pr-3" aria-label="Watch and details" />
             </tr>
           </thead>
           <tbody>
@@ -2284,7 +2384,7 @@ function ActiveListings({
                     onMouseLeave={() => setHoverId(null)}
                     className={`cursor-pointer scroll-mt-24 transition-colors hover:bg-mint-soft ${open || hot ? "bg-mint-soft" : ""}`}
                   >
-                    <td className={`${td} min-w-[300px] pl-4`}>
+                    <td className={`${td} min-w-[250px] pl-4`}>
                       <div className="flex items-start gap-3">
                         <span className="relative shrink-0" title={`Listed by ${l.agency.name}`}>
                           <Thumb src={l.photo_url} alt={l.asset_name} />
@@ -2292,7 +2392,7 @@ function ActiveListings({
                             <AgencyLogo agency={l.agency} size={20} rounded={4} />
                           </span>
                         </span>
-                        <div>
+                        <div className="min-w-0 max-w-[210px]">
                           <p className="flex flex-wrap items-center gap-1.5 text-[13px] font-medium text-zinc-950">
                             {l.asset_name}
                             <ScrapeTags l={l} />
@@ -2318,10 +2418,17 @@ function ActiveListings({
                     ) : commercialOnly ? (
                       <td className={`${td} text-right text-[13px] text-zinc-700`}>{l.category === "Commercial" ? l.commercial_use : DASH}</td>
                     ) : (
-                      <>
-                        <td className={num}>{l.category === "Property" ? l.bedrooms : DASH}</td>
-                        <td className={num}>{l.category === "Property" ? l.bathrooms : DASH}</td>
-                      </>
+                      <td className={num}>
+                        {l.category === "Property" ? (
+                          <>
+                            {l.bedrooms}
+                            <span className="text-zinc-400"> / </span>
+                            {l.bathrooms}
+                          </>
+                        ) : (
+                          DASH
+                        )}
+                      </td>
                     )}
                     {!landOnly && <td className={num}>{l.category === "Land" ? DASH : int.format(l.built_sqft)}</td>}
                     <td className={num}>{l.lot_sqft ? int.format(l.lot_sqft) : DASH}</td>
@@ -2363,7 +2470,7 @@ function ActiveListings({
                       <SignalBadge signal={l.signal} />
                     </td>
                     <td className={num}>{l.is_new ? <span className="font-semibold text-zinc-950">Today</span> : `${l.days_on_market}d`}</td>
-                    <td className={`${td} pr-4 text-right`}>
+                    <td className={`${td} pr-3 text-right`}>
                       <span className="flex items-center justify-end gap-1">
                         <WatchButton l={l} variant="icon" />
                         <ChevronDown size={14} strokeWidth={1.5} className={`text-zinc-400 transition-transform ${open ? "rotate-180" : ""}`} />
@@ -2372,8 +2479,10 @@ function ActiveListings({
                   </tr>
                   {open && (
                     <tr className="bg-mint-soft">
-                      <td colSpan={colCount} className="border-b border-zinc-300 px-4 pb-6 pt-1">
-                        <ListingDetails l={l} marketYield={marketYield} />
+                      <td colSpan={colCount} className="border-b border-zinc-300 p-0">
+                        <div className="sticky left-0 px-4 pb-6 pt-1" style={paneW ? { width: paneW } : undefined}>
+                          <ListingDetails l={l} marketYield={marketYield} />
+                        </div>
                       </td>
                     </tr>
                   )}
@@ -2382,6 +2491,7 @@ function ActiveListings({
             })}
           </tbody>
         </table>
+      </div>
       </div>
       <div className="mt-4 space-y-1 text-[11px] leading-relaxed text-zinc-500">
         <p>
