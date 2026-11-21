@@ -417,3 +417,31 @@ body {
   0%, 55% { opacity: 1; }
   56%, 100% { opacity: 0; }
 }
+
+/* Landing hero: scan sweep over the island and the pin it lights */
+.hero-scan {
+  animation-name: hero-scan;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+@keyframes hero-scan {
+  from { transform: translateY(-160px); }
+  to { transform: translateY(1000px); }
+}
+.hero-hit {
+  transform-box: fill-box;
+  transform-origin: center;
+  opacity: 0;
+  animation-name: hero-hit;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  animation-iteration-count: infinite;
+}
+@keyframes hero-hit {
+  0% { opacity: 0; transform: scale(0.4); }
+  2% { opacity: 0.9; transform: scale(1); }
+  16% { opacity: 0; transform: scale(2.8); }
+  100% { opacity: 0; transform: scale(2.8); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-scan, .hero-hit { animation: none; }
+}

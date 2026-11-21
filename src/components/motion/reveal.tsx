@@ -65,10 +65,25 @@ export function StaggerItem({ children, className }: { children: React.ReactNode
   );
 }
 
-/** Counts up to `value` when it scrolls into view. */
-export function CountUp({ value, prefix = "", suffix = "", decimals = 0 }: { value: number; prefix?: string; suffix?: string; decimals?: number }) {
+/** Counts up to `value` when it scrolls into view (or on mount, for above-the-fold figures). */
+export function CountUp({
+  value,
+  prefix = "",
+  suffix = "",
+  decimals = 0,
+  onMount = false,
+  delay = 0,
+}: {
+  value: number;
+  prefix?: string;
+  suffix?: string;
+  decimals?: number;
+  onMount?: boolean;
+  delay?: number;
+}) {
   const ref = useRef<HTMLSpanElement>(null);
-  const inView = useInView(ref, { once: true, margin: "0px 0px -10% 0px" });
+  const seen = useInView(ref, { once: true, margin: "0px 0px -10% 0px" });
+  const inView = onMount || seen;
   const mv = useMotionValue(0);
   const text = useTransform(mv, (v) => `${prefix}${v.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}${suffix}`);
   useEffect(() => {
@@ -77,9 +92,9 @@ export function CountUp({ value, prefix = "", suffix = "", decimals = 0 }: { val
       mv.set(value);
       return;
     }
-    const c = animate(mv, value, { duration: 1.4, ease: EASE });
+    const c = animate(mv, value, { duration: 1.4, ease: EASE, delay });
     return () => c.stop();
-  }, [inView, mv, value]);
+  }, [inView, mv, value, delay]);
   return (
     <span ref={ref} className="tabular-nums">
       <motion.span>{text}</motion.span>

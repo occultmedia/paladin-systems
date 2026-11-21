@@ -1,13 +1,14 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, ArrowUpRight, Building2, MessageCircle, Phone, Pin, Search, Sparkles, TrendingDown, Users } from "lucide-react";
+import { ArrowRight, ArrowUpRight, MessageCircle, Phone, Pin, Users } from "lucide-react";
 import { SequenceLockup, Wordmark } from "@/components/logo";
 import { PlanPrice } from "@/components/landing/plan-price";
 import { AIBadge, AIMarketScan, Spotlight } from "@/components/ai/ai-visuals";
-import { NavAuth } from "@/components/auth/nav-auth";
+import { Hero, type HeroEvent, type HeroKpi, type HeroPin } from "@/components/landing/hero";
+import { SiteHeader } from "@/components/landing/site-header";
 import { MARKET_TOTAL, marketBrief, scanRows } from "@/lib/scan-data";
 import { ClientsPane, HistoryPane, TerminalPreview, type PreviewData } from "@/components/landing/terminal-preview";
-import { CountUp, MotionRoot, Reveal, Stagger, StaggerItem } from "@/components/motion/reveal";
+import { MotionRoot, Reveal, Stagger, StaggerItem } from "@/components/motion/reveal";
 import { CONTACT_EMAIL, PLANS, SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/site";
 import {
   ALL_LISTINGS,
@@ -16,6 +17,7 @@ import {
   SCRAPE_RUNS,
   VILLA_PHOTOS,
   type Listing,
+  type ListingSignal,
   type Signal,
 } from "@/lib/aruba-data";
 
@@ -53,7 +55,6 @@ const NEW_THIS_WEEK = ALL_LISTINGS.filter((l) => l.days_on_market <= 7).length;
 const UNDERVALUED = ALL_LISTINGS.filter((l) => l.signal === "UNDERVALUED").length;
 const NEWEST = [...ALL_LISTINGS].sort((a, b) => a.days_on_market - b.days_on_market).slice(0, 6);
 const AGENCIES = new Set(ALL_LISTINGS.map((l) => l.agency.id)).size;
-const AGENTS = new Set(ALL_LISTINGS.map((l) => l.agent?.id).filter(Boolean)).size;
 const NEW_PICK = NEWEST.find((l) => l.category === "Property") ?? NEWEST[0];
 
 const TICKER: Array<[string, string, number | null]> = [
@@ -219,6 +220,45 @@ function previewData(): PreviewData {
 }
 
 const PREVIEW = previewData();
+
+/* ── hero: real pins, real events from today's read, live figures ─────── */
+
+function heroData() {
+  const tone = (sig: Signal) => (sig === "UNDERVALUED" ? "up" : sig === "OVERPRICED" ? "down" : "flat") as HeroPin["tone"];
+  const pins: HeroPin[] = ALL_LISTINGS.map((l) => ({ id: l.listing_id, lat: l.lat, lng: l.lng, tone: tone(l.signal) }));
+  const at = (l: Listing) => ({ id: l.listing_id, lat: l.lat, lng: l.lng });
+  const fresh = RUN.new_listings.filter((l) => l.category === "Property").slice(0, 2);
+  const moves = RUN.price_changes.slice(0, 2);
+  const status = RUN.status_changes.slice(0, 1);
+  const doubt = [...ALL_LISTINGS].sort((a, b) => a.confidence_score - b.confidence_score)[0];
+  const best = ALL_LISTINGS.filter((l): l is ListingSignal => l.category === "Property" && l.status === "For sale").sort(
+    (a, b) => b.yield_spread_bps - a.yield_spread_bps,
+  )[0];
+  const events: HeroEvent[] = [];
+  if (fresh[0]) events.push({ ...at(fresh[0]), id: `new-${fresh[0].listing_id}`, kind: "New listing", tone: "mint", title: fresh[0].asset_name, detail: `${fresh[0].district} · ${fresh[0].agency.name}`, value: `${usdM(fresh[0].asking_price_usd)} · ${SIGNAL[fresh[0].signal].label}` });
+  moves.forEach((c, i) => {
+    const p = c.change.change_pct ?? 0;
+    events.push({ ...at(c.listing), id: `px-${c.listing.listing_id}-${i}`, kind: p < 0 ? "Price cut" : "Price raised", tone: p < 0 ? "down" : "up", title: c.listing.asset_name, detail: `${c.listing.district} · ${c.listing.agency.name}`, value: `${pct(p)} → ${usdM(c.change.price_usd)}` });
+  });
+  if (best)
+    events.push({ ...at(best), id: `ai-${best.listing_id}`, kind: "AI Signal", tone: "up", title: best.asset_name, detail: `Projected yield ${best.projected_gross_yield_pct.toFixed(1)}% vs market`, value: `+${best.yield_spread_bps} bps · Undervalued` });
+  status.forEach((l) => events.push({ ...at(l), id: `st-${l.listing_id}`, kind: l.status, tone: "warn", title: l.asset_name, detail: `${l.district} · ${l.agency.name}`, value: `Was ${usdM(l.asking_price_usd)}` }));
+  if (fresh[1]) events.push({ ...at(fresh[1]), id: `new-${fresh[1].listing_id}`, kind: "New listing", tone: "mint", title: fresh[1].asset_name, detail: `${fresh[1].district} · ${fresh[1].agency.name}`, value: usdM(fresh[1].asking_price_usd) });
+  if (doubt && doubt.confidence_score < 80)
+    events.push({ ...at(doubt), id: `cf-${doubt.listing_id}`, kind: `Confidence ${doubt.confidence_score}%`, tone: "warn", title: doubt.asset_name, detail: "Missing from the agency site, price unchanged", value: "Possible ghost listing" });
+
+  const medianAsk = median(ALL_LISTINGS.map((l) => l.asking_price_usd));
+  const kpis: HeroKpi[] = [
+    { label: "Listings", value: ALL_LISTINGS.length },
+    { label: "New today", value: RUN.new_listings.length },
+    { label: "Price changes", value: RUN.price_changes.length, note: "today" },
+    { label: "Median ask", value: medianAsk / 1e6, prefix: "$", suffix: "M", decimals: 2 },
+    { label: "Agencies", value: AGENCIES },
+  ];
+  return { pins, events, kpis, runLabel: `Read ${PREVIEW.run.time} · ${ALL_LISTINGS.length} listings · ${RUN.new_listings.length} new` };
+}
+
+const HERO = heroData();
 const BRIEF = marketBrief();
 const SCAN = scanRows(12);
 
@@ -357,129 +397,29 @@ export default function Home() {
     <div className="min-h-screen bg-white font-sans text-zinc-800 antialiased selection:bg-mint selection:text-zinc-950">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
-      {/* Nav */}
-      <header className="sticky top-0 z-[1000] border-b border-zinc-200 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-[1240px] items-center justify-between px-5 sm:px-6">
-          <Link href="/" aria-label="Terminal home">
-            <Wordmark />
-          </Link>
-          <nav className="hidden items-center gap-8 md:flex">
-            {[
-              ["AI Signal", "#ai-signal"],
-              ["Listings", "#listings"],
-              ["Watchlist", "#watchlist"],
-              ["Clients", "#clients"],
-              ["Pricing", "#pricing"],
-            ].map(([label, href]) => (
-              <a key={href} href={href} className="link-underline text-[14px] font-medium text-zinc-600 transition-colors hover:text-zinc-950">
-                {label}
-              </a>
-            ))}
-          </nav>
-          <NavAuth />
-        </div>
-      </header>
+      <SiteHeader />
 
       <main id="main">
-        {/* Hero */}
-        <section className="relative overflow-hidden bg-gradient-to-b from-mint via-mint-soft to-white">
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-0 opacity-60 [background-image:radial-gradient(rgb(10_10_10/0.07)_1px,transparent_1px)] [background-size:22px_22px] [mask-image:linear-gradient(to_bottom,black,transparent_75%)]"
-          />
-          <div className="relative mx-auto grid max-w-[1240px] grid-cols-[minmax(0,1fr)] gap-10 px-5 pb-16 pt-10 sm:px-6 sm:pb-20 sm:pt-14 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:items-center lg:gap-12 lg:pt-16">
-            <Reveal>
-              <p className="inline-flex items-center gap-2 rounded-full border border-zinc-950/10 bg-white/70 px-3 py-1.5 text-[12px] font-medium text-zinc-700 backdrop-blur">
-                <span className="relative flex size-1.5">
-                  <span className="absolute inline-flex size-full animate-ping rounded-full bg-[#2E9E5B] opacity-60 motion-reduce:animate-none" />
-                  <span className="relative inline-flex size-1.5 rounded-full bg-[#2E9E5B]" />
-                </span>
-                AI Signal read {MARKET_TOTAL} listings this morning · {PREVIEW.run.newCount} new
-              </p>
-              <h1 className="mt-5 font-display text-[40px] font-bold leading-[1.02] tracking-tight text-zinc-950 sm:text-[56px] lg:text-[60px]">
-                Aruba Real Estate Market Intelligence
-              </h1>
-              <p className="mt-5 max-w-[46ch] text-[16px] leading-relaxed text-zinc-600 sm:text-[17px]">
-                Every morning Terminal&apos;s AI reads every home, land and commercial listing in Aruba, then tells you what
-                changed, what each property is worth a look for and who is selling it. Pin what you are watching and keep
-                track of the clients who asked.
-              </p>
+        <Hero pins={HERO.pins} events={HERO.events} kpis={HERO.kpis} runLabel={HERO.runLabel} runTime={PREVIEW.run.time} total={ALL_LISTINGS.length} />
 
-              <div className="mt-8 max-w-[540px] rounded-2xl border border-zinc-200 bg-white p-2 shadow-xl shadow-zinc-900/5">
-                <form action={DASHBOARD} method="get" className="flex items-center gap-2">
-                  <label className="flex min-w-0 flex-1 items-center gap-3 pl-3">
-                    <Search size={18} strokeWidth={2} className="shrink-0 text-zinc-400" />
-                    <span className="sr-only">Search listings</span>
-                    <input
-                      name="q"
-                      placeholder="District, property or listing ID"
-                      className="w-full min-w-0 bg-transparent py-3 text-[15px] text-zinc-950 outline-none placeholder:text-zinc-400"
-                    />
-                  </label>
-                  <button
-                    type="submit"
-                    className="shrink-0 rounded-xl bg-zinc-950 px-4 py-3 font-display text-[14px] font-semibold text-mint transition-colors hover:bg-zinc-800 sm:px-5"
-                  >
-                    Search
-                  </button>
-                </form>
-                <div className="no-scrollbar mt-2 flex gap-1 overflow-x-auto border-t border-zinc-100 px-1 pt-2">
-                  {[
-                    { icon: Building2, label: "All listings", href: DASHBOARD },
-                    { icon: Sparkles, label: "New today", href: `${DASHBOARD}?tab=listings` },
-                    { icon: TrendingDown, label: "Price drops", href: `${DASHBOARD}?tab=listings` },
-                    { icon: Pin, label: "Watchlist", href: `${DASHBOARD}?tab=watchlist` },
-                  ].map(({ icon: Icon, label, href }) => (
-                    <Link
-                      key={label}
-                      href={href}
-                      className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-[13px] font-medium text-zinc-700 transition-colors hover:bg-zinc-100 hover:text-zinc-950"
-                    >
-                      <Icon size={15} strokeWidth={1.75} />
-                      {label}
-                    </Link>
-                  ))}
-                </div>
+        {/* The product */}
+        <section className="relative bg-gradient-to-b from-mint-soft to-white pb-20 sm:pb-28">
+          <div className="mx-auto max-w-[1240px] px-5 pt-16 sm:px-6 sm:pt-24">
+            <Reveal className="flex flex-wrap items-end justify-between gap-6">
+              <div className="max-w-[640px]">
+                <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-zinc-500">The terminal</p>
+                <h2 className="mt-3 font-display text-[32px] font-bold leading-[1.05] tracking-[-0.02em] text-zinc-950 sm:text-[44px]">
+                  This morning&apos;s market, on one screen.
+                </h2>
               </div>
-              <dl className="mt-8 grid max-w-[540px] grid-cols-3 gap-4 border-t border-zinc-950/10 pt-6">
-                {[
-                  [ALL_LISTINGS.length, "Listings for sale"],
-                  [PREVIEW.run.newCount, "New today"],
-                  [AGENCIES, "Agencies tracked"],
-                ].map(([v, l]) => (
-                  <div key={l}>
-                    <dt className="font-display text-[26px] font-bold leading-none text-zinc-950 sm:text-[30px]">
-                      <CountUp value={Number(v)} />
-                    </dt>
-                    <dd className="mt-1.5 text-[12px] text-zinc-500">{l}</dd>
-                  </div>
-                ))}
-              </dl>
+              <p className="max-w-[44ch] text-[15px] leading-relaxed text-zinc-600">
+                What changed overnight, what each listing is worth against its comps, and who is selling it. Pin what you watch, log who asked.
+              </p>
             </Reveal>
-
-            <Reveal delay={0.12} y={24} className="min-w-0">
+            <Reveal delay={0.1} y={28} className="mt-10 min-w-0 sm:mt-14">
               <TerminalPreview data={{ ...PREVIEW, headline: BRIEF.headline }} />
             </Reveal>
           </div>
-        </section>
-
-        {/* Stats band */}
-        <section className="bg-zinc-950 text-white">
-          <dl className="mx-auto grid max-w-[1240px] grid-cols-2 gap-x-6 gap-y-10 px-5 py-12 sm:px-6 sm:py-14 lg:grid-cols-4">
-            {[
-              [PREVIEW.run.checked, "Listings checked today"],
-              [LAND.length, "Land parcels"],
-              [PREVIEW.run.newCount + PREVIEW.run.drops + PREVIEW.run.ups + PREVIEW.run.statusChanges, "Market moves today"],
-              [AGENTS, "Listing agents"],
-            ].map(([v, l]) => (
-              <div key={String(l)}>
-                <dt className="font-display text-[44px] font-bold leading-none text-mint sm:text-[60px]">
-                  <CountUp value={Number(v)} />
-                </dt>
-                <dd className="mt-2 text-[13px] text-zinc-400 sm:text-[14px]">{l}</dd>
-              </div>
-            ))}
-          </dl>
         </section>
 
         {/* Ticker */}
