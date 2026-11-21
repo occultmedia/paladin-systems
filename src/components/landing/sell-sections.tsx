@@ -12,17 +12,14 @@ import { Reveal, Stagger, StaggerItem } from "@/components/motion/reveal";
 
 function Eyebrow({ children }: { children: React.ReactNode }) {
   return (
-    <p className="inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.16em] text-zinc-500">
-      <span className="size-1.5 rounded-full bg-lime ring-1 ring-zinc-950/40" />
-      {children}
-    </p>
+    <p className="text-[13.5px] font-medium text-zinc-500">{children}</p>
   );
 }
 
 function Benefit({ n, title, text }: { n: number; title: string; text: string }) {
   return (
     <StaggerItem className="flex gap-4 border-t border-zinc-200 py-5 first:border-t-0 first:pt-0">
-      <span className="font-mono text-[12px] tabular-nums text-zinc-400">{String(n).padStart(2, "0")}</span>
+      <span className="mt-0.5 text-[13px] tabular-nums text-zinc-400">{String(n).padStart(2, "0")}</span>
       <div>
         <p className="font-display text-[18px] font-semibold text-zinc-950">{title}</p>
         <p className="mt-1 max-w-[52ch] text-[14.5px] leading-relaxed text-zinc-600">{text}</p>
@@ -33,13 +30,8 @@ function Benefit({ n, title, text }: { n: number; title: string; text: string })
 
 function Cta({ href, children }: { href: string; children: React.ReactNode }) {
   return (
-    <Link href={href} className="group inline-flex h-12 items-center gap-2 rounded-full bg-zinc-950 pl-6 pr-4 font-display text-[15px] font-semibold text-lime transition-colors hover:bg-zinc-800">
+    <Link href={href} className="inline-flex h-11 items-center rounded-full bg-zinc-950 px-5 text-[14px] font-medium text-white shadow-sm transition-colors hover:bg-zinc-800">
       {children}
-      <span className="grid size-6 place-items-center rounded-full bg-lime text-zinc-950 transition-transform group-hover:translate-x-0.5">
-        <svg viewBox="0 0 12 12" className="size-3" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
-          <path d="M2 6h8M6.5 2.5 10 6l-3.5 3.5" strokeLinecap="square" />
-        </svg>
-      </span>
     </Link>
   );
 }
@@ -58,9 +50,9 @@ export function AiCapabilities({ ex }: { ex: AiExamples }) {
   return (
     <Stagger className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-4" gap={0.08}>
       <StaggerItem className="flex flex-col rounded-2xl border border-zinc-200 bg-white p-5">
-        <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-zinc-400">01 · A verdict on every listing</p>
+        <p className="text-[12.5px] font-medium text-zinc-500">01 · A verdict on every listing</p>
         <div className="mt-4 flex-1 rounded-xl bg-zinc-950 p-4 text-white">
-          <p className="flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-400">
+          <p className="flex items-center justify-between text-[12px] font-medium text-zinc-400">
             AI Signal <span className="rounded bg-lime px-1.5 py-px font-semibold text-zinc-950">{ex.note.verdict}</span>
           </p>
           <p className="mt-2.5 text-[13.5px] font-semibold leading-snug">{ex.note.headline}</p>
@@ -72,16 +64,16 @@ export function AiCapabilities({ ex }: { ex: AiExamples }) {
       </StaggerItem>
 
       <StaggerItem className="flex flex-col rounded-2xl border border-zinc-200 bg-white p-5">
-        <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-zinc-400">02 · Your morning briefing</p>
+        <p className="text-[12.5px] font-medium text-zinc-500">02 · Your morning briefing</p>
         <div className="mt-4 flex-1 rounded-xl border border-zinc-200 bg-zinc-50 p-4">
-          <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-500">Ready at {ex.brief.time}</p>
+          <p className="text-[12px] font-medium text-zinc-500">Ready at {ex.brief.time}</p>
           <p className="mt-2.5 text-[13.5px] font-semibold leading-snug text-zinc-950">{ex.brief.headline}</p>
         </div>
         <p className="mt-4 text-[13.5px] leading-relaxed text-zinc-600">What moved overnight across the island, summed up before your first call.</p>
       </StaggerItem>
 
       <StaggerItem className="flex flex-col rounded-2xl border border-zinc-200 bg-white p-5">
-        <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-zinc-400">03 · Comps in a second</p>
+        <p className="text-[12.5px] font-medium text-zinc-500">03 · Comps in a second</p>
         <div className="mt-4 flex-1 rounded-xl border border-zinc-200 bg-zinc-50 p-4">
           <p className="truncate text-[13px] font-semibold text-zinc-950">{ex.comps.listing}</p>
           <div className="mt-3 space-y-2 text-[11.5px] text-zinc-500">
@@ -108,7 +100,7 @@ export function AiCapabilities({ ex }: { ex: AiExamples }) {
       </StaggerItem>
 
       <StaggerItem className="flex flex-col rounded-2xl border border-zinc-200 bg-white p-5">
-        <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-zinc-400">04 · Ghost listings caught</p>
+        <p className="text-[12.5px] font-medium text-zinc-500">04 · Ghost listings caught</p>
         <div className="mt-4 flex-1 rounded-xl border border-zinc-200 bg-zinc-50 p-4">
           <p className="truncate text-[13px] font-semibold text-zinc-950">{ex.ghost.listing}</p>
           <p className="mt-2 flex items-baseline gap-2">
@@ -142,12 +134,8 @@ export function AgentsSection({ m }: { m: AgentMorning }) {
         <div>
           <Reveal>
             <Eyebrow>For real estate agents</Eyebrow>
-            <h2 className="mt-4 max-w-[16ch] font-display text-[34px] font-bold leading-[1.04] tracking-[-0.025em] text-zinc-950 sm:text-[52px]">
-              Smart agents run on{" "}
-              <span className="relative inline-block">
-                <span aria-hidden className="absolute inset-x-[-0.05em] bottom-[0.06em] top-[0.55em] -z-10 rounded-[0.08em] bg-lime" />
-                Terminal.
-              </span>
+            <h2 className="mt-4 max-w-[16ch] font-display text-[34px] leading-[1.04] tracking-[-0.03em] text-[#15171C] sm:text-[48px]">
+              Smart agents run on Terminal.
             </h2>
             <p className="mt-5 max-w-[50ch] text-[16.5px] leading-relaxed text-zinc-600">
               The market intelligence that used to take a morning of browsing agency sites and calling around, ready before your first coffee. Walk into every conversation knowing more than the other side.
@@ -167,10 +155,10 @@ export function AgentsSection({ m }: { m: AgentMorning }) {
         {/* an agent's morning, from today's data */}
         <Reveal delay={0.1} y={24}>
           <div className="relative rounded-3xl border border-zinc-200 bg-zinc-50 p-4 sm:p-6">
-            <p className="px-1 font-mono text-[10.5px] uppercase tracking-[0.16em] text-zinc-500">Your morning in Terminal · {m.time}</p>
+            <p className="px-1 text-[12px] font-medium text-zinc-500">Your morning in Terminal · {m.time}</p>
             <div className="mt-3 space-y-3">
               <div className="rounded-2xl bg-zinc-950 p-5 text-white">
-                <p className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-lime">Market brief</p>
+                <p className="text-[12px] font-medium text-lime">Market brief</p>
                 <div className="mt-3 grid grid-cols-3 gap-3">
                   {[
                     [m.newCount, "new listings"],
@@ -186,7 +174,7 @@ export function AgentsSection({ m }: { m: AgentMorning }) {
               </div>
               {m.drop && (
                 <div className="rounded-2xl border border-zinc-200 bg-white p-4">
-                  <p className="flex items-center justify-between font-mono text-[10.5px] uppercase tracking-[0.14em] text-zinc-500">
+                  <p className="flex items-center justify-between text-[12px] font-medium text-zinc-500">
                     Price cut on a listing you watch <span className="rounded bg-zinc-950 px-1.5 py-px text-[#FF9A9A]">{m.drop.pct.toFixed(1)}%</span>
                   </p>
                   <p className="mt-2 text-[14px] font-semibold text-zinc-950">
@@ -204,7 +192,7 @@ export function AgentsSection({ m }: { m: AgentMorning }) {
               )}
               {m.pricing && (
                 <div className="rounded-2xl border border-zinc-200 bg-white p-4">
-                  <p className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-zinc-500">Pricing check</p>
+                  <p className="text-[12px] font-medium text-zinc-500">Pricing check</p>
                   <p className="mt-2 text-[14px] font-semibold text-zinc-950">
                     {m.pricing.listing} is priced {Math.abs(m.pricing.pct).toFixed(0)}% {m.pricing.pct > 0 ? "above" : "below"} comparable homes
                   </p>
@@ -237,8 +225,8 @@ export function InvestorsSection({ ex }: { ex: InvestorExample }) {
           <div className="relative">
             <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-[0_30px_70px_-35px_rgb(10_10_10/0.35)] sm:p-6">
               <div className="flex items-center justify-between">
-                <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-zinc-500">Deals · Partnership</p>
-                <span className="rounded-full bg-zinc-950 px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] text-lime">Members only</span>
+                <p className="text-[12px] font-medium text-zinc-500">Deals · Partnership</p>
+                <span className="rounded-full bg-zinc-950 px-2.5 py-0.5 text-[12px] font-medium text-lime">Members only</span>
               </div>
               <div className="mt-4 flex items-center gap-3">
                 <span className="grid size-11 place-items-center rounded-full bg-zinc-950 font-display text-[15px] font-bold text-lime">
@@ -274,7 +262,7 @@ export function InvestorsSection({ ex }: { ex: InvestorExample }) {
         <div className="order-1 lg:order-2">
           <Reveal>
             <Eyebrow>For investors</Eyebrow>
-            <h2 className="mt-4 max-w-[17ch] font-display text-[34px] font-bold leading-[1.04] tracking-[-0.025em] text-zinc-950 sm:text-[52px]">
+            <h2 className="mt-4 max-w-[17ch] font-display text-[34px] leading-[1.04] tracking-[-0.03em] text-[#15171C] sm:text-[48px]">
               Where Aruba&apos;s serious capital meets.
             </h2>
             <p className="mt-5 max-w-[50ch] text-[16.5px] leading-relaxed text-zinc-600">

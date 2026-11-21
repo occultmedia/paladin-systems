@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ArrowRight, ArrowUpRight, MessageCircle, Phone, Pin, Users } from "lucide-react";
 import { SequenceLockup, Wordmark } from "@/components/logo";
 import { PlanPrice } from "@/components/landing/plan-price";
-import { AIBadge, AIMarketScan, Spotlight } from "@/components/ai/ai-visuals";
+import { AIBadge, AIMarketScan } from "@/components/ai/ai-visuals";
 import { Hero, type HeroEvent, type HeroKpi } from "@/components/landing/hero";
 import { SiteHeader } from "@/components/landing/site-header";
 import { AgentsSection, AiCapabilities, InvestorsSection, type AgentMorning, type AiExamples, type InvestorExample } from "@/components/landing/sell-sections";
@@ -311,6 +311,13 @@ const INVESTOR: InvestorExample = {
 };
 
 const AI_EX = aiExamples();
+const DISTRICT_NAMES = [...new Set(ALL_LISTINGS.map((l) => l.district))].sort();
+const STATS: Array<[string, string]> = [
+  [String(ALL_LISTINGS.length), "listings tracked across Aruba today"],
+  [String(AGENCIES), "agency websites read every night"],
+  [String(RUN.new_listings.length + RUN.price_changes.length + RUN.status_changes.length), "market moves caught this morning"],
+  [String(ALL_LISTINGS.filter((l) => l.signal === "UNDERVALUED").length), "listings priced below their comps"],
+];
 const AGENT_AM = agentMorning();
 const SCAN = scanRows(12);
 
@@ -335,7 +342,7 @@ const jsonLd = {
 
 function Eyebrow({ children, light }: { children: React.ReactNode; light?: boolean }) {
   return (
-    <p className={`font-display text-[12px] font-semibold uppercase tracking-[0.14em] ${light ? "text-zinc-400" : "text-zinc-500"}`}>
+    <p className={`text-[13.5px] font-medium ${light ? "text-zinc-400" : "text-zinc-500"}`}>
       {children}
     </p>
   );
@@ -345,12 +352,12 @@ function PrimaryCta({ href = DASHBOARD, children, light }: { href?: string; chil
   return (
     <Link
       href={href}
-      className={`shine group inline-flex items-center gap-2.5 rounded-full px-6 py-3.5 font-display text-[14px] font-semibold transition-[background-color,transform] duration-300 active:scale-[0.97] ${
-        light ? "bg-lime text-zinc-950 hover:bg-white" : "bg-zinc-950 text-lime hover:bg-zinc-800"
+      className={`group inline-flex h-11 items-center gap-2 rounded-full px-5 text-[14px] font-medium shadow-sm transition-colors ${
+        light ? "bg-white text-zinc-950 hover:bg-zinc-100" : "bg-zinc-950 text-white hover:bg-zinc-800"
       }`}
     >
       {children}
-      <ArrowRight size={16} strokeWidth={2} className="transition-transform duration-300 group-hover:translate-x-1" />
+      <ArrowRight size={15} strokeWidth={2} className="transition-transform duration-300 group-hover:translate-x-0.5" />
     </Link>
   );
 }
@@ -375,7 +382,7 @@ function SectionHeading({ eyebrow, title, body, light }: { eyebrow: string; titl
     <Reveal>
       <Eyebrow light={light}>{eyebrow}</Eyebrow>
       <h2
-        className={`mt-4 max-w-[20ch] font-display text-[30px] font-bold leading-[1.08] tracking-tight sm:text-[44px] ${light ? "text-white" : "text-zinc-950"}`}
+        className={`mt-4 max-w-[20ch] font-display text-[32px] leading-[1.05] tracking-[-0.03em] sm:text-[46px] ${light ? "text-white" : "text-zinc-950"}`}
       >
         {title}
       </h2>
@@ -446,7 +453,8 @@ export default function Home() {
 
   return (
     <MotionRoot>
-    <div className="min-h-screen bg-white font-sans text-zinc-800 antialiased selection:bg-lime selection:text-zinc-950">
+    <div className="relative min-h-screen bg-white font-sans text-zinc-800 antialiased selection:bg-lime selection:text-zinc-950">
+      <div aria-hidden className="pointer-events-none absolute inset-y-0 left-1/2 z-[5] hidden w-full max-w-[1240px] -translate-x-1/2 border-x border-zinc-200 md:block" />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
       <SiteHeader />
@@ -454,13 +462,33 @@ export default function Home() {
       <main id="main">
         <Hero listings={ALL_LISTINGS} events={HERO.events} kpis={HERO.kpis} brief={BRIEF.headline} backdrop={ARUBA_PHOTOS.aerial} runLabel={HERO.runLabel} runTime={PREVIEW.run.time} total={ALL_LISTINGS.length} />
 
+        {/* coverage */}
+        <section aria-label="Coverage" className="border-y border-zinc-200 bg-white">
+          <div className="mx-auto max-w-[1240px] px-5 py-8 text-center sm:px-6">
+            <p className="text-[13px] text-zinc-500">Every district on the island, read every night</p>
+            <ul className="mt-5 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-[15px] font-medium text-zinc-400">
+              {DISTRICT_NAMES.map((d) => (
+                <li key={d}>{d}</li>
+              ))}
+            </ul>
+          </div>
+        </section>
+
+        {/* numbers */}
+        <section aria-label="Today in numbers" className="border-b border-zinc-200 bg-white">
+          <dl className="mx-auto grid max-w-[1240px] grid-cols-2 lg:grid-cols-4">
+            {STATS.map(([v, l], i) => (
+              <div key={l} className={`px-5 py-10 sm:px-8 sm:py-12 ${i % 2 ? "border-l border-zinc-200" : ""} ${i >= 2 ? "border-t border-zinc-200 lg:border-t-0" : ""} ${i === 2 ? "lg:border-l" : ""}`}>
+                <dt className="font-display text-[40px] leading-none tracking-[-0.035em] text-[#15171C] sm:text-[52px]">{v}</dt>
+                <dd className="mt-3 max-w-[22ch] text-[14px] leading-snug text-zinc-500">{l}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+
         {/* AI Signal */}
         <section id="ai-signal" className="scroll-mt-16 border-y border-zinc-200 bg-white text-zinc-950">
-          <Spotlight>
-            <div
-              aria-hidden
-              className="pointer-events-none absolute inset-0 opacity-70 [background-image:radial-gradient(rgb(10_10_10/0.08)_1px,transparent_1px)] [background-size:24px_24px] [mask-image:radial-gradient(ellipse_at_70%_40%,black,transparent_70%)]"
-            />
+          <div className="relative">
             <div className="relative mx-auto grid max-w-[1240px] grid-cols-[minmax(0,1fr)] gap-12 px-5 py-16 sm:px-6 sm:py-24 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:items-center lg:gap-16 sm:pb-10">
               <div>
                 <Reveal>
@@ -513,7 +541,7 @@ export default function Home() {
             <div className="relative mx-auto max-w-[1240px] px-5 pb-20 sm:px-6 sm:pb-28">
               <AiCapabilities ex={AI_EX} />
             </div>
-          </Spotlight>
+          </div>
         </section>
 
         {/* The product */}
@@ -521,7 +549,7 @@ export default function Home() {
           <div className="mx-auto max-w-[1240px] px-5 pt-16 sm:px-6 sm:pt-24">
             <Reveal className="flex flex-wrap items-end justify-between gap-6">
               <div className="max-w-[640px]">
-                <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-zinc-500">The terminal</p>
+                <p className="text-[12px] font-medium text-zinc-500">The terminal</p>
                 <h2 className="mt-3 font-display text-[32px] font-bold leading-[1.05] tracking-[-0.02em] text-zinc-950 sm:text-[44px]">
                   This morning&apos;s market, on one screen.
                 </h2>
