@@ -173,9 +173,7 @@ const int = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 const fmtUsd = (n: number) => usd0.format(n);
 const fmtUsdCompact = (n: number) =>
   n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(2)}M` : usd0.format(n);
-const fmtPct = (n: number, digits = 1) => `${n.toFixed(digits)}%`;
 const fmtDelta = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : "±"}${Math.abs(n).toFixed(1)}%`;
-const fmtBps = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : "±"}${int.format(Math.abs(n))} bps`;
 const fmtTimestamp = (iso: string) =>
   new Date(iso).toISOString().replace("T", " ").slice(0, 16) + " UTC";
 
@@ -478,14 +476,14 @@ function SignalBadge({ signal }: { signal: Signal }) {
  * ──────────────────────────────────────────────────────────────────────── */
 
 type Category = "All" | "Property" | "Land" | "Commercial";
-type SortKey = "name" | "district" | "beds" | "baths" | "built" | "lot" | "asking" | "psf" | "adr" | "yield" | "vsDistrict" | "listed" | "status" | "confidence";
+type SortKey = "name" | "district" | "beds" | "baths" | "built" | "lot" | "asking" | "psf" | "vsDistrict" | "listed" | "status" | "confidence";
 
 /** Sort choices for the phone layout (no column headers there). */
 const MOBILE_SORTS: Array<[SortKey, "asc" | "desc", string]> = [
   ["listed", "asc", "Newest"],
   ["asking", "desc", "Price: high to low"],
   ["asking", "asc", "Price: low to high"],
-  ["yield", "desc", "Highest yield"],
+  ["vsDistrict", "asc", "Cheapest vs comps"],
   ["psf", "asc", "Lowest $ / sq ft"],
   ["beds", "desc", "Most bedrooms"],
   ["built", "desc", "Largest built-up"],
@@ -504,9 +502,7 @@ const SORT_VALUE: Record<SortKey, (l: Listing) => number | string | null> = {
   confidence: (l) => l.confidence_score,
   asking: (l) => l.asking_price_usd,
   psf: (l) => l.price_per_sqft_usd,
-  adr: (l) => (l.category === "Property" ? l.sequence_adr_usd : null),
-  yield: (l) => (l.category === "Property" ? l.projected_gross_yield_pct : null),
-  vsDistrict: (l) => (l.category === "Property" ? null : l.price_vs_district_pct),
+  vsDistrict: (l) => (l.category === "Property" ? l.price_vs_comps_pct : l.price_vs_district_pct),
   listed: (l) => l.days_on_market,
 };
 
@@ -594,11 +590,8 @@ function downloadCsv(rows: Listing[]) {
     ["Price change %", (l) => l.price_change_pct],
     ["District avg per sq ft USD", (l) => d(l)?.district_land_psf_usd ?? c(l)?.district_commercial_psf_usd],
     ["Price vs district %", (l) => (l.category === "Property" ? null : l.price_vs_district_pct)],
-    ["Est. ADR USD", (l) => p(l)?.sequence_adr_usd],
-    ["Est. occupancy %", (l) => p(l)?.projected_occupancy_pct],
-    ["Est. annual revenue USD", (l) => p(l)?.projected_annual_revenue_usd],
-    ["Projected gross yield %", (l) => p(l)?.projected_gross_yield_pct],
-    ["Yield spread vs market bps", (l) => p(l)?.yield_spread_bps],
+    ["Comparable listings median per sq ft USD", (l) => p(l)?.comps_psf_usd],
+    ["Price vs comparable listings %", (l) => p(l)?.price_vs_comps_pct],
     ["Value", (l) => SIGNAL_STYLE[l.signal].label],
     ["Days on market", (l) => l.days_on_market],
     ["First seen", (l) => l.first_seen],
@@ -926,17 +919,28 @@ function FlagDialog({ l, open, onClose }: { l: Listing; open: boolean; onClose: 
 /** After a flag: "Removed for everyone" with Undo while the undo window is open. */
 function FlagToast({ listings }: { listings?: Listing[] }) {
   const { flags, undo } = useFlags();
-  const [dismissed, setDismissed] = useState<string | null>(null);
-  const [, tick] = useState(0);
-  const latest = Object.entries(flags).sort((a, b) => Date.parse(b[1].at) - Date.parse(a[1].at))[0];
-  const fresh = latest && Date.now() - Date.parse(latest[1].at) < 12_000 && dismissed !== latest[0];
+  const [toast, setToast] = useState<string | null>(null);
+  const seen = useRef<Set<string> | null>(null);
+  // Show a toast for 12 s whenever a listing is newly flagged in this visit.
   useEffect(() => {
-    if (!fresh) return;
-    const t = window.setTimeout(() => tick((n) => n + 1), 12_000);
-    return () => window.clearTimeout(t);
-  }, [fresh, latest]);
-  if (!fresh || !latest) return null;
-  const [id, f] = latest;
+    const keys = Object.keys(flags);
+    if (!seen.current) {
+      seen.current = new Set(keys);
+      return;
+    }
+    const added = keys.find((k) => !seen.current!.has(k));
+    seen.current = new Set(keys);
+    if (!added) return;
+    const show = window.setTimeout(() => setToast(added), 0);
+    const hide = window.setTimeout(() => setToast((t) => (t === added ? null : t)), 12_000);
+    return () => {
+      window.clearTimeout(show);
+      window.clearTimeout(hide);
+    };
+  }, [flags]);
+  const f = toast ? flags[toast] : undefined;
+  if (!toast || !f) return null;
+  const id = toast;
   const name = listings?.find((l) => l.listing_id === id)?.asset_name ?? id;
   return (
     <div role="status" className="fixed inset-x-4 bottom-4 z-[1100] mx-auto flex max-w-md items-center gap-3 rounded-xl bg-zinc-950 px-4 py-3 text-[13px] text-white shadow-2xl">
@@ -948,7 +952,7 @@ function FlagToast({ listings }: { listings?: Listing[] }) {
         <button
           type="button"
           onClick={() => {
-            setDismissed(id);
+            setToast(null);
             void undo(id).catch((e) => window.alert(e instanceof Error ? e.message : "Could not undo."));
           }}
           className="inline-flex shrink-0 items-center gap-1 font-semibold text-mint hover:underline"
@@ -1142,21 +1146,21 @@ const MONTHLY_GROWTH: Record<Listing["category"], number> = { Property: 0.006, L
 
 /**
  * What the listing should be worth today:
- * residential = projected rental revenue capitalised at the market yield,
+ * homes = median price per sq ft of comparable listings × built size,
  * land / commercial = district average price per sq ft × size.
  */
-function estMarketValue(l: Listing, marketYield?: number) {
-  if (l.category === "Property") return marketYield ? l.projected_annual_revenue_usd / (marketYield / 100) : l.asking_price_usd;
+function estMarketValue(l: Listing) {
+  if (l.category === "Property") return l.comps_psf_usd * l.built_sqft;
   if (l.category === "Land") return l.district_land_psf_usd * l.lot_sqft;
   return l.district_commercial_psf_usd * l.built_sqft;
 }
 
 /** Asking price (step line, from the day we found it) and estimated market value over time. */
-function valueSeries(l: Listing, marketYield?: number) {
+function valueSeries(l: Listing) {
   const today = dayTs(SCRAPE_RUNS[0].date);
   const listed = dayTs(l.price_history[0].date);
   const start = Math.min(listed - 45 * DAY_MS, today - 270 * DAY_MS);
-  const fair = estMarketValue(l, marketYield);
+  const fair = estMarketValue(l);
   const g = MONTHLY_GROWTH[l.category];
   let h = 0;
   for (const c of l.listing_id) h = (h * 31 + c.charCodeAt(0)) >>> 0;
@@ -1201,10 +1205,10 @@ function ValueChartTooltip({ active, payload, label }: { active?: boolean; paylo
 
 const MARKET_LINE = "#2E9E5B";
 
-function PriceHistory({ l, marketYield }: { l: Listing; marketYield?: number }) {
+function PriceHistory({ l }: { l: Listing }) {
   const history = l.price_history;
-  const series = valueSeries(l, marketYield);
-  const fair = estMarketValue(l, marketYield);
+  const series = valueSeries(l);
+  const fair = estMarketValue(l);
   const gap = ((l.asking_price_usd - fair) / fair) * 100;
   const changed = history.length > 1;
   return (
@@ -1682,7 +1686,7 @@ function AINote({ l }: { l: Listing }) {
   );
 }
 
-function ListingDetails({ l, marketYield }: { l: Listing; marketYield?: number }) {
+function ListingDetails({ l }: { l: Listing }) {
   const shared = (
     <>
       <DetailItem label="Status" value={<StatusBadge l={l} withDate />} />
@@ -1753,10 +1757,11 @@ function ListingDetails({ l, marketYield }: { l: Listing; marketYield?: number }
           }
         />
         <DetailItem label="Price / sq ft" value={fmtUsd(l.price_per_sqft_usd)} />
+        <DetailItem label="Comparable $ / sq ft" value={`${fmtUsd(l.comps_psf_usd)} (${l.comps_count} listings)`} />
         <DetailItem
-          label="Yield vs market"
-          value={`${fmtPct(l.projected_gross_yield_pct)} vs ${marketYield !== undefined ? fmtPct(marketYield) : "—"}`}
-          color={deltaColor(l.yield_spread_bps)}
+          label="Vs. comps"
+          value={`${fmtDelta(l.price_vs_comps_pct)} ${l.price_vs_comps_pct < 0 ? "cheaper" : "pricier"}`}
+          color={deltaColor(-l.price_vs_comps_pct)}
         />
       </>
     );
@@ -1802,7 +1807,7 @@ function ListingDetails({ l, marketYield }: { l: Listing; marketYield?: number }
             {facts}
             {shared}
           </dl>
-          <PriceHistory l={l} marketYield={marketYield} />
+          <PriceHistory l={l}  />
         </div>
       </div>
     </div>
@@ -1811,14 +1816,12 @@ function ListingDetails({ l, marketYield }: { l: Listing; marketYield?: number }
 
 function ActiveListings({
   listings,
-  marketYield,
   initialDistrict,
   initialQuery,
   initialOpenId,
   initialNewToday,
 }: {
   listings?: Listing[];
-  marketYield?: number;
   initialDistrict?: string;
   initialQuery?: string;
   initialOpenId?: string;
@@ -1945,7 +1948,7 @@ function ActiveListings({
     setSubtypes([]);
     if (c !== "All" && c !== "Property") setBedsMin(0);
     if (c === "Property" && sort.key === "vsDistrict") setSort({ key: "listed", dir: "asc" });
-    if ((c === "Land" || c === "Commercial") && (sort.key === "beds" || sort.key === "baths" || sort.key === "adr" || sort.key === "yield" || (c === "Land" && sort.key === "built")))
+    if ((c === "Land" || c === "Commercial") && (sort.key === "beds" || sort.key === "baths" || (c === "Land" && sort.key === "built")))
       setSort({ key: "listed", dir: "asc" });
   };
   const toggleSubtype = (t: string) => setSubtypes((xs) => (xs.includes(t) ? xs.filter((x) => x !== t) : [...xs, t]));
@@ -2297,7 +2300,7 @@ function ActiveListings({
               </button>
               {open && (
                 <div className="pb-6">
-                  <ListingDetails l={l} marketYield={marketYield} />
+                  <ListingDetails l={l}  />
                 </div>
               )}
             </li>
@@ -2325,11 +2328,7 @@ function ActiveListings({
               <SortHeader label="Lot ft²" k="lot" sort={sort} onSort={onSort} />
               <SortHeader label="Asking" k="asking" sort={sort} onSort={onSort} />
               <SortHeader label="$ / ft²" k="psf" sort={sort} onSort={onSort} />
-              {nonResidential ? (
-                <SortHeader label="Vs. District" k="vsDistrict" sort={sort} onSort={onSort} />
-              ) : (
-                <SortHeader label="Proj. Yield" k="yield" sort={sort} onSort={onSort} />
-              )}
+              <SortHeader label="Vs. comps" k="vsDistrict" sort={sort} onSort={onSort} />
               <SortHeader label="Status" k="status" sort={sort} onSort={onSort} />
               <SortHeader
                 label="Confidence"
@@ -2370,10 +2369,8 @@ function ActiveListings({
             {rows.map((l) => {
               const open = openId === l.listing_id;
               const hot = hoverId === l.listing_id;
-              const vsDistrict =
-                l.category !== "Property" ? (
-                  <span style={{ color: deltaColor(-l.price_vs_district_pct) }}>{fmtDelta(l.price_vs_district_pct)}</span>
-                ) : null;
+              const vsPct = l.category === "Property" ? l.price_vs_comps_pct : l.price_vs_district_pct;
+              const compsPsf = l.category === "Property" ? l.comps_psf_usd : l.category === "Land" ? l.district_land_psf_usd : l.district_commercial_psf_usd;
               return (
                 <Fragment key={l.listing_id}>
                   <tr
@@ -2439,27 +2436,12 @@ function ActiveListings({
                       </p>
                     </td>
                     <td className={num}>{fmtUsd(l.price_per_sqft_usd)}</td>
-                    {nonResidential ? (
-                      <td className={num}>{vsDistrict}</td>
-                    ) : (
-                      <>
-                        <td className={`${td} ${MONO} text-right`}>
-                          {l.category === "Property" ? (
-                            <>
-                              <p className="text-[13px] text-zinc-950">{fmtPct(l.projected_gross_yield_pct)}</p>
-                              <p className="mt-1 text-[11px]" style={{ color: deltaColor(l.yield_spread_bps) }}>
-                                {fmtBps(l.yield_spread_bps)}
-                              </p>
-                            </>
-                          ) : (
-                            <>
-                              <p className="text-[13px]">{DASH}</p>
-                              <p className="mt-1 text-[11px]">{vsDistrict} vs dist.</p>
-                            </>
-                          )}
-                        </td>
-                      </>
-                    )}
+                    <td className={`${td} ${MONO} text-right`}>
+                      <p className="text-[13px]" style={{ color: deltaColor(-vsPct) }}>
+                        {fmtDelta(vsPct)}
+                      </p>
+                      <p className="mt-1 text-[11px] text-zinc-500">comps {fmtUsd(compsPsf)}/ft²</p>
+                    </td>
                     <td className={`${td} text-right`}>
                       <StatusBadge l={l} align="end" />
                     </td>
@@ -2481,7 +2463,7 @@ function ActiveListings({
                     <tr className="bg-mint-soft">
                       <td colSpan={colCount} className="border-b border-zinc-300 p-0">
                         <div className="sticky left-0 px-4 pb-6 pt-1" style={paneW ? { width: paneW } : undefined}>
-                          <ListingDetails l={l} marketYield={marketYield} />
+                          <ListingDetails l={l}  />
                         </div>
                       </td>
                     </tr>
@@ -2495,8 +2477,9 @@ function ActiveListings({
       </div>
       <div className="mt-4 space-y-1 text-[11px] leading-relaxed text-zinc-500">
         <p>
-          <span className="text-zinc-700">Residential</span> listings are scored on projected rental yield: estimated nightly
-          rate and occupancy come from comparable vacation rentals in the same district. Gross, before costs.
+          <span className="text-zinc-700">Homes and condos</span> are scored on price per sq ft against comparable listings: the
+          same kind of property (villas and estates, or condos and apartments) in the same district, or island-wide when the
+          district has fewer than 3. 10% or more below is Undervalued, 10% or more above is Overpriced.
         </p>
         <p>
           <span className="text-zinc-700">Land</span> and <span className="text-zinc-700">commercial</span> listings are
@@ -2549,7 +2532,7 @@ function watchUpdates(ids: Set<string>, runs: ScrapeRun[]): WatchUpdate[] {
   return out;
 }
 
-function Watchlist({ listings, marketYield, onOpenListing, onBrowse }: { listings?: Listing[]; marketYield?: number; onOpenListing: (id: string) => void; onBrowse: () => void }) {
+function Watchlist({ listings, onOpenListing, onBrowse }: { listings?: Listing[]; onOpenListing: (id: string) => void; onBrowse: () => void }) {
   const { entries, unpin, setNote, clear } = useWatchlist();
   const [sort, setSort] = useState<WatchSort>("pinned");
   const [openId, setOpenId] = useState<string | null>(null);
@@ -2763,7 +2746,7 @@ function Watchlist({ listings, marketYield, onOpenListing, onBrowse }: { listing
                     </div>
                     {open && (
                       <div className="pt-6">
-                        <ListingDetails l={l} marketYield={marketYield} />
+                        <ListingDetails l={l}  />
                       </div>
                     )}
                   </li>
@@ -3124,7 +3107,7 @@ function Dashboard() {
             <ActiveListings
               key={listingsView.key}
               listings={market}
-              marketYield={data?.snapshot.est_gross_yield_pct}
+              
               initialDistrict={listingsView.district}
               initialQuery={listingsView.query}
               initialOpenId={listingsView.openId}
@@ -3134,7 +3117,7 @@ function Dashboard() {
         ) : tab === "Feed" ? (
           <FeedView profile={me.profile} profileLoading={me.loading} shared={me.shared} onEditProfile={openProfile} />
         ) : (
-          <Watchlist listings={market} marketYield={data?.snapshot.est_gross_yield_pct} onOpenListing={openListing} onBrowse={() => setTab("Listings")} />
+          <Watchlist listings={market}  onOpenListing={openListing} onBrowse={() => setTab("Listings")} />
         )}
       </main>
 

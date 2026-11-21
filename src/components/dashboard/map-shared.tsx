@@ -89,7 +89,7 @@ export function HoverCard({ l }: { l: Listing }) {
   const status = STATUS_PILL[l.status];
   const metric =
     l.category === "Property"
-      ? { value: `${l.projected_gross_yield_pct.toFixed(1)}%`, label: "rental yield" }
+      ? { value: `$${num(l.price_per_sqft_usd)}/sq ft`, label: `${pct(l.price_vs_comps_pct)} vs comps` }
       : { value: `$${num(l.price_per_sqft_usd)}/sq ft`, label: `${pct(l.price_vs_district_pct)} vs district` };
   return (
     <div style={{ width: 250 }}>

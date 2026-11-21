@@ -106,10 +106,8 @@ export function listingFacts(l: Listing, all: Listing[]): ListingFacts {
     l.category === "Property"
       ? {
           signal: l.signal,
-          projected_nightly_rate_usd: l.sequence_adr_usd,
-          projected_occupancy_pct: l.projected_occupancy_pct,
-          projected_gross_yield_pct: l.projected_gross_yield_pct,
-          yield_vs_market_bps: l.yield_spread_bps,
+          comps_psf_usd: l.comps_psf_usd,
+          price_vs_comps_pct: l.price_vs_comps_pct,
         }
       : l.category === "Land"
         ? { signal: l.signal, district_land_psf_usd: l.district_land_psf_usd, price_vs_district_pct: l.price_vs_district_pct }
@@ -150,14 +148,13 @@ export function computedListingNote(f: ListingFacts): ListingNote {
   const rich = c.vs_median_pct >= 15;
   const stale = f.days_on_market > Math.max(90, c.median_days_on_market * 1.5);
   const cut = f.change_since_listed_pct <= -3;
-  const yieldBps = typeof f.scoring.yield_vs_market_bps === "number" ? f.scoring.yield_vs_market_bps : null;
 
   const verdict: Verdict =
     f.status !== "For sale"
       ? "Watch"
-      : (cheap || (yieldBps ?? 0) >= 100) && !rich
+      : cheap && !rich
         ? "Opportunity"
-        : rich || (yieldBps ?? 0) <= -100
+        : rich
           ? "Overpriced"
           : stale || cut
             ? "Watch"
@@ -171,13 +168,9 @@ export function computedListingNote(f: ListingFacts): ListingNote {
         ? `Taken off the agency site after ${f.days_on_market} days; call the agent to ask if it is still available.`
         : `${f.status} after ${f.days_on_market} days; useful as a pricing comp for ${f.district}.`
       : verdict === "Opportunity"
-        ? cheap
-          ? `${Math.abs(c.vs_median_pct).toFixed(0)}% under comparable ${segName} per sq ft${cut ? " after a price cut" : ""}: worth a call today.`
-          : `Projected rental yield ${f.scoring.projected_gross_yield_pct}% beats the market by ${yieldBps} bps: worth a call today.`
+        ? `${Math.abs(c.vs_median_pct).toFixed(0)}% under comparable ${segName} per sq ft${cut ? " after a price cut" : ""}: worth a call today.`
         : verdict === "Overpriced"
-          ? rich
-            ? `${c.vs_median_pct.toFixed(0)}% above comparable ${segName} per sq ft; expect room to negotiate.`
-            : `Priced above what it would earn as a rental: ${f.scoring.projected_gross_yield_pct}% yield, ${Math.abs(yieldBps ?? 0)} bps under market.`
+          ? `${c.vs_median_pct.toFixed(0)}% above comparable ${segName} per sq ft; expect room to negotiate.`
           : verdict === "Watch"
             ? stale
               ? `${f.days_on_market} days listed with ${f.drops ? `${f.drops} price cut${f.drops > 1 ? "s" : ""}` : "no cuts yet"}; the seller may be ready to move.`
@@ -190,8 +183,6 @@ export function computedListingNote(f: ListingFacts): ListingNote {
   else if (f.days_on_market === 0) points.push("Listed today, so there is no price history yet.");
   else points.push(`No price changes since it was listed ${f.days_on_market} day${f.days_on_market === 1 ? "" : "s"} ago.`);
   if (f.days_on_market > 0) points.push(`${f.days_on_market} days on market vs a ${c.median_days_on_market}-day median for its comps.`);
-  if (yieldBps !== null)
-    points.push(`Projected gross rental yield ${f.scoring.projected_gross_yield_pct}% (${yieldBps >= 0 ? "+" : ""}${yieldBps} bps vs market).`);
   if (f.tenure === "Erfpacht") points.push(`Leasehold (erfpacht)${f.lease_years_left ? ` with ${f.lease_years_left} years left` : ""}; check the lease terms.`);
 
   const analysis =

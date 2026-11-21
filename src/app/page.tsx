@@ -4,7 +4,7 @@ import { ArrowRight, ArrowUpRight, MessageCircle, Phone, Pin, Users } from "luci
 import { SequenceLockup, Wordmark } from "@/components/logo";
 import { PlanPrice } from "@/components/landing/plan-price";
 import { AIBadge, AIMarketScan, Spotlight } from "@/components/ai/ai-visuals";
-import { Hero, type HeroEvent, type HeroKpi, type HeroPin } from "@/components/landing/hero";
+import { Hero, type HeroEvent, type HeroFeature, type HeroPin, type HeroPlace } from "@/components/landing/hero";
 import { SiteHeader } from "@/components/landing/site-header";
 import { MARKET_TOTAL, marketBrief, scanRows } from "@/lib/scan-data";
 import { ClientsPane, HistoryPane, TerminalPreview, type PreviewData } from "@/components/landing/terminal-preview";
@@ -13,7 +13,6 @@ import { CONTACT_EMAIL, PLANS, SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/l
 import {
   ALL_LISTINGS,
   ARUBA_PHOTOS,
-  MOCK_SNAPSHOT,
   SCRAPE_RUNS,
   VILLA_PHOTOS,
   type Listing,
@@ -143,7 +142,7 @@ function previewData(): PreviewData {
   // Featured listing for the price-history pane: one with a price drop.
   const f = ALL_LISTINGS.find((l) => l.listing_id === "AW-0388") ?? ALL_LISTINGS[0];
   const marketNow =
-    f.category === "Property" ? f.projected_annual_revenue_usd / (MOCK_SNAPSHOT.est_gross_yield_pct / 100) : f.asking_price_usd;
+    f.category === "Property" ? f.comps_psf_usd * f.built_sqft : f.asking_price_usd;
   const DAYMS = 86_400_000;
   const today = Date.parse(RUN.date);
   const first = Date.parse(f.price_history[0].date);
@@ -232,7 +231,7 @@ function heroData() {
   const status = RUN.status_changes.slice(0, 1);
   const doubt = [...ALL_LISTINGS].sort((a, b) => a.confidence_score - b.confidence_score)[0];
   const best = ALL_LISTINGS.filter((l): l is ListingSignal => l.category === "Property" && l.status === "For sale").sort(
-    (a, b) => b.yield_spread_bps - a.yield_spread_bps,
+    (a, b) => a.price_vs_comps_pct - b.price_vs_comps_pct,
   )[0];
   const events: HeroEvent[] = [];
   if (fresh[0]) events.push({ ...at(fresh[0]), id: `new-${fresh[0].listing_id}`, kind: "New listing", tone: "mint", title: fresh[0].asset_name, detail: `${fresh[0].district} · ${fresh[0].agency.name}`, value: `${usdM(fresh[0].asking_price_usd)} · ${SIGNAL[fresh[0].signal].label}` });
@@ -241,21 +240,31 @@ function heroData() {
     events.push({ ...at(c.listing), id: `px-${c.listing.listing_id}-${i}`, kind: p < 0 ? "Price cut" : "Price raised", tone: p < 0 ? "down" : "up", title: c.listing.asset_name, detail: `${c.listing.district} · ${c.listing.agency.name}`, value: `${pct(p)} → ${usdM(c.change.price_usd)}` });
   });
   if (best)
-    events.push({ ...at(best), id: `ai-${best.listing_id}`, kind: "AI Signal", tone: "up", title: best.asset_name, detail: `Projected yield ${best.projected_gross_yield_pct.toFixed(1)}% vs market`, value: `+${best.yield_spread_bps} bps · Undervalued` });
+    events.push({ ...at(best), id: `ai-${best.listing_id}`, kind: "AI Signal", tone: "up", title: best.asset_name, detail: `${usd(best.price_per_sqft_usd)}/ft² vs ${usd(best.comps_psf_usd)} for ${best.comps_count} comps`, value: `${pct(best.price_vs_comps_pct)} vs comps · Undervalued` });
   status.forEach((l) => events.push({ ...at(l), id: `st-${l.listing_id}`, kind: l.status, tone: "warn", title: l.asset_name, detail: `${l.district} · ${l.agency.name}`, value: `Was ${usdM(l.asking_price_usd)}` }));
   if (fresh[1]) events.push({ ...at(fresh[1]), id: `new-${fresh[1].listing_id}`, kind: "New listing", tone: "mint", title: fresh[1].asset_name, detail: `${fresh[1].district} · ${fresh[1].agency.name}`, value: usdM(fresh[1].asking_price_usd) });
   if (doubt && doubt.confidence_score < 80)
     events.push({ ...at(doubt), id: `cf-${doubt.listing_id}`, kind: `Confidence ${doubt.confidence_score}%`, tone: "warn", title: doubt.asset_name, detail: "Missing from the agency site, price unchanged", value: "Possible ghost listing" });
 
-  const medianAsk = median(ALL_LISTINGS.map((l) => l.asking_price_usd));
-  const kpis: HeroKpi[] = [
-    { label: "Listings", value: ALL_LISTINGS.length },
-    { label: "New today", value: RUN.new_listings.length },
-    { label: "Price changes", value: RUN.price_changes.length, note: "today" },
-    { label: "Median ask", value: medianAsk / 1e6, prefix: "$", suffix: "M", decimals: 2 },
-    { label: "Agencies", value: AGENCIES },
+  const ids = (ls: Listing[]) => ls.map((l) => l.listing_id);
+  const undervalued = ALL_LISTINGS.filter((l) => l.signal === "UNDERVALUED");
+  const lowConfidence = ALL_LISTINGS.filter((l) => l.confidence_score < 80);
+  const features: HeroFeature[] = [
+    { id: "read", name: "Daily market read", text: "Every agency site in Aruba, read overnight", stat: `${RUN.new_listings.length} new today`, tone: "mint", ids: ids(RUN.new_listings) },
+    { id: "signal", name: "AI Signal", text: "Every listing priced against its comps", stat: `${undervalued.length} undervalued`, tone: "up", ids: ids(undervalued) },
+    { id: "price", name: "Price tracking", text: "Every cut and raise, with full history", stat: `${RUN.price_changes.length} moves today`, tone: "down", ids: RUN.price_changes.map((c) => c.listing.listing_id) },
+    { id: "confidence", name: "Confidence Score", text: "Ghost listings flagged before you call", stat: `${lowConfidence.length} under 80%`, tone: "warn", ids: ids(lowConfidence) },
+    { id: "status", name: "Contracts & sales", text: "Know the day a listing goes under contract", stat: `${RUN.status_changes.length} today`, tone: "warn", ids: ids(RUN.status_changes) },
+    { id: "feed", name: "Member Feed", text: "Off-market deals and buyer requests", stat: "48 h posts", tone: "mint", ids: [] },
   ];
-  return { pins, events, kpis, runLabel: `Read ${PREVIEW.run.time} · ${ALL_LISTINGS.length} listings · ${RUN.new_listings.length} new` };
+  const places: HeroPlace[] = [
+    { name: "Eagle Beach", lat: 12.5545, lng: -70.051 },
+    { name: "Oranjestad", lat: 12.521, lng: -70.0335 },
+    { name: "Santa Cruz", lat: 12.506, lng: -69.984, align: "right" },
+    { name: "Savaneta", lat: 12.4545, lng: -69.945 },
+    { name: "San Nicolas", lat: 12.433, lng: -69.905, align: "right" },
+  ];
+  return { pins, events, features, places, runLabel: `Read ${PREVIEW.run.time} · ${ALL_LISTINGS.length} listings · ${RUN.new_listings.length} new` };
 }
 
 const HERO = heroData();
@@ -373,9 +382,9 @@ function ListingCard({ l }: { l: Listing }) {
           </div>
           <div className="text-right">
             <p className="font-display text-[17px] font-bold tabular-nums text-zinc-950">
-              {l.category === "Property" ? `${l.projected_gross_yield_pct.toFixed(1)}%` : `$${l.price_per_sqft_usd}`}
+              {pct(l.category === "Property" ? l.price_vs_comps_pct : l.price_vs_district_pct)}
             </p>
-            <p className="text-[11px] text-zinc-500">{l.category === "Property" ? "Rental yield" : "Per sq ft"}</p>
+            <p className="text-[11px] text-zinc-500">${l.price_per_sqft_usd}/ft² vs comps</p>
           </div>
         </div>
         <div className="mt-4 flex items-center justify-between border-t border-zinc-100 pt-3">
@@ -400,7 +409,7 @@ export default function Home() {
       <SiteHeader />
 
       <main id="main">
-        <Hero pins={HERO.pins} events={HERO.events} kpis={HERO.kpis} runLabel={HERO.runLabel} runTime={PREVIEW.run.time} total={ALL_LISTINGS.length} />
+        <Hero pins={HERO.pins} events={HERO.events} features={HERO.features} places={HERO.places} runLabel={HERO.runLabel} runTime={PREVIEW.run.time} total={ALL_LISTINGS.length} />
 
         {/* The product */}
         <section className="relative bg-gradient-to-b from-mint-soft to-white pb-20 sm:pb-28">

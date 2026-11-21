@@ -206,7 +206,7 @@ export interface ListingBase {
   photo_url: string | null; // main listing photo (scraped)
 }
 
-/** A house, villa or condo: scored on projected short-term-rental yield. */
+/** A house, villa or condo: scored on price per sq ft against comparable listings. */
 export interface ListingSignal extends ListingBase {
   category: "Property";
   property_type: PropertyType;
@@ -214,11 +214,9 @@ export interface ListingSignal extends ListingBase {
   bathrooms: number;
   built_sqft: number;
   lot_sqft: number | null; // null for penthouses
-  sequence_adr_usd: number;
-  projected_occupancy_pct: number;
-  projected_annual_revenue_usd: number;
-  projected_gross_yield_pct: number;
-  yield_spread_bps: number; // vs market est_gross_yield_pct
+  comps_psf_usd: number; // median asking $/sq ft of comparable listings (same kind, same district when there are 3+)
+  comps_count: number;
+  price_vs_comps_pct: number; // negative = cheaper per sq ft than its comps
 }
 
 /** A land parcel: scored on price per sq ft vs. the district's land average. */
@@ -417,18 +415,18 @@ export const ARUBA_PHOTOS = {
 
 /* Approximate district centres (lat, lng) used to place listings on the map. */
 export const DISTRICT_CENTERS: Record<string, [number, number]> = {
-  Arashi: [12.6105, -70.0505],
-  "Tierra del Sol": [12.6055, -70.0405],
-  Malmok: [12.5985, -70.0485],
-  "Boca Catalina": [12.5915, -70.0505],
+  Arashi: [12.6105, -70.048],
+  "Tierra del Sol": [12.6051, -70.0401],
+  Malmok: [12.6017, -70.0453],
+  "Boca Catalina": [12.5979, -70.0441],
   "Gold Coast": [12.6005, -70.0395],
-  "Palm Beach": [12.5735, -70.0445],
-  Noord: [12.5800, -70.0310],
-  "Eagle Beach": [12.5545, -70.0545],
-  Oranjestad: [12.5190, -70.0355],
-  "Pos Chiquito": [12.4760, -69.9700],
-  Savaneta: [12.4545, -69.9450],
-  "Santa Cruz": [12.5060, -69.9840],
+  "Palm Beach": [12.5735, -70.041],
+  Noord: [12.58, -70.031],
+  "Eagle Beach": [12.5545, -70.051],
+  Oranjestad: [12.521, -70.0335],
+  "Pos Chiquito": [12.476, -69.97],
+  Savaneta: [12.4545, -69.945],
+  "Santa Cruz": [12.506, -69.984],
 };
 
 /** Deterministic small offset from the district centre (real rows carry their own coordinates). */
@@ -537,13 +535,31 @@ function scrapeMeta(
   };
 }
 
-export function deriveSignal(r: RawRow, marketYieldPct: number): ListingSignal {
-  const [id, name, type, district, beds, baths, built, lot, price, adr, occ, dom, chg, source] = r;
-  const revenue = Math.round(adr * 365 * (occ / 100));
-  const yieldPct = (revenue / price) * 100;
-  const spreadBps = Math.round((yieldPct - marketYieldPct) * 100);
-  const signal: Signal =
-    spreadBps >= 100 ? "UNDERVALUED" : spreadBps <= -100 ? "OVERPRICED" : "AT_MARKET";
+/**
+ * Comparable listings for a home: the same kind (villas, estates and beach
+ * houses vs condos, apartments, penthouses and townhouses), in the same
+ * district when there are at least 3, otherwise island-wide. Same grouping
+ * as the AI note (lib/signal-ai.ts).
+ */
+const UNIT_TYPES: PropertyType[] = ["Condo", "Apartment", "Penthouse", "Townhouse"];
+function propertyComps(type: PropertyType, district: string) {
+  const compact = UNIT_TYPES.includes(type);
+  // Sold and de-listed homes are not comps for what is for sale now.
+  const live = (x: RawRow) => !["Sold", "De-listed"].includes(STATUS_CHANGES[x[0]]?.[0] ?? "");
+  const kind = RAW_LISTINGS.filter((x) => UNIT_TYPES.includes(x[2]) === compact && live(x));
+  const local = kind.filter((x) => x[3] === district);
+  const pool = local.length >= 3 ? local : kind;
+  const psfs = pool.map((x) => Math.round(x[8] / x[6])).sort((a, b) => a - b);
+  const m = Math.floor(psfs.length / 2);
+  const med = psfs.length % 2 ? psfs[m] : (psfs[m - 1] + psfs[m]) / 2;
+  return { psf: Math.round(med), count: pool.length };
+}
+
+export function deriveSignal(r: RawRow): ListingSignal {
+  const [id, name, type, district, beds, baths, built, lot, price, , , dom, chg, source] = r;
+  const comps = propertyComps(type, district);
+  const vsComps = Math.round(((price / built - comps.psf) / comps.psf) * 1000) / 10;
+  const signal: Signal = vsComps <= -10 ? "UNDERVALUED" : vsComps >= 10 ? "OVERPRICED" : "AT_MARKET";
   const firstSeen = new Date(Date.parse(SCRAPED_AT) - dom * 86_400_000).toISOString().slice(0, 10);
   return {
     category: "Property",
@@ -571,11 +587,9 @@ export function deriveSignal(r: RawRow, marketYieldPct: number): ListingSignal {
     photo_url: COMPACT_TYPES.includes(type)
       ? CONDO_PHOTOS[RAW_LISTINGS.filter((x) => COMPACT_TYPES.includes(x[2])).indexOf(r) % CONDO_PHOTOS.length]
       : VILLA_PHOTOS[RAW_LISTINGS.indexOf(r) % VILLA_PHOTOS.length],
-    sequence_adr_usd: adr,
-    projected_occupancy_pct: occ,
-    projected_annual_revenue_usd: revenue,
-    projected_gross_yield_pct: Math.round(yieldPct * 10) / 10,
-    yield_spread_bps: spreadBps,
+    comps_psf_usd: comps.psf,
+    comps_count: comps.count,
+    price_vs_comps_pct: vsComps,
     signal,
   };
 }
@@ -711,11 +725,11 @@ const mockRepository: DashboardRepository = {
   getMonthlyPerformance: async (_id, months) => latency(MOCK_MONTHLY.slice(-months)),
   getActiveListingSignals: async (_id, limit) =>
     latency(
-      RAW_LISTINGS.map((l) => deriveSignal(l, MOCK_SNAPSHOT.est_gross_yield_pct)).slice(0, limit),
+      RAW_LISTINGS.map((l) => deriveSignal(l)).slice(0, limit),
     ),
   getActiveListings: async () =>
     latency<Listing[]>([
-      ...RAW_LISTINGS.map((l) => deriveSignal(l, MOCK_SNAPSHOT.est_gross_yield_pct)),
+      ...RAW_LISTINGS.map((l) => deriveSignal(l)),
       ...RAW_LAND.map(deriveLand),
       ...RAW_COMMERCIAL.map(deriveCommercial),
     ]),
@@ -779,7 +793,7 @@ export const repository: DashboardRepository = mockRepository;
  * ──────────────────────────────────────────────────────────────────────── */
 
 export const ALL_LISTINGS: Listing[] = [
-  ...RAW_LISTINGS.map((l) => deriveSignal(l, MOCK_SNAPSHOT.est_gross_yield_pct)),
+  ...RAW_LISTINGS.map((l) => deriveSignal(l)),
   ...RAW_LAND.map(deriveLand),
   ...RAW_COMMERCIAL.map(deriveCommercial),
 ];
@@ -844,7 +858,7 @@ export const DISTRICTS: DistrictStats[] = RAW_DISTRICT_RENTALS.map(([district, a
   const here = ALL_LISTINGS.filter((l) => l.district === district);
   const props = here.filter((l): l is ListingSignal => l.category === "Property");
   const land = here.filter((l): l is LandListing => l.category === "Land");
-  const avgYield = props.length ? Math.round((props.reduce((a, p) => a + p.projected_gross_yield_pct, 0) / props.length) * 10) / 10 : null;
+  const avgYield: number | null = null; // listings are no longer scored on rental yield
   const [lat, lng] = DISTRICT_CENTERS[district];
   return {
     district,
