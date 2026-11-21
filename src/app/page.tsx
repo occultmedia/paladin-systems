@@ -944,8 +944,15 @@ export default function Home() {
         </section>
 
         {/* Closing CTA */}
-        <section className="relative overflow-hidden bg-zinc-950">
-          <Image src={img(ARUBA_PHOTOS.beach, 1800, 800)} alt="" fill unoptimized className="object-cover opacity-40" />
+        <section className="relative overflow-hidden bg-[#0B0C0A]">
+          {/* brand backdrop: ink black, a faint grid fading in from the right, a soft lime light and the wordmark */}
+          <div aria-hidden className="pointer-events-none absolute inset-0">
+            <div className="absolute inset-0 [background-image:linear-gradient(rgb(255_255_255/0.05)_1px,transparent_1px),linear-gradient(90deg,rgb(255_255_255/0.05)_1px,transparent_1px)] [background-size:56px_56px] [mask-image:linear-gradient(to_left,black,transparent_70%)]" />
+            <div className="absolute -bottom-40 -right-24 size-[520px] rounded-full bg-[radial-gradient(circle,rgb(172_250_104/0.16),transparent_65%)]" />
+            <p className="absolute -bottom-[0.16em] right-6 hidden select-none items-end font-display text-[clamp(72px,10vw,150px)] uppercase leading-none tracking-[0.14em] text-white/[0.04] md:flex">
+              Terminal
+            </p>
+          </div>
           <div className="relative mx-auto flex max-w-[1240px] flex-col items-start justify-between gap-10 px-5 py-16 sm:px-6 sm:py-24 md:flex-row md:items-center">
             <div className="shrink-0 md:order-last md:hidden lg:order-none lg:block">
               <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-white/60">Powered by</p>
