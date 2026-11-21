@@ -16,7 +16,6 @@ import { MotionRoot, Reveal, Stagger, StaggerItem } from "@/components/motion/re
 import { CONTACT_EMAIL, PLANS, SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/site";
 import {
   ALL_LISTINGS,
-  ARUBA_PHOTOS,
   SCRAPE_RUNS,
   VILLA_PHOTOS,
   type Listing,
@@ -308,7 +307,6 @@ const INVESTOR: InvestorExample = {
   },
   undervalued: ALL_LISTINGS.filter((l) => l.signal === "UNDERVALUED").length,
   offMarket: 0,
-  photo: ARUBA_PHOTOS.aerial,
 };
 
 const AI_EX = aiExamples();

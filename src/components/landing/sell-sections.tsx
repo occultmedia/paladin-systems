@@ -4,9 +4,9 @@
  * Every example is built from today's data by the page.
  */
 
-import Image from "next/image";
 import Link from "next/link";
 import { Reveal, Stagger, StaggerItem } from "@/components/motion/reveal";
+import { FloorPlan } from "./floor-plan";
 
 /* ── shared bits ─────────────────────────────────────────────────────── */
 
@@ -213,7 +213,6 @@ export type InvestorExample = {
   post: { name: string; company: string; title: string; body: string; amount: string; district: string };
   undervalued: number;
   offMarket: number;
-  photo: string | null;
 };
 
 export function InvestorsSection({ ex }: { ex: InvestorExample }) {
@@ -240,9 +239,9 @@ export function InvestorsSection({ ex }: { ex: InvestorExample }) {
                   <p className="text-[12px] text-zinc-500">Investor · {ex.post.company}</p>
                 </div>
               </div>
-              {ex.photo && (
-                <Image src={`${ex.photo}?auto=format&fit=crop&w=900&h=380&q=70`} alt="" width={520} height={220} unoptimized className="mt-4 aspect-[2.4/1] h-auto w-full rounded-xl object-cover" />
-              )}
+              <div className="mt-4 overflow-hidden rounded-xl border border-zinc-200">
+                <FloorPlan className="block h-auto w-full" />
+              </div>
               <p className="mt-4 font-display text-[18px] font-bold leading-snug text-zinc-950">{ex.post.title}</p>
               <p className="mt-1.5 text-[13.5px] leading-relaxed text-zinc-600">{ex.post.body}</p>
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-zinc-100 pt-4">
