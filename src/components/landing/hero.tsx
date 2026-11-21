@@ -99,7 +99,7 @@ function IslandMap({
 
         {/* sea: depth contours */}
         {CONTOURS.map((d, i) => (
-          <path key={d} d={d} fill="none" stroke={INK} strokeOpacity={0.13 - i * 0.025} strokeWidth="1" strokeDasharray={i % 2 ? "3 7" : undefined} />
+          <path key={d} d={d} fill="none" stroke={INK} strokeOpacity={0.07 - i * 0.014} strokeWidth="1" strokeDasharray={i % 2 ? "3 7" : undefined} />
         ))}
 
         {/* graticule with real coordinates */}
@@ -127,10 +127,10 @@ function IslandMap({
         })}
 
         {/* island: lime halo, white land, dot matrix, ink coastline */}
-        <path d={COAST_PATH} fill="none" stroke={LIME} strokeOpacity="0.75" strokeWidth="14" filter="url(#hero-glow)" />
+        <path d={COAST_PATH} fill="none" stroke={LIME} strokeOpacity="0.4" strokeWidth="10" filter="url(#hero-glow)" />
         <path d={COAST_PATH} fill="#FFFFFF" />
         <path d={COAST_PATH} fill="url(#hero-dots)" />
-        <path d={COAST_PATH} fill="none" stroke={INK} strokeOpacity="0.9" strokeWidth="1.5" strokeLinejoin="round" />
+        <path d={COAST_PATH} fill="none" stroke={INK} strokeOpacity="0.22" strokeWidth="0.9" strokeLinejoin="round" />
 
         {/* scan sweep, clipped to the island */}
         {!still && (

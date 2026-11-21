@@ -1825,12 +1825,14 @@ function ActiveListings({
   initialQuery,
   initialOpenId,
   initialNewToday,
+  initialFullMap,
 }: {
   listings?: Listing[];
   initialDistrict?: string;
   initialQuery?: string;
   initialOpenId?: string;
   initialNewToday?: boolean;
+  initialFullMap?: boolean;
 }) {
   const [query, setQuery] = useState(initialQuery ?? "");
   const [tenure, setTenure] = useState<Tenure | "All">("All");
@@ -1852,8 +1854,16 @@ function ActiveListings({
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "listed", dir: "asc" });
   const [openId, setOpenId] = useState<string | null>(initialOpenId ?? null);
   const [hoverId, setHoverId] = useState<string | null>(null);
-  const [fullMap, setFullMap] = useState(false);
-  const closeFullMap = useCallback(() => setFullMap(false), []);
+  const [fullMap, setFullMap] = useState(Boolean(initialFullMap));
+  const closeFullMap = useCallback(() => {
+    setFullMap(false);
+    // Opened from a "?map=full" link: drop the flag so it does not reopen.
+    const url = new URL(window.location.href);
+    if (url.searchParams.has("map")) {
+      url.searchParams.delete("map");
+      window.history.replaceState(null, "", url);
+    }
+  }, []);
 
   // The table scrolls sideways on narrower screens. An open listing's details
   // are pinned to the visible width so nothing is cut off on the right.
@@ -3139,6 +3149,7 @@ function Dashboard() {
               initialQuery={listingsView.query}
               initialOpenId={listingsView.openId}
               initialNewToday={listingsView.newToday}
+              initialFullMap={params.get("map") === "full"}
             />
           </>
         ) : tab === "Feed" ? (

@@ -6,6 +6,10 @@ import { PlanPrice } from "@/components/landing/plan-price";
 import { AIBadge, AIMarketScan, Spotlight } from "@/components/ai/ai-visuals";
 import { Hero, type HeroEvent, type HeroFeature, type HeroPin, type HeroPlace } from "@/components/landing/hero";
 import { SiteHeader } from "@/components/landing/site-header";
+import { MapShowcase, MapShowcaseCta } from "@/components/landing/map-showcase";
+import { AgentsSection, AiCapabilities, InvestorsSection, type AgentMorning, type AiExamples, type InvestorExample } from "@/components/landing/sell-sections";
+import { computedListingNote, listingFacts } from "@/lib/signal-ai";
+import { scoreConfidence } from "@/lib/confidence";
 import { MARKET_TOTAL, marketBrief, scanRows } from "@/lib/scan-data";
 import { ClientsPane, HistoryPane, TerminalPreview, type PreviewData } from "@/components/landing/terminal-preview";
 import { MotionRoot, Reveal, Stagger, StaggerItem } from "@/components/motion/reveal";
@@ -219,6 +223,7 @@ function previewData(): PreviewData {
 }
 
 const PREVIEW = previewData();
+const BRIEF = marketBrief();
 
 /* ── hero: real pins, real events from today's read, live figures ─────── */
 
@@ -268,7 +273,62 @@ function heroData() {
 }
 
 const HERO = heroData();
-const BRIEF = marketBrief();
+
+/* ── selling sections: AI examples, an agent's morning, an investor post, the 3D map tour ── */
+
+const FOR_SALE = ALL_LISTINGS.filter((l) => l.status === "For sale");
+const HOMES_FOR_SALE = FOR_SALE.filter((l): l is ListingSignal => l.category === "Property");
+const BEST = [...HOMES_FOR_SALE].sort((a, b) => a.price_vs_comps_pct - b.price_vs_comps_pct)[0];
+// A realistic "priced above its comps" example for the agents section (not an outlier).
+const PRICIEST = [...HOMES_FOR_SALE].filter((l) => l.price_vs_comps_pct <= 40).sort((a, b) => b.price_vs_comps_pct - a.price_vs_comps_pct)[0];
+const GHOST = [...ALL_LISTINGS].sort((a, b) => a.confidence_score - b.confidence_score)[0];
+
+function aiExamples(): AiExamples {
+  const facts = listingFacts(BEST, ALL_LISTINGS);
+  const note = computedListingNote(facts);
+  const lastMove = GHOST.price_history[GHOST.price_history.length - 1]?.date ?? GHOST.first_seen;
+  const why = scoreConfidence({ lastFoundAt: GHOST.last_found_at, daysOnMarket: GHOST.days_on_market, lastPriceChangeAt: `${lastMove}T00:00:00Z`, asOf: GHOST.last_scraped }).reasons;
+  return {
+    note: { listing: BEST.asset_name, district: BEST.district, verdict: note.verdict, headline: note.headline },
+    brief: { headline: BRIEF.headline, time: PREVIEW.run.time },
+    comps: { listing: BEST.asset_name, psf: BEST.price_per_sqft_usd, compsPsf: BEST.comps_psf_usd, pct: BEST.price_vs_comps_pct, basis: facts.comps.basis },
+    ghost: { listing: GHOST.asset_name, score: GHOST.confidence_score, reason: why.map((r) => r.label).join(" · ") || "Missing from the agency site" },
+  };
+}
+
+function agentMorning(): AgentMorning {
+  const cut = RUN.price_changes.find((c) => (c.change.change_pct ?? 0) < 0);
+  return {
+    time: "7:00 AM",
+    newCount: RUN.new_listings.length,
+    moves: RUN.price_changes.length,
+    contracts: RUN.status_changes.length,
+    drop: cut ? { listing: cut.listing.asset_name, pct: cut.change.change_pct ?? 0, price: usdM(cut.change.price_usd) } : null,
+    lead: PREVIEW.clients.people[0] ? { name: PREVIEW.clients.people[0].name, listing: cut?.listing.asset_name ?? "" } : null,
+    pricing: PRICIEST ? { listing: PRICIEST.asset_name, district: PRICIEST.district, pct: PRICIEST.price_vs_comps_pct } : null,
+  };
+}
+
+// Fictional member and project, same as the Feed's sample posts.
+const INVESTOR: InvestorExample = {
+  post: {
+    name: "Elena Vos",
+    company: "Coastline Ventures",
+    title: "Investor wanted: 6-unit rental project in Noord",
+    body: "Land secured and permits submitted for six 1-bed units. Looking for a capital partner for 40%. Projections and drawings on request.",
+    amount: "$650,000",
+    district: "Noord",
+  },
+  undervalued: ALL_LISTINGS.filter((l) => l.signal === "UNDERVALUED").length,
+  offMarket: 0,
+  photo: ARUBA_PHOTOS.aerial,
+};
+
+const AI_EX = aiExamples();
+const AGENT_AM = agentMorning();
+const MAP_TOUR = HOMES_FOR_SALE.filter((l) => l.photo_url)
+  .sort((a, b) => a.price_vs_comps_pct - b.price_vs_comps_pct)
+  .slice(0, 6);
 const SCAN = scanRows(12);
 
 
@@ -411,43 +471,6 @@ export default function Home() {
       <main id="main">
         <Hero pins={HERO.pins} events={HERO.events} features={HERO.features} places={HERO.places} runLabel={HERO.runLabel} runTime={PREVIEW.run.time} total={ALL_LISTINGS.length} />
 
-        {/* The product */}
-        <section className="relative bg-gradient-to-b from-mint-soft to-white pb-20 sm:pb-28">
-          <div className="mx-auto max-w-[1240px] px-5 pt-16 sm:px-6 sm:pt-24">
-            <Reveal className="flex flex-wrap items-end justify-between gap-6">
-              <div className="max-w-[640px]">
-                <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-zinc-500">The terminal</p>
-                <h2 className="mt-3 font-display text-[32px] font-bold leading-[1.05] tracking-[-0.02em] text-zinc-950 sm:text-[44px]">
-                  This morning&apos;s market, on one screen.
-                </h2>
-              </div>
-              <p className="max-w-[44ch] text-[15px] leading-relaxed text-zinc-600">
-                What changed overnight, what each listing is worth against its comps, and who is selling it. Pin what you watch, log who asked.
-              </p>
-            </Reveal>
-            <Reveal delay={0.1} y={28} className="mt-10 min-w-0 sm:mt-14">
-              <TerminalPreview data={{ ...PREVIEW, headline: BRIEF.headline }} />
-            </Reveal>
-          </div>
-        </section>
-
-        {/* Ticker */}
-        <div className="overflow-hidden border-b border-mint-deep bg-mint-soft">
-          <div className="flex w-max animate-[ticker_52s_linear_infinite] gap-10 whitespace-nowrap py-3.5 motion-reduce:animate-none">
-            {tickerItems.map(([k, v, d], i) => (
-              <span key={i} className="text-[13px] text-zinc-500">
-                {k} <span className="font-semibold tabular-nums text-zinc-950">{v}</span>
-                {d !== null && (
-                  <span className="ml-1 font-semibold tabular-nums" style={{ color: d >= 0 ? UP : DOWN }}>
-                    {pct(d)}
-                  </span>
-                )}
-              </span>
-            ))}
-          </div>
-          <style>{`@keyframes ticker { from { transform: translateX(0) } to { transform: translateX(-50%) } }`}</style>
-        </div>
-
         {/* AI Signal */}
         <section id="ai-signal" className="scroll-mt-16 border-y border-zinc-200 bg-white text-zinc-950">
           <Spotlight>
@@ -455,16 +478,17 @@ export default function Home() {
               aria-hidden
               className="pointer-events-none absolute inset-0 opacity-70 [background-image:radial-gradient(rgb(10_10_10/0.08)_1px,transparent_1px)] [background-size:24px_24px] [mask-image:radial-gradient(ellipse_at_70%_40%,black,transparent_70%)]"
             />
-            <div className="relative mx-auto grid max-w-[1240px] grid-cols-[minmax(0,1fr)] gap-12 px-5 py-16 sm:px-6 sm:py-24 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:items-center lg:gap-16">
+            <div className="relative mx-auto grid max-w-[1240px] grid-cols-[minmax(0,1fr)] gap-12 px-5 py-16 sm:px-6 sm:py-24 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:items-center lg:gap-16 sm:pb-10">
               <div>
                 <Reveal>
                   <AIBadge />
-                  <h2 className="mt-5 max-w-[16ch] font-display text-[32px] font-bold leading-[1.06] tracking-tight sm:text-[48px]">
-                    AI reads the whole Aruba market before you do.
+                  <h2 className="mt-5 max-w-[17ch] font-display text-[34px] font-bold leading-[1.04] tracking-[-0.025em] sm:text-[52px]">
+                    An AI analyst that reads the whole market before you wake up.
                   </h2>
                   <p className="mt-5 max-w-[50ch] text-[16px] leading-relaxed text-zinc-600">
-                    Every morning Terminal reads every listing on Aruba&apos;s agency websites, checks each one against its comps and
-                    its own history, and tells you what changed and what it means.
+                    AI is the core of Terminal, not a chat box on the side. Every night it reads every listing on Aruba&apos;s agency
+                    websites, prices each one against its comps, checks its history, catches the ghosts, and writes you a plain-English
+                    take on what changed and what to do about it.
                   </p>
                 </Reveal>
                 <Stagger className="relative mt-10 space-y-7" gap={0.14}>
@@ -503,8 +527,91 @@ export default function Home() {
                 </div>
               </Reveal>
             </div>
+            <div className="relative mx-auto max-w-[1240px] px-5 pb-20 sm:px-6 sm:pb-28">
+              <AiCapabilities ex={AI_EX} />
+            </div>
           </Spotlight>
         </section>
+
+        {/* The product */}
+        <section className="relative bg-gradient-to-b from-mint-soft to-white pb-20 sm:pb-28">
+          <div className="mx-auto max-w-[1240px] px-5 pt-16 sm:px-6 sm:pt-24">
+            <Reveal className="flex flex-wrap items-end justify-between gap-6">
+              <div className="max-w-[640px]">
+                <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-zinc-500">The terminal</p>
+                <h2 className="mt-3 font-display text-[32px] font-bold leading-[1.05] tracking-[-0.02em] text-zinc-950 sm:text-[44px]">
+                  This morning&apos;s market, on one screen.
+                </h2>
+              </div>
+              <p className="max-w-[44ch] text-[15px] leading-relaxed text-zinc-600">
+                What changed overnight, what each listing is worth against its comps, and who is selling it. Pin what you watch, log who asked.
+              </p>
+            </Reveal>
+            <Reveal delay={0.1} y={28} className="mt-10 min-w-0 sm:mt-14">
+              <TerminalPreview data={{ ...PREVIEW, headline: BRIEF.headline }} />
+            </Reveal>
+          </div>
+        </section>
+
+        {/* Full-screen map, 3D */}
+        <section id="map" className="scroll-mt-16 border-t border-zinc-200 bg-white">
+          <div className="mx-auto max-w-[1240px] px-5 py-20 sm:px-6 sm:py-28">
+            <Reveal className="flex flex-wrap items-end justify-between gap-6">
+              <div className="max-w-[660px]">
+                <p className="inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.16em] text-zinc-500">
+                  <span className="size-1.5 rounded-full bg-lime ring-1 ring-zinc-950/40" />
+                  Full-screen map · 3D
+                </p>
+                <h2 className="mt-4 font-display text-[34px] font-bold leading-[1.04] tracking-[-0.025em] text-zinc-950 sm:text-[52px]">
+                  Walk the island before you drive it.
+                </h2>
+              </div>
+              <p className="max-w-[44ch] text-[15.5px] leading-relaxed text-zinc-600">
+                Every listing on one full-screen map. Click a pin and Terminal flies in and tilts to 3D, so you see the street, the neighbours and the view before you book a viewing.
+              </p>
+            </Reveal>
+            <Reveal delay={0.1} y={28} className="mt-10 sm:mt-14">
+              <MapShowcase listings={FOR_SALE} tour={MAP_TOUR} />
+            </Reveal>
+            <Stagger className="mt-8 grid gap-6 sm:grid-cols-3" gap={0.08}>
+              {[
+                ["3D buildings and terrain", "Tilt any area to see height, density and sea view."],
+                ["Your filters come with you", "Price, area, type and AI Signal carry into the map."],
+                ["One click to the full story", "From a pin straight to price history, comps and the agent."],
+              ].map(([t, d]) => (
+                <StaggerItem key={t} className="border-t border-zinc-950 pt-4">
+                  <p className="font-display text-[16px] font-semibold text-zinc-950">{t}</p>
+                  <p className="mt-1 text-[13.5px] leading-relaxed text-zinc-600">{d}</p>
+                </StaggerItem>
+              ))}
+            </Stagger>
+            <Reveal className="mt-10">
+              <MapShowcaseCta />
+            </Reveal>
+          </div>
+        </section>
+
+        <AgentsSection m={AGENT_AM} />
+
+        <InvestorsSection ex={INVESTOR} />
+
+        {/* Ticker */}
+        <div className="overflow-hidden border-b border-mint-deep bg-mint-soft">
+          <div className="flex w-max animate-[ticker_52s_linear_infinite] gap-10 whitespace-nowrap py-3.5 motion-reduce:animate-none">
+            {tickerItems.map(([k, v, d], i) => (
+              <span key={i} className="text-[13px] text-zinc-500">
+                {k} <span className="font-semibold tabular-nums text-zinc-950">{v}</span>
+                {d !== null && (
+                  <span className="ml-1 font-semibold tabular-nums" style={{ color: d >= 0 ? UP : DOWN }}>
+                    {pct(d)}
+                  </span>
+                )}
+              </span>
+            ))}
+          </div>
+          <style>{`@keyframes ticker { from { transform: translateX(0) } to { transform: translateX(-50%) } }`}</style>
+        </div>
+
 
         {/* Overview bento */}
         <section className="mx-auto max-w-[1240px] px-5 py-16 sm:px-6 sm:py-24">
@@ -809,47 +916,6 @@ export default function Home() {
             <Reveal className="rounded-3xl border border-zinc-200 bg-mint-soft p-3 shadow-xl shadow-zinc-900/5 sm:p-4">
               <ClientsPane data={PREVIEW} />
             </Reveal>
-          </div>
-        </section>
-
-        {/* Who it's for */}
-        <section className="relative overflow-hidden border-y border-zinc-200 bg-white">
-          <div className="relative mx-auto max-w-[1240px] px-5 py-16 sm:px-6 sm:py-24">
-            <SectionHeading eyebrow="Who it's for" title="Built for the people who move Aruba's market." />
-            <Stagger className="mt-10 grid gap-5 sm:mt-14 md:grid-cols-2" gap={0.12}>
-              {[
-                {
-                  who: "Real estate agents",
-                  points: [
-                    "See every new listing and price drop on the island each morning",
-                    "Price your own listings against what similar homes and land are asking",
-                    "Keep every interested client on the property they asked about",
-                    "Call them back the day the price drops, and export lists to CSV",
-                  ],
-                },
-                {
-                  who: "Investors",
-                  points: [
-                    "Find undervalued homes and land before they are gone",
-                    "Check the full price history before you make an offer",
-                    "Pin properties and catch every price cut on them",
-                    "See how long listings sit and contact the agent in one tap",
-                  ],
-                },
-              ].map((c) => (
-                <StaggerItem key={c.who} className="h-full rounded-3xl border border-zinc-200 bg-zinc-50 p-7 sm:p-10">
-                  <p className="font-display text-[24px] font-bold text-zinc-950">{c.who}</p>
-                  <ul className="mt-6 space-y-3.5">
-                    {c.points.map((p) => (
-                      <li key={p} className="flex gap-3 text-[15px] leading-relaxed text-zinc-700">
-                        <span className="mt-2 size-2 shrink-0 rounded-full bg-zinc-950 ring-2 ring-lime" />
-                        {p}
-                      </li>
-                    ))}
-                  </ul>
-                </StaggerItem>
-              ))}
-            </Stagger>
           </div>
         </section>
 

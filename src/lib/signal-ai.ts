@@ -49,10 +49,10 @@ const pct = (n: number, d = 1) => `${n > 0 ? "+" : ""}${n.toFixed(d)}%`;
 const kindOf = (l: Listing) =>
   l.category === "Property" ? l.property_type.toLowerCase() : l.category === "Land" ? "land parcel" : `${l.commercial_use.toLowerCase()} building`;
 
-const COMPACT = new Set(["Condo", "Apartment", "Penthouse", "Townhouse"]);
-/** Comparable group: "villas & estates", "condos & apartments", "land" or "commercial". */
+const COMPACT = new Set(["Condo", "Apartment", "Townhouse"]);
+/** Comparable group: "villas, estates & penthouses", "condos & apartments", "land" or "commercial". */
 const segmentOf = (l: Listing) =>
-  l.category === "Property" ? (COMPACT.has(l.property_type) ? "condos & apartments" : "villas & estates") : l.category === "Land" ? "land" : "commercial";
+  l.category === "Property" ? (COMPACT.has(l.property_type) ? "condos & apartments" : "villas, estates & penthouses") : l.category === "Land" ? "land" : "commercial";
 
 /* ── Listing facts ─────────────────────────────────────────────────────── */
 

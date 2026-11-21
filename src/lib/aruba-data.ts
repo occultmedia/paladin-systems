@@ -537,11 +537,11 @@ function scrapeMeta(
 
 /**
  * Comparable listings for a home: the same kind (villas, estates and beach
- * houses vs condos, apartments, penthouses and townhouses), in the same
+ * houses and penthouses vs condos, apartments and townhouses), in the same
  * district when there are at least 3, otherwise island-wide. Same grouping
  * as the AI note (lib/signal-ai.ts).
  */
-const UNIT_TYPES: PropertyType[] = ["Condo", "Apartment", "Penthouse", "Townhouse"];
+const UNIT_TYPES: PropertyType[] = ["Condo", "Apartment", "Townhouse"];
 function propertyComps(type: PropertyType, district: string) {
   const compact = UNIT_TYPES.includes(type);
   // Sold and de-listed homes are not comps for what is for sale now.
