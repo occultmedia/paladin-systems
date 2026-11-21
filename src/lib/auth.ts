@@ -33,6 +33,10 @@ export interface SignUpInput {
   password: string;
   role: Role;
   plan: Billing;
+  /** Feed profile details entered at sign-up (photo and logo upload after the first sign-in). */
+  company?: string;
+  title?: string;
+  whatsapp?: string;
 }
 
 export type AuthResult = { ok: true; message?: string } | { ok: false; error: string };
@@ -46,7 +50,14 @@ export async function signUp(input: SignUpInput): Promise<AuthResult> {
     email: input.email.trim(),
     password: input.password,
     options: {
-      data: { full_name: input.name.trim(), role: input.role, plan: input.plan },
+      data: {
+        full_name: input.name.trim(),
+        role: input.role,
+        plan: input.plan,
+        company: input.company?.trim() ?? "",
+        title: input.title?.trim() ?? "",
+        whatsapp: input.whatsapp?.trim() ?? "",
+      },
       emailRedirectTo: `${window.location.origin}/dashboard`,
     },
   });

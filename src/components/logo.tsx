@@ -32,17 +32,17 @@ export function SequenceMonogram({ className = "h-6 w-auto", tone = "black" }: {
 }
 
 /**
- * Signal mark: a sharp signal pulse off a faint baseline, with a lock marker
- * over the peak. Hard angles, square caps, mitred joins.
+ * Sequence Terminal mark: a command prompt chevron with a block cursor.
+ * Hard angles, square caps, mitred joins. The cursor blinks slowly
+ * (motion-safe only).
  */
-export function SignalGlyph({ tone = "black", className = "size-[22px]" }: { tone?: Tone; className?: string }) {
+export function TerminalGlyph({ tone = "black", className = "size-[22px]", blink = true }: { tone?: Tone; className?: string; blink?: boolean }) {
   const fg = tone === "black" ? "#0A0A0A" : "#FFFFFF";
-  const lock = tone === "black" ? "#0A0A0A" : "#DDE5DC";
+  const cursor = tone === "black" ? "#0A0A0A" : "#DDE5DC";
   return (
     <svg viewBox="0 0 24 24" className={`${className} shrink-0`} aria-hidden fill="none" strokeLinecap="square" strokeLinejoin="miter">
-      <path d="M1 14h22" stroke={fg} strokeWidth="1.3" opacity="0.3" />
-      <path d="M1.5 14h4.5l2.5-6.5 4 13.5 3-10 2 3h5" stroke={fg} strokeWidth="2.4" />
-      <rect x="7.4" y="1" width="2.2" height="2.2" fill={lock} />
+      <path d="M3 5.5l7 6.5-7 6.5" stroke={fg} strokeWidth="2.6" />
+      <rect x="12.5" y="16.2" width="9" height="2.8" fill={cursor} className={blink ? "motion-safe:animate-[st-cursor_1.2s_steps(1)_infinite]" : undefined} />
     </svg>
   );
 }
@@ -53,7 +53,7 @@ export function Wordmark({ tone = "black", tagline = false }: { tone?: Tone; tag
   const muted = tone === "black" ? "text-zinc-500" : "text-zinc-400";
   return (
     <span className="flex items-center gap-2.5">
-      <SignalGlyph tone={tone} />
+      <TerminalGlyph tone={tone} />
       <span className="leading-none">
         <span className={`block whitespace-nowrap font-display text-[17px] font-bold uppercase tracking-[0.2em] ${text}`}>Sequence</span>
         <span className={`mt-[3px] block whitespace-nowrap font-display text-[9.5px] font-semibold uppercase tracking-[0.62em] ${muted}`}>Terminal</span>

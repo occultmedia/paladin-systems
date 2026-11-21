@@ -2,13 +2,17 @@
 
 /*
  * Member profile: who you are on the Feed (name, company, photo, company
- * logo and how people reach you).
+ * logo and how people reach you). It is filled in when the account is
+ * created (sign-up step 2) and can be edited later from the account menu.
  *
  * Two backends behind one hook:
  *  - Supabase (when accounts are configured and you are signed in): the
  *    `profiles` table, images in the public `profile-media` bucket under
  *    your user id. See supabase/migrations/*_profiles_feed.sql.
  *  - This browser (localStorage) until then, so the Feed works as a demo.
+ *    Sign-up also keeps the profile here until the new account's first
+ *    sign-in (email confirmation means there is no session at sign-up), then
+ *    uploads the photo and logo and removes the local copy.
  */
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
@@ -74,6 +78,19 @@ function writeLocal(p: Profile) {
   listeners.forEach((l) => l());
 }
 
+function clearLocal() {
+  try {
+    window.localStorage.removeItem(KEY);
+  } catch {}
+  cache = null;
+  listeners.forEach((l) => l());
+}
+
+/** Called by the sign-up form: keeps the new member's profile until their first sign-in. */
+export function saveSignupProfile(p: Profile) {
+  writeLocal(p);
+}
+
 function subscribe(cb: () => void) {
   listeners.add(cb);
   const onStorage = (e: StorageEvent) => {
@@ -129,6 +146,37 @@ async function uploadIfNew(uid: string, kind: "photo" | "logo", value?: string):
   return sb.storage.from("profile-media").getPublicUrl(path).data.publicUrl;
 }
 
+async function persist(uid: string, p: Profile): Promise<Profile> {
+  const sb = supabase();
+  if (!sb) throw new Error("Accounts are not configured.");
+  const [photo_url, logo_url] = await Promise.all([uploadIfNew(uid, "photo", p.photo), uploadIfNew(uid, "logo", p.logo)]);
+  const row: ProfileRow = {
+    id: uid,
+    name: p.name.trim(),
+    role: p.role,
+    company: p.company.trim(),
+    title: p.title?.trim() || null,
+    email: p.email?.trim() || null,
+    phone: p.phone?.trim() || null,
+    whatsapp: p.whatsapp?.trim() || null,
+    photo_url,
+    logo_url,
+  };
+  const { error } = await sb.from("profiles").upsert(row);
+  if (error) throw new Error(error.message);
+  return rowToProfile(row);
+}
+
+/** Fill gaps in the stored profile with what was entered at sign-up. */
+function mergeSignup(stored: Profile | null, signup: Profile): Profile {
+  if (!stored) return signup;
+  const out: Profile = { ...signup };
+  (Object.keys(stored) as (keyof Profile)[]).forEach((k) => {
+    if (stored[k]) (out as unknown as Record<string, unknown>)[k] = stored[k];
+  });
+  return out;
+}
+
 /* ── hook ─────────────────────────────────────────────────────────────── */
 
 export function useProfile() {
@@ -145,8 +193,21 @@ export function useProfile() {
       .select("name, role, company, title, email, phone, whatsapp, photo_url, logo_url")
       .eq("id", user.id)
       .maybeSingle()
-      .then(({ data }) => {
-        if (live) setRemote({ uid: user.id, profile: data ? rowToProfile(data as ProfileRow) : null });
+      .then(async ({ data }) => {
+        let stored = data ? rowToProfile(data as ProfileRow) : null;
+        const signup = readLocal();
+        const sameAccount = signup && signup.email?.trim().toLowerCase() === user.email?.toLowerCase();
+        if (sameAccount && (!stored || (!stored.photo && signup.photo) || (!stored.logo && signup.logo))) {
+          try {
+            stored = await persist(user.id, mergeSignup(stored, signup));
+            clearLocal();
+          } catch {
+            /* keep the local copy and try again next time */
+          }
+        } else if (sameAccount && stored) {
+          clearLocal();
+        }
+        if (live) setRemote({ uid: user.id, profile: stored });
       });
     return () => {
       live = false;
@@ -155,24 +216,8 @@ export function useProfile() {
 
   const save = useCallback(
     async (p: Profile) => {
-      const sb = supabase();
-      if (!user || !sb) return writeLocal(p);
-      const [photo_url, logo_url] = await Promise.all([uploadIfNew(user.id, "photo", p.photo), uploadIfNew(user.id, "logo", p.logo)]);
-      const row: ProfileRow = {
-        id: user.id,
-        name: p.name.trim(),
-        role: p.role,
-        company: p.company.trim(),
-        title: p.title?.trim() || null,
-        email: p.email?.trim() || null,
-        phone: p.phone?.trim() || null,
-        whatsapp: p.whatsapp?.trim() || null,
-        photo_url,
-        logo_url,
-      };
-      const { error } = await sb.from("profiles").upsert(row);
-      if (error) throw new Error(error.message);
-      setRemote({ uid: user.id, profile: rowToProfile(row) });
+      if (!user || !supabase()) return writeLocal(p);
+      setRemote({ uid: user.id, profile: await persist(user.id, p) });
     },
     [user],
   );

@@ -86,7 +86,7 @@ export function Avatar({ name, photo, logo, size = 44 }: { name: string; photo?:
   );
 }
 
-function ImagePick({ label, hint, value, round, onChange, onError }: { label: string; hint: string; value?: string; round: boolean; onChange: (v?: string) => void; onError: (m: string) => void }) {
+export function ImagePick({ label, hint, value, round, onChange, onError }: { label: string; hint: string; value?: string; round: boolean; onChange: (v?: string) => void; onError: (m: string) => void }) {
   const ref = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const Icon = round ? Camera : Building2;

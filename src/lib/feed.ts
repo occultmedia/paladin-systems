@@ -1,10 +1,10 @@
 "use client";
 
 /*
- * The Feed: members post offers (off-market deals, listings for co-broke,
- * buyer requests, rentals, partnerships) that every Sequence Terminal member
- * can see and respond to by contacting the poster directly. No chat, no
- * comments: one post, one clear offer, one way to reach the person.
+ * The Feed: members post updates and offers (off-market deals, listings for
+ * co-broke, buyer requests, rentals, partnerships) that every Sequence
+ * Terminal member can see and respond to by contacting the poster directly.
+ * No chat, no comments. Every post deletes itself 48 hours after it goes up.
  *
  * Same two backends as profiles:
  *  - Supabase `feed_posts` (joined to `profiles`) once accounts are live.
@@ -15,10 +15,20 @@ import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 
 import { supabase, useUser } from "./auth";
 import { rowToProfile, type Profile } from "./profile";
 
-export const POST_KINDS = ["Off-market", "For sale", "Buyer request", "For rent", "Partnership"] as const;
+export const POST_KINDS = ["Update", "Off-market", "For sale", "Buyer request", "For rent", "Partnership"] as const;
 export type PostKind = (typeof POST_KINDS)[number];
 
+/** Post types that are offers (they can carry a price). "Update" is a plain post. */
+export const isOffer = (k: PostKind) => k !== "Update";
+
+/** Posts are removed automatically this long after they are published. */
+export const FEED_TTL_HOURS = 48;
+const TTL_MS = FEED_TTL_HOURS * 36e5;
+export const expiresAt = (iso: string) => Date.parse(iso) + TTL_MS;
+const isLive = (iso: string, now = Date.now()) => expiresAt(iso) > now;
+
 export const POST_KIND_HINT: Record<PostKind, string> = {
+  Update: "Market news, a sale you closed, an open house, anything members should know",
   "Off-market": "A property you can sell quietly, not on public sites",
   "For sale": "A listing you want other agents to bring buyers to",
   "Buyer request": "A client looking for something specific",
@@ -102,8 +112,19 @@ const SAMPLES: FeedPost[] = [
     sample: true,
   },
   {
+    id: "sample-6",
+    created_at: ago(8),
+    kind: "Update",
+    title: "Open house Saturday 10am to 1pm, Palm Beach condo",
+    body: "Agents welcome to bring clients. Corner unit, 2 bed, pool view. Coffee and floor plans on site.",
+    price_usd: null,
+    district: "Palm Beach",
+    author: { name: "Daniela Ruiz", role: "Agent", company: "Brightwater Realty", title: "Senior agent" },
+    sample: true,
+  },
+  {
     id: "sample-5",
-    created_at: ago(49),
+    created_at: ago(40),
     kind: "For sale",
     title: "Commercial unit on main road, Oranjestad: co-broke welcome",
     body: "Ground floor retail, 180 m², currently leased until 2027. Good yield for an investor client. 3% to the buyer's agent.",
@@ -126,7 +147,10 @@ function readLocal(): FeedPost[] {
   try {
     const raw = window.localStorage.getItem(KEY);
     const parsed = raw ? (JSON.parse(raw) as unknown) : [];
-    cache = Array.isArray(parsed) ? (parsed as FeedPost[]).filter((p) => p && typeof p.id === "string") : [];
+    const all = Array.isArray(parsed) ? (parsed as FeedPost[]).filter((p) => p && typeof p.id === "string") : [];
+    cache = all.filter((p) => isLive(p.created_at));
+    // Expired posts are deleted, not just hidden.
+    if (cache.length !== all.length) window.localStorage.setItem(KEY, JSON.stringify(cache));
   } catch {
     cache = [];
   }
@@ -199,7 +223,8 @@ export function useFeed(author: Profile | null) {
   const load = useCallback(async () => {
     const sb = supabase();
     if (!user || !sb) return;
-    const { data, error: e } = await sb.from("feed_posts").select(SELECT).order("created_at", { ascending: false }).limit(200);
+    const since = new Date(Date.now() - TTL_MS).toISOString();
+    const { data, error: e } = await sb.from("feed_posts").select(SELECT).gt("created_at", since).order("created_at", { ascending: false }).limit(200);
     if (e) return setError(e.message);
     setError(null);
     setRemote({ uid: user.id, posts: ((data ?? []) as unknown as PostRow[]).map((r) => fromRow(r, user.id)) });
@@ -237,12 +262,22 @@ export function useFeed(author: Profile | null) {
     [user, load],
   );
 
+  // Re-check expiry every minute so posts drop off the Feed at 48 hours.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = window.setInterval(() => setNow(Date.now()), 60_000);
+    return () => window.clearInterval(t);
+  }, []);
+
   // Local posts show the poster's current profile (photo, logo) like a live account would.
   const posts = useMemo(() => {
-    if (remoteMode) return remote && remote.uid === user?.id ? remote.posts : [];
-    const mine = local.map((p) => (author ? { ...p, author } : p));
-    return [...mine, ...SAMPLES].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
-  }, [remoteMode, remote, user, local, author]);
+    const all = remoteMode
+      ? remote && remote.uid === user?.id
+        ? remote.posts
+        : []
+      : [...local.map((p) => (author ? { ...p, author } : p)), ...SAMPLES];
+    return all.filter((p) => isLive(p.created_at, now)).sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+  }, [remoteMode, remote, user, local, author, now]);
 
   return {
     posts,

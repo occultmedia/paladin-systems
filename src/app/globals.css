@@ -411,3 +411,9 @@ body {
   background-attachment: fixed;
   color: #fff;
 }
+
+/* Sequence Terminal logo cursor */
+@keyframes st-cursor {
+  0%, 55% { opacity: 1; }
+  56%, 100% { opacity: 0; }
+}

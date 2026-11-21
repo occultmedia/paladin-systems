@@ -6,8 +6,10 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, ArrowRight, Check, Eye, EyeOff, Mail } from "lucide-react";
 import { useId, useState } from "react";
 import { AIBadge, AIMarketScan, Spotlight, type ScanRow } from "@/components/ai/ai-visuals";
+import { ImagePick } from "@/components/feed/profile-dialog";
 import { Wordmark } from "@/components/logo";
 import { ROLES, logIn, sendReset, signUp, type AuthResult, type Role } from "@/lib/auth";
+import { saveSignupProfile } from "@/lib/profile";
 import { CONTACT_EMAIL, PLANS, YEARLY_SAVINGS_USD, type Billing } from "@/lib/site";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
@@ -297,6 +299,19 @@ export function LoginForm() {
 
 /* ── sign up ────────────────────────────────────────────────────────────── */
 
+function StepLabel({ step }: { step: 1 | 2 }) {
+  return (
+    <div className="flex items-center gap-3 text-[11.5px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
+      <span className="flex gap-1">
+        {[1, 2].map((i) => (
+          <span key={i} className={`h-1 w-6 rounded-full transition-colors ${i <= step ? "bg-zinc-950" : "bg-zinc-200"}`} />
+        ))}
+      </span>
+      Step {step} of 2 · {step === 1 ? "Account" : "Profile"}
+    </div>
+  );
+}
+
 export function SignupForm({ initialPlan = "monthly" }: { initialPlan?: Billing }) {
   const router = useRouter();
   const [name, setName] = useState("");
@@ -304,6 +319,12 @@ export function SignupForm({ initialPlan = "monthly" }: { initialPlan?: Billing 
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<Role>("Agent");
   const [plan, setPlan] = useState<Billing>(initialPlan);
+  const [step, setStep] = useState<1 | 2>(1);
+  const [company, setCompany] = useState("");
+  const [title, setTitle] = useState("");
+  const [whatsapp, setWhatsapp] = useState("");
+  const [photo, setPhoto] = useState<string>();
+  const [logo, setLogo] = useState<string>();
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<AuthResult | null>(null);
   const [sent, setSent] = useState(false);
@@ -320,22 +341,68 @@ export function SignupForm({ initialPlan = "monthly" }: { initialPlan?: Billing 
       />
     );
 
-  const submit = async (e: React.FormEvent) => {
+  const next = (e: React.FormEvent) => {
     e.preventDefault();
     if (strength(password) < 1) return setResult({ ok: false, error: "Use a password of at least 8 characters." });
+    setResult(null);
+    setStep(2);
+  };
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (role !== "Investor" && !company.trim()) return setResult({ ok: false, error: "Add your company or brokerage name." });
     setBusy(true);
     setResult(null);
-    const r = await signUp({ name, email, password, role, plan });
+    try {
+      saveSignupProfile({ name: name.trim(), role, company: company.trim(), title: title.trim() || undefined, email: email.trim(), whatsapp: whatsapp.trim() || undefined, photo, logo });
+    } catch (err) {
+      setBusy(false);
+      return setResult({ ok: false, error: err instanceof Error ? err.message : "Could not save your profile." });
+    }
+    const r = await signUp({ name, email, password, role, plan, company, title, whatsapp });
     setBusy(false);
     if (r.ok) return r.message === "confirm-email" ? setSent(true) : router.push("/dashboard");
     setResult(r);
   };
 
+  if (step === 2)
+    return (
+      <>
+        <StepLabel step={2} />
+        <h1 className="mt-3 font-display text-[32px] font-bold tracking-tight text-zinc-950">Your member profile</h1>
+        <p className="mt-2 text-[15px] text-zinc-500">This is how other agents and investors see you on the Feed, and how they reach you.</p>
+        <form onSubmit={submit} className="mt-8 space-y-5">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <ImagePick label="Your photo" hint="A clear headshot" value={photo} round onChange={setPhoto} onError={(m) => setResult({ ok: false, error: m })} />
+            <ImagePick label="Company logo" hint="PNG with a clear background" value={logo} round={false} onChange={setLogo} onError={(m) => setResult({ ok: false, error: m })} />
+          </div>
+          <Field label={role === "Investor" ? "Company (optional)" : role === "Brokerage" ? "Brokerage name" : "Company or brokerage"}>
+            {(id) => <input id={id} required={role !== "Investor"} autoComplete="organization" value={company} onChange={(e) => setCompany(e.target.value)} className={inputCls} placeholder="Brightwater Realty" />}
+          </Field>
+          <Field label="Job title (optional)">
+            {(id) => <input id={id} autoComplete="organization-title" value={title} onChange={(e) => setTitle(e.target.value)} className={inputCls} placeholder="Senior agent" />}
+          </Field>
+          <Field label="WhatsApp or mobile" hint={<span className="text-[12px] text-zinc-400">Shown to members</span>}>
+            {(id) => <input id={id} type="tel" autoComplete="tel" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} className={inputCls} placeholder="+297 560 0000" />}
+          </Field>
+          <SubmitButton busy={busy}>Create account</SubmitButton>
+          <Notice result={result} />
+          <p className="text-center text-[12px] text-zinc-400">You won&apos;t be charged today. You can change your profile any time.</p>
+        </form>
+        <p className="mt-6 text-center text-[14px] text-zinc-500">
+          <button type="button" onClick={() => { setResult(null); setStep(1); }} className="inline-flex items-center gap-1.5 font-semibold text-zinc-950 underline-offset-4 hover:underline">
+            <ArrowLeft size={14} /> Back
+          </button>
+        </p>
+      </>
+    );
+
   return (
     <>
-      <h1 className="font-display text-[32px] font-bold tracking-tight text-zinc-950">Create your account</h1>
+      <StepLabel step={1} />
+      <h1 className="mt-3 font-display text-[32px] font-bold tracking-tight text-zinc-950">Create your account</h1>
       <p className="mt-2 text-[15px] text-zinc-500">The whole Aruba market, read for you every morning.</p>
-      <form onSubmit={submit} className="mt-8 space-y-5">
+      <form onSubmit={next} className="mt-8 space-y-5">
         <Field label="Full name">
           {(id) => <input id={id} required autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} className={inputCls} placeholder="Maria Croes" />}
         </Field>
@@ -399,9 +466,9 @@ export function SignupForm({ initialPlan = "monthly" }: { initialPlan?: Billing 
           </div>
         </fieldset>
 
-        <SubmitButton busy={busy}>Create account</SubmitButton>
+        <SubmitButton busy={false}>Continue</SubmitButton>
         <Notice result={result} />
-        <p className="text-center text-[12px] text-zinc-400">You won&apos;t be charged today.</p>
+        <p className="text-center text-[12px] text-zinc-400">Next: your photo, company logo and contact details.</p>
       </form>
       <p className="mt-6 text-center text-[14px] text-zinc-500">
         Already have an account?{" "}
