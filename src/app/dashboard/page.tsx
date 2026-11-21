@@ -18,6 +18,9 @@ import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Wordmark } from "@/components/logo";
+import { FeedView } from "@/components/feed/feed-view";
+import { ProfileDialog } from "@/components/feed/profile-dialog";
+import { useProfile } from "@/lib/profile";
 import { useWatchlist, type WatchEntry } from "@/lib/watchlist";
 import { useInterestedClients, type ClientInput, type InterestedClient } from "@/lib/clients";
 import { useListingNote, useMarketBrief } from "@/lib/use-signal";
@@ -58,6 +61,7 @@ import {
   Bell,
   ChevronDown,
   LayoutList,
+  Megaphone,
   Pencil,
   Pin,
   Plus,
@@ -193,25 +197,26 @@ function PriceMove({ pct, label = true, size = 12 }: { pct: number; label?: bool
 
 function Logo() {
   return (
-    <Link href="/" className="select-none" aria-label="Signal home">
+    <Link href="/" className="select-none" aria-label="Sequence Terminal home">
       <Wordmark tone="white" />
     </Link>
   );
 }
 
-const TABS = ["Listings", "Watchlist"] as const;
+const TABS = ["Listings", "Watchlist", "Feed"] as const;
 type Tab = (typeof TABS)[number];
 const TAB_SLUG: Record<Tab, string> = {
   Listings: "listings",
   Watchlist: "watchlist",
+  Feed: "feed",
 };
 
-const TAB_ICON: Record<Tab, typeof Pin> = { Listings: LayoutList, Watchlist: Pin };
+const TAB_ICON: Record<Tab, typeof Pin> = { Listings: LayoutList, Watchlist: Pin, Feed: Megaphone };
 
 /** Pill switch between the dashboard tabs. */
 function TabSwitch({ tab, onTab, watchCount, full = false }: { tab: Tab; onTab: (t: Tab) => void; watchCount: number; full?: boolean }) {
   return (
-    <div className={`${full ? "grid w-full grid-cols-2" : "inline-flex"} gap-1 rounded-full bg-white/[0.06] p-1 ring-1 ring-white/10`} role="tablist">
+    <div className={`${full ? "grid w-full grid-cols-3" : "inline-flex"} gap-1 rounded-full bg-white/[0.06] p-1 ring-1 ring-white/10`} role="tablist">
       {TABS.map((t) => {
         const on = tab === t;
         const Icon = TAB_ICON[t];
@@ -222,7 +227,7 @@ function TabSwitch({ tab, onTab, watchCount, full = false }: { tab: Tab; onTab: 
             role="tab"
             aria-selected={on}
             onClick={() => onTab(t)}
-            className={`relative inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full px-4 py-1.5 text-[13px] font-medium transition-colors ${
+            className={`relative inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full ${full ? "px-2" : "px-4"} py-1.5 text-[13px] font-medium transition-colors ${
               on ? "text-zinc-950" : "text-zinc-400 hover:text-white"
             }`}
           >
@@ -247,7 +252,7 @@ function TabSwitch({ tab, onTab, watchCount, full = false }: { tab: Tab; onTab: 
   );
 }
 
-function AccountMenu({ compact = false }: { compact?: boolean }) {
+function AccountMenu({ compact = false, onProfile }: { compact?: boolean; onProfile: () => void }) {
   const { user } = useUser();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -267,9 +272,9 @@ function AccountMenu({ compact = false }: { compact?: boolean }) {
   }, [open]);
 
   const items = [
-    { icon: User, label: "Profile" },
-    { icon: KeyRound, label: "API Keys" },
-    { icon: CreditCard, label: "Billing" },
+    { icon: User, label: "Profile", onClick: onProfile },
+    { icon: KeyRound, label: "API Keys", onClick: undefined },
+    { icon: CreditCard, label: "Billing", onClick: undefined },
   ];
 
   if (!user)
@@ -332,11 +337,15 @@ function AccountMenu({ compact = false }: { compact?: boolean }) {
               Aruba · ${PLANS[plan].price.toLocaleString("en-US")}/{PLANS[plan].per}
             </p>
           </div>
-          {items.map(({ icon: Icon, label }) => (
+          {items.map(({ icon: Icon, label, onClick }) => (
             <button
               key={label}
               role="menuitem"
               type="button"
+              onClick={() => {
+                setOpen(false);
+                onClick?.();
+              }}
               className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-[12.5px] text-zinc-600 transition-colors hover:bg-zinc-50 hover:text-zinc-950"
             >
               <Icon size={13} strokeWidth={1.5} />
@@ -361,7 +370,7 @@ function AccountMenu({ compact = false }: { compact?: boolean }) {
   );
 }
 
-function Header({ tab, onTab, updates, onUpdates, watchCount }: { tab: Tab; onTab: (t: Tab) => void; updates: number; onUpdates: () => void; watchCount: number }) {
+function Header({ tab, onTab, updates, onUpdates, watchCount, onProfile }: { tab: Tab; onTab: (t: Tab) => void; updates: number; onUpdates: () => void; watchCount: number; onProfile: () => void }) {
   return (
     <header className="deck border-b border-white/[0.08]">
       <div className="mx-auto flex max-w-[1400px] flex-col px-4 pt-3 sm:px-6 lg:h-16 lg:flex-row lg:items-center lg:justify-between lg:pt-0">
@@ -381,7 +390,7 @@ function Header({ tab, onTab, updates, onUpdates, watchCount }: { tab: Tab; onTa
                 </span>
               )}
             </button>
-            <AccountMenu compact />
+            <AccountMenu compact onProfile={onProfile} />
           </div>
           <nav className="hidden lg:block" aria-label="Primary">
             <TabSwitch tab={tab} onTab={onTab} watchCount={watchCount} />
@@ -411,7 +420,7 @@ function Header({ tab, onTab, updates, onUpdates, watchCount }: { tab: Tab; onTa
               </span>
             )}
           </button>
-          <AccountMenu />
+          <AccountMenu onProfile={onProfile} />
         </div>
 
         {/* mobile tabs */}
@@ -2738,6 +2747,9 @@ function Dashboard() {
   const updatesToday = SCRAPE_RUNS[0].new_listings.length + SCRAPE_RUNS[0].price_changes.length + SCRAPE_RUNS[0].status_changes.length;
   const { data, error } = useDashboardData(MARKET_ID);
   const watchCount = useWatchlist().entries.length;
+  const me = useProfile();
+  const [profileOpen, setProfileOpen] = useState(false);
+  const openProfile = useCallback(() => setProfileOpen(true), []);
 
   const setTab = (t: Tab) => {
     setTabState(t);
@@ -2761,7 +2773,7 @@ function Dashboard() {
 
   return (
     <div className={`${inter.className} min-h-screen overflow-x-clip bg-white text-zinc-800 antialiased selection:bg-mint selection:text-zinc-950`}>
-      <Header tab={tab} onTab={setTab} updates={updatesToday} onUpdates={openUpdates} watchCount={watchCount} />
+      <Header tab={tab} onTab={setTab} updates={updatesToday} onUpdates={openUpdates} watchCount={watchCount} onProfile={openProfile} />
 
       <main className="mx-auto max-w-[1400px] px-4 pb-20 sm:px-6">
         {error ? (
@@ -2781,14 +2793,18 @@ function Dashboard() {
               initialNewToday={listingsView.newToday}
             />
           </>
+        ) : tab === "Feed" ? (
+          <FeedView profile={me.profile} profileLoading={me.loading} shared={me.shared} onEditProfile={openProfile} />
         ) : (
           <Watchlist listings={data?.allListings} marketYield={data?.snapshot.est_gross_yield_pct} onOpenListing={openListing} onBrowse={() => setTab("Listings")} />
         )}
       </main>
 
+      <ProfileDialog open={profileOpen} onClose={() => setProfileOpen(false)} initial={me.draft} onSave={me.save} shared={me.shared} />
+
       <footer className="border-t border-zinc-200">
         <div className={`${MONO} mx-auto flex max-w-[1400px] flex-wrap justify-between gap-2 px-6 py-5 text-[10px] tracking-wider text-zinc-500`}>
-          <span>© 2026 SIGNAL · POWERED BY SEQUENCE DATA · PROPRIETARY & CONFIDENTIAL</span>
+          <span>© 2026 SEQUENCE TERMINAL · POWERED BY SEQUENCE DATA · PROPRIETARY & CONFIDENTIAL</span>
           <span>NOT INVESTMENT ADVICE · FOR LICENSED SUBSCRIBERS ONLY</span>
         </div>
       </footer>
