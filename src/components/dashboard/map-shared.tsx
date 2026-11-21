@@ -107,7 +107,7 @@ export function HoverCard({ l }: { l: Listing }) {
         <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "baseline" }}>
           <span style={{ fontWeight: 600, fontSize: 13, color: "#09090B", whiteSpace: "normal", lineHeight: 1.25 }}>{l.asset_name}</span>
           {l.is_new && (
-            <span style={{ background: "#0A0A0A", color: "#DDE5DC", fontSize: 9, fontWeight: 700, borderRadius: 4, padding: "2px 6px", flexShrink: 0 }}>NEW</span>
+            <span style={{ background: "#0A0A0A", color: "#ACFA68", fontSize: 9, fontWeight: 700, borderRadius: 4, padding: "2px 6px", flexShrink: 0 }}>NEW</span>
           )}
         </div>
         <div style={{ color: "#71717A", fontSize: 11, marginTop: 2 }}>

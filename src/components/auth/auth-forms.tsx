@@ -51,24 +51,26 @@ export function AuthShell({
         <p className="text-center text-[11.5px] text-zinc-400 lg:text-left">© 2026 Terminal by Sequence Data · Aruba</p>
       </div>
 
-      <Spotlight className="relative hidden overflow-hidden bg-zinc-950 lg:sticky lg:top-0 lg:block lg:h-dvh">
+      <Spotlight className="relative hidden overflow-hidden border-l border-zinc-200 bg-zinc-50 lg:sticky lg:top-0 lg:block lg:h-dvh">
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 opacity-50 [background-image:radial-gradient(rgb(221_229_220/0.10)_1px,transparent_1px)] [background-size:22px_22px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]"
+          className="pointer-events-none absolute inset-0 opacity-80 [background-image:radial-gradient(rgb(10_10_10/0.07)_1px,transparent_1px)] [background-size:22px_22px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]"
         />
         <div className="relative flex h-full flex-col justify-center px-12 py-16 xl:px-20">
-          <AIBadge dark />
-          <h2 className="mt-6 max-w-[18ch] font-display text-[34px] font-bold leading-[1.08] tracking-tight text-white xl:text-[40px]">
+          <AIBadge />
+          <h2 className="mt-6 max-w-[18ch] font-display text-[34px] font-bold leading-[1.08] tracking-tight text-zinc-950 xl:text-[40px]">
             Terminal read {total} Aruba listings this morning.
           </h2>
-          <p className="mt-4 max-w-[46ch] text-[15px] leading-relaxed text-zinc-400">
+          <p className="mt-4 max-w-[46ch] text-[15px] leading-relaxed text-zinc-600">
             Every listing is checked against its comps, its price history and its status, then explained in plain English.
           </p>
-          <AIMarketScan dark rows={rows} total={total} headline={headline} className="mt-10 max-w-[520px]" />
-          <ul className="mt-10 grid max-w-[520px] grid-cols-3 gap-4 border-t border-white/10 pt-6 text-[12.5px] text-zinc-400">
+          <AIMarketScan rows={rows} total={total} headline={headline} className="mt-10 max-w-[520px]" />
+          <ul className="mt-10 grid max-w-[520px] grid-cols-3 gap-4 border-t border-zinc-200 pt-6 text-[12.5px] text-zinc-600">
             {["Daily market briefing", "AI note on every listing", "Watchlist and client leads"].map((t) => (
               <li key={t} className="flex gap-2">
-                <Check size={14} strokeWidth={2.5} className="mt-0.5 shrink-0 text-lime" />
+                <span className="mt-0.5 grid size-4 shrink-0 place-items-center rounded-full bg-zinc-950">
+                  <Check size={10} strokeWidth={3} className="text-lime" />
+                </span>
                 {t}
               </li>
             ))}
@@ -82,7 +84,7 @@ export function AuthShell({
 /* ── fields ─────────────────────────────────────────────────────────────── */
 
 const inputCls =
-  "h-12 w-full rounded-xl border border-zinc-200 bg-white px-4 text-[15px] text-zinc-950 outline-none transition-[border-color,box-shadow] placeholder:text-zinc-400 hover:border-zinc-300 focus:border-zinc-950 focus:shadow-[0_0_0_4px_rgb(221_229_220)]";
+  "h-12 w-full rounded-xl border border-zinc-200 bg-white px-4 text-[15px] text-zinc-950 outline-none transition-[border-color,box-shadow] placeholder:text-zinc-400 hover:border-zinc-300 focus:border-zinc-950 focus:shadow-[0_0_0_4px_rgb(172_250_104/0.5)]";
 
 function Field({ label, children, hint }: { label: string; children: (id: string) => React.ReactNode; hint?: React.ReactNode }) {
   const id = useId();
@@ -447,7 +449,7 @@ export function SignupForm({ initialPlan = "monthly" }: { initialPlan?: Billing 
                   type="button"
                   aria-pressed={on}
                   onClick={() => setPlan(b)}
-                  className={`relative rounded-xl border p-4 text-left transition-[border-color,box-shadow,transform] active:scale-[0.99] ${on ? "border-zinc-950 shadow-[0_0_0_3px_rgb(221_229_220)]" : "border-zinc-200 hover:border-zinc-300"}`}
+                  className={`relative rounded-xl border p-4 text-left transition-[border-color,box-shadow,transform] active:scale-[0.99] ${on ? "border-zinc-950 shadow-[0_0_0_3px_rgb(172_250_104/0.5)]" : "border-zinc-200 hover:border-zinc-300"}`}
                 >
                   <span className="flex items-center justify-between">
                     <span className="text-[13px] font-semibold text-zinc-950">{b === "monthly" ? "Monthly" : "Yearly"}</span>

@@ -227,7 +227,7 @@ export function Spotlight({ children, className = "" }: { children: React.ReactN
   const y = useMotionValue(-400);
   const sx = useSpring(x, { stiffness: 120, damping: 20 });
   const sy = useSpring(y, { stiffness: 120, damping: 20 });
-  const bg = useMotionTemplate`radial-gradient(520px circle at ${sx}px ${sy}px, rgb(221 229 220 / 0.10), transparent 70%)`;
+  const bg = useMotionTemplate`radial-gradient(520px circle at ${sx}px ${sy}px, rgb(172 250 104 / 0.10), transparent 70%)`;
   return (
     <div
       className={`relative ${className}`}

@@ -6,7 +6,7 @@ import Image from "next/image";
  *  - sd-monogram-*.png : the SD monogram alone
  *  - sd-icon.png       : white SD on black square (favicon / app icon)
  *  - sd-head-*.png / sd-logo-*.png : older head silhouette marks (still used on 404 / error)
- * Brand accent: mint #DDE5DC (Tailwind: bg-lime / text-lime), always paired with black.
+ * Brand: white, clinical surfaces; black and lime #ACFA68 (bg-lime / text-lime) are the only accents.
  */
 
 type Tone = "black" | "white";

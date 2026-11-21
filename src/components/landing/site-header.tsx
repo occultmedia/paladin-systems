@@ -1,6 +1,6 @@
 "use client";
 
-/* Landing nav: transparent over the dark hero, solid white once you scroll past it. */
+/* Landing nav: transparent over the white hero, frosted white with a hairline once you scroll. */
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -18,7 +18,7 @@ const LINKS: Array<[string, string]> = [
 export function SiteHeader() {
   const [solid, setSolid] = useState(false);
   useEffect(() => {
-    const onScroll = () => setSolid(window.scrollY > window.innerHeight - 80);
+    const onScroll = () => setSolid(window.scrollY > 8);
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onScroll);
@@ -36,20 +36,20 @@ export function SiteHeader() {
     >
       <div className="mx-auto flex h-16 max-w-[1400px] items-center justify-between px-5 sm:px-8 lg:px-12">
         <Link href="/" aria-label="Terminal home">
-          <Wordmark tone={solid ? "black" : "white"} />
+          <Wordmark />
         </Link>
         <nav className="hidden items-center gap-8 lg:flex">
           {LINKS.map(([label, href]) => (
             <a
               key={href}
               href={href}
-              className={`link-underline text-[14px] font-medium transition-colors ${solid ? "text-zinc-600 hover:text-zinc-950" : "text-zinc-400 hover:text-white"}`}
+              className={`link-underline text-[14px] font-medium transition-colors text-zinc-600 hover:text-zinc-950`}
             >
               {label}
             </a>
           ))}
         </nav>
-        <NavAuth tone={solid ? "light" : "dark"} />
+        <NavAuth />
       </div>
     </header>
   );

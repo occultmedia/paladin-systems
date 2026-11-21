@@ -11,15 +11,16 @@
   --color-signal: #3c7d14;
   --color-brand: #b3fd6a;
 
-  /* Sequence Data accent: mint from the logo, always paired with black */
+  /* Surfaces: white overall, very clinical. Black and lime are the only accents. */
   /* Brand lime: the live accent (buttons, highlights, "live" states), always on black or dark */
   --color-lime: #acfa68;
   --color-lime-deep: #8fdc4b;
   --color-lime-soft: #f2fee6;
   --color-ink: #111405;
-  --color-mint: #dde5dc;
-  --color-mint-soft: #eff4ef;
-  --color-mint-deep: #c3d2c2;
+  /* Clinical neutrals (the old mint names are kept so existing classes keep working) */
+  --color-mint: #eceef0;
+  --color-mint-soft: #f7f8f9;
+  --color-mint-deep: #dfe2e6;
 }
 
 @theme inline {

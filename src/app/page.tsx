@@ -449,38 +449,38 @@ export default function Home() {
         </div>
 
         {/* AI Signal */}
-        <section id="ai-signal" className="scroll-mt-16 bg-zinc-950 text-white">
+        <section id="ai-signal" className="scroll-mt-16 border-y border-zinc-200 bg-white text-zinc-950">
           <Spotlight>
             <div
               aria-hidden
-              className="pointer-events-none absolute inset-0 opacity-40 [background-image:radial-gradient(rgb(221_229_220/0.10)_1px,transparent_1px)] [background-size:24px_24px] [mask-image:radial-gradient(ellipse_at_70%_40%,black,transparent_70%)]"
+              className="pointer-events-none absolute inset-0 opacity-70 [background-image:radial-gradient(rgb(10_10_10/0.08)_1px,transparent_1px)] [background-size:24px_24px] [mask-image:radial-gradient(ellipse_at_70%_40%,black,transparent_70%)]"
             />
             <div className="relative mx-auto grid max-w-[1240px] grid-cols-[minmax(0,1fr)] gap-12 px-5 py-16 sm:px-6 sm:py-24 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:items-center lg:gap-16">
               <div>
                 <Reveal>
-                  <AIBadge dark />
+                  <AIBadge />
                   <h2 className="mt-5 max-w-[16ch] font-display text-[32px] font-bold leading-[1.06] tracking-tight sm:text-[48px]">
                     AI reads the whole Aruba market before you do.
                   </h2>
-                  <p className="mt-5 max-w-[50ch] text-[16px] leading-relaxed text-zinc-400">
+                  <p className="mt-5 max-w-[50ch] text-[16px] leading-relaxed text-zinc-600">
                     Every morning Terminal reads every listing on Aruba&apos;s agency websites, checks each one against its comps and
                     its own history, and tells you what changed and what it means.
                   </p>
                 </Reveal>
                 <Stagger className="relative mt-10 space-y-7" gap={0.14}>
-                  <span aria-hidden className="absolute bottom-3 left-[17px] top-3 w-px bg-gradient-to-b from-mint/60 via-white/10 to-transparent" />
+                  <span aria-hidden className="absolute bottom-3 left-[17px] top-3 w-px bg-gradient-to-b from-zinc-950/40 via-zinc-200 to-transparent" />
                   {[
                     ["Read", `${MARKET_TOTAL} listings from ${AGENCIES} agencies, every morning: price, size, land title, status, agent and photos.`],
                     ["Compare", "Each listing against similar ones in its district: price per sq ft, days on market, price cuts and status changes."],
                     ["Explain", "A daily market briefing, plus a plain-English note on every listing with a verdict and the next step to take."],
                   ].map(([k, v], i) => (
                     <StaggerItem key={k} className="relative flex gap-5">
-                      <span className="relative grid size-[35px] shrink-0 place-items-center rounded-full border border-mint/30 bg-zinc-950 font-display text-[13px] font-bold text-lime">
+                      <span className="relative grid size-[35px] shrink-0 place-items-center rounded-full bg-zinc-950 font-display text-[13px] font-bold text-lime">
                         {i + 1}
                       </span>
                       <div>
                         <p className="font-display text-[17px] font-semibold">{k}</p>
-                        <p className="mt-1 max-w-[46ch] text-[14px] leading-relaxed text-zinc-400">{v}</p>
+                        <p className="mt-1 max-w-[46ch] text-[14px] leading-relaxed text-zinc-600">{v}</p>
                       </div>
                     </StaggerItem>
                   ))}
@@ -488,14 +488,14 @@ export default function Home() {
               </div>
 
               <Reveal delay={0.1} y={24} className="min-w-0">
-                <AIMarketScan dark rows={SCAN} total={MARKET_TOTAL} headline={BRIEF.headline} />
-                <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+                <AIMarketScan rows={SCAN} total={MARKET_TOTAL} headline={BRIEF.headline} />
+                <div className="mt-4 rounded-2xl border border-zinc-200 bg-zinc-50 p-5">
                   <p className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-zinc-500">Today&apos;s briefing</p>
-                  <p className="mt-2 text-[14px] leading-relaxed text-zinc-300">{BRIEF.summary}</p>
+                  <p className="mt-2 text-[14px] leading-relaxed text-zinc-800">{BRIEF.summary}</p>
                   <Stagger className="mt-3 space-y-2" gap={0.1}>
                     {BRIEF.points.slice(0, 3).map((pt) => (
-                      <StaggerItem key={pt} className="flex gap-2.5 text-[13px] leading-snug text-zinc-400">
-                        <span className="mt-[7px] size-1 shrink-0 rounded-full bg-lime" />
+                      <StaggerItem key={pt} className="flex gap-2.5 text-[13px] leading-snug text-zinc-600">
+                        <span className="mt-[7px] size-1.5 shrink-0 rounded-full bg-zinc-950 ring-2 ring-lime" />
                         {pt}
                       </StaggerItem>
                     ))}
@@ -813,10 +813,9 @@ export default function Home() {
         </section>
 
         {/* Who it's for */}
-        <section className="relative overflow-hidden bg-zinc-950 text-white">
-          <Image src={img(ARUBA_PHOTOS.aerial, 1800, 900)} alt="" fill unoptimized className="object-cover opacity-25" />
+        <section className="relative overflow-hidden border-y border-zinc-200 bg-white">
           <div className="relative mx-auto max-w-[1240px] px-5 py-16 sm:px-6 sm:py-24">
-            <SectionHeading eyebrow="Who it's for" title="Built for the people who move Aruba's market." light />
+            <SectionHeading eyebrow="Who it's for" title="Built for the people who move Aruba's market." />
             <Stagger className="mt-10 grid gap-5 sm:mt-14 md:grid-cols-2" gap={0.12}>
               {[
                 {
@@ -838,12 +837,12 @@ export default function Home() {
                   ],
                 },
               ].map((c) => (
-                <StaggerItem key={c.who} className="h-full rounded-3xl border border-white/10 bg-zinc-950/70 p-7 backdrop-blur sm:p-10">
-                  <p className="font-display text-[24px] font-bold">{c.who}</p>
+                <StaggerItem key={c.who} className="h-full rounded-3xl border border-zinc-200 bg-zinc-50 p-7 sm:p-10">
+                  <p className="font-display text-[24px] font-bold text-zinc-950">{c.who}</p>
                   <ul className="mt-6 space-y-3.5">
                     {c.points.map((p) => (
-                      <li key={p} className="flex gap-3 text-[15px] leading-relaxed text-zinc-200">
-                        <span className="mt-2.5 size-1.5 shrink-0 rounded-full bg-white" />
+                      <li key={p} className="flex gap-3 text-[15px] leading-relaxed text-zinc-700">
+                        <span className="mt-2 size-2 shrink-0 rounded-full bg-zinc-950 ring-2 ring-lime" />
                         {p}
                       </li>
                     ))}

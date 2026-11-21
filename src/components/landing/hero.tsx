@@ -1,11 +1,12 @@
 "use client";
 
 /*
- * Landing hero: full viewport. The visual is the product itself: every
- * listing Terminal tracks, pinned on Aruba's real coastline (geoBoundaries),
- * a scan line sweeping the island (the overnight AI read) and callouts that
- * cycle through today's real market events. The features rail along the
- * bottom is live too: hover a feature and the listings it found light up.
+ * Landing hero: full viewport, white and clinical; black and lime are the only
+ * accents. The visual is the product itself: every listing Terminal tracks,
+ * pinned on Aruba's real coastline (geoBoundaries), a lime scan line sweeping
+ * the island (the overnight AI read) and callouts cycling through today's real
+ * market events. The features rail is live too: hover a feature and the
+ * listings it found light up on the map.
  *
  * Motion: headline line reveal, scan sweep + pin hits (CSS), cycling event
  * callouts, feature-to-map highlighting, pointer-follow light and a slight map
@@ -25,6 +26,8 @@ export type HeroPlace = { name: string; lat: number; lng: number; align?: "left"
 const EASE = [0.22, 1, 0.36, 1] as const;
 const SCAN_S = 7; // one sweep of the island, seconds
 const CYCLE_MS = 3600;
+const LIME = "#ACFA68";
+const INK = "#0A0A0A";
 
 /* ── geometry: Aruba, projected (north up) ───────────────────────────── */
 
@@ -48,8 +51,12 @@ const CONTOURS = [1.07, 1.16, 1.28, 1.43].map((k) =>
 const GRID_LATS = [12.6, 12.55, 12.5, 12.45];
 const GRID_LNGS = [-70.05, -70.0, -69.95, -69.9];
 
-const TONE: Record<HeroPin["tone"], string> = { up: "#ACFA68", flat: "#D4DACB", down: "#F28B82" };
-const ACCENT: Record<HeroEvent["tone"], string> = { up: "#ACFA68", down: "#F28B82", warn: "#F2B45A", mint: "#E4FCC9" };
+/** Pin fill on white: lime = undervalued, grey = at market, red = overpriced. */
+const TONE: Record<HeroPin["tone"], string> = { up: LIME, flat: "#A1A1AA", down: "#E5484D" };
+/** Accent colour of a highlighted feature / event, as a fill on white. */
+const ACCENT: Record<HeroEvent["tone"], string> = { up: LIME, down: "#E5484D", warn: "#F5A524", mint: INK };
+/** The same accents as text on a black chip. */
+const ON_INK: Record<HeroEvent["tone"], string> = { up: LIME, down: "#FF9A9A", warn: "#FBC15E", mint: "#FFFFFF" };
 
 /* ── the map ─────────────────────────────────────────────────────────── */
 
@@ -75,33 +82,24 @@ function IslandMap({
       <svg viewBox="0 0 1000 1000" className="absolute inset-0 size-full overflow-visible" aria-hidden>
         <defs>
           <pattern id="hero-dots" width="10" height="10" patternUnits="userSpaceOnUse">
-            <circle cx="5" cy="5" r="1.55" fill="#DDE5DC" opacity="0.42" />
+            <circle cx="5" cy="5" r="1.45" fill={INK} opacity="0.2" />
           </pattern>
-          <radialGradient id="hero-land" cx="45%" cy="40%" r="70%">
-            <stop offset="0" stopColor="#5C8C28" stopOpacity="0.42" />
-            <stop offset="1" stopColor="#1C2A0C" stopOpacity="0.18" />
-          </radialGradient>
-          <radialGradient id="hero-sea" cx="50%" cy="50%" r="55%">
-            <stop offset="0" stopColor="#3E6420" stopOpacity="0.38" />
-            <stop offset="1" stopColor="#3E6420" stopOpacity="0" />
-          </radialGradient>
           <linearGradient id="hero-scan" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#DDE5DC" stopOpacity="0" />
-            <stop offset="0.85" stopColor="#ACFA68" stopOpacity="0.22" />
-            <stop offset="1" stopColor="#E4FCC9" stopOpacity="0.8" />
+            <stop offset="0" stopColor={LIME} stopOpacity="0" />
+            <stop offset="0.82" stopColor={LIME} stopOpacity="0.3" />
+            <stop offset="1" stopColor="#8FDC4B" stopOpacity="0.95" />
           </linearGradient>
           <filter id="hero-glow" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="6" />
+            <feGaussianBlur stdDeviation="7" />
           </filter>
           <clipPath id="hero-island">
             <path d={COAST_PATH} />
           </clipPath>
         </defs>
 
-        {/* sea: soft light and depth contours */}
-        <circle cx={CENTROID.x} cy={CENTROID.y} r="620" fill="url(#hero-sea)" />
+        {/* sea: depth contours */}
         {CONTOURS.map((d, i) => (
-          <path key={d} d={d} fill="none" stroke="#ACFA68" strokeOpacity={0.26 - i * 0.05} strokeWidth="1" strokeDasharray={i % 2 ? "3 7" : undefined} />
+          <path key={d} d={d} fill="none" stroke={INK} strokeOpacity={0.13 - i * 0.025} strokeWidth="1" strokeDasharray={i % 2 ? "3 7" : undefined} />
         ))}
 
         {/* graticule with real coordinates */}
@@ -109,8 +107,8 @@ function IslandMap({
           const y = project(la, LNG_MIN).y;
           return (
             <g key={la}>
-              <line x1="0" x2="1000" y1={y} y2={y} stroke="#fff" strokeOpacity="0.05" strokeDasharray="2 8" />
-              <text x="6" y={y - 7} className="fill-zinc-500 font-mono text-[14px]">
+              <line x1="0" x2="1000" y1={y} y2={y} stroke={INK} strokeOpacity="0.06" strokeDasharray="2 8" />
+              <text x="6" y={y - 7} className="fill-zinc-400 font-mono text-[14px]">
                 {la.toFixed(2)}°N
               </text>
             </g>
@@ -120,19 +118,19 @@ function IslandMap({
           const x = project(LAT_MIN, ln).x;
           return (
             <g key={ln}>
-              <line y1="0" y2="1000" x1={x} x2={x} stroke="#fff" strokeOpacity="0.05" strokeDasharray="2 8" />
-              <text x={x + 6} y="992" className="fill-zinc-500 font-mono text-[14px]">
+              <line y1="0" y2="1000" x1={x} x2={x} stroke={INK} strokeOpacity="0.06" strokeDasharray="2 8" />
+              <text x={x + 6} y="992" className="fill-zinc-400 font-mono text-[14px]">
                 {Math.abs(ln).toFixed(2)}°W
               </text>
             </g>
           );
         })}
 
-        {/* island: tint, dot matrix, glowing coast */}
-        <path d={COAST_PATH} fill="url(#hero-land)" />
+        {/* island: lime halo, white land, dot matrix, ink coastline */}
+        <path d={COAST_PATH} fill="none" stroke={LIME} strokeOpacity="0.75" strokeWidth="14" filter="url(#hero-glow)" />
+        <path d={COAST_PATH} fill="#FFFFFF" />
         <path d={COAST_PATH} fill="url(#hero-dots)" />
-        <path d={COAST_PATH} fill="none" stroke="#ACFA68" strokeOpacity="0.5" strokeWidth="6" filter="url(#hero-glow)" />
-        <path d={COAST_PATH} fill="none" stroke="#EEFBDD" strokeOpacity="0.85" strokeWidth="1.4" strokeLinejoin="round" />
+        <path d={COAST_PATH} fill="none" stroke={INK} strokeOpacity="0.9" strokeWidth="1.5" strokeLinejoin="round" />
 
         {/* scan sweep, clipped to the island */}
         {!still && (
@@ -151,7 +149,7 @@ function IslandMap({
               x={right ? x + 16 : x - 16}
               y={y + 4}
               textAnchor={right ? "start" : "end"}
-              className="fill-zinc-400 font-mono text-[13px] uppercase tracking-[0.18em]"
+              className="fill-zinc-500 font-mono text-[13px] uppercase tracking-[0.18em]"
             >
               {p.name}
             </text>
@@ -166,10 +164,10 @@ function IslandMap({
           const delay = `${(y / 1170) * SCAN_S - SCAN_S}s`;
           const color = lit && on && focus ? ACCENT[focus.tone] : TONE[p.tone];
           return (
-            <g key={p.id} transform={`translate(${x} ${y})`} style={{ opacity: on ? 1 : 0.18, transition: "opacity 300ms ease" }}>
-              <circle r={lit && on ? 16 : 11} fill={color} opacity="0.35" filter="url(#hero-glow)" />
-              {!still && <circle r="10" fill="none" stroke={color} strokeWidth="1.6" className="hero-hit" style={{ animationDelay: delay, animationDuration: `${SCAN_S}s` }} />}
-              <circle r={lit && on ? 7 : 5.2} fill={color} stroke="#0A0D05" strokeWidth="1.6" />
+            <g key={p.id} transform={`translate(${x} ${y})`} style={{ opacity: on ? 1 : 0.15, transition: "opacity 300ms ease" }}>
+              {lit && on && <circle r="16" fill={color} opacity="0.45" filter="url(#hero-glow)" />}
+              {!still && <circle r="10" fill="none" stroke={INK} strokeWidth="1.4" className="hero-hit" style={{ animationDelay: delay, animationDuration: `${SCAN_S}s` }} />}
+              <circle r={lit && on ? 7.5 : 5.6} fill={color} stroke={INK} strokeWidth="1.8" />
             </g>
           );
         })}
@@ -181,7 +179,7 @@ function IslandMap({
               key={event.id}
               r="20"
               fill="none"
-              stroke={ACCENT[event.tone]}
+              stroke={INK}
               strokeWidth="1.6"
               initial={{ scale: 2.4, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
@@ -206,17 +204,16 @@ function IslandMap({
               ...(at.x > 480 ? { right: `${100 - (at.x / 1000) * 100}%`, marginRight: 30 } : { left: `${(at.x / 1000) * 100}%`, marginLeft: 30 }),
             }}
           >
-            <div className="w-[280px] -translate-y-1/2 overflow-hidden rounded-xl border border-white/12 bg-[#0E1208]/85 shadow-2xl shadow-black/60 backdrop-blur-md">
-              <div className="h-px w-full" style={{ background: `linear-gradient(90deg, transparent, ${ACCENT[event.tone]}, transparent)` }} />
-              <div className="p-3.5">
-                <p className="flex items-center justify-between font-mono text-[10.5px] uppercase tracking-[0.16em]" style={{ color: ACCENT[event.tone] }}>
-                  <span>{event.kind}</span>
-                  <span className="text-zinc-500">{runTime}</span>
-                </p>
-                <p className="mt-2 text-[14px] font-semibold leading-snug text-white">{event.title}</p>
-                <p className="mt-0.5 text-[12px] text-zinc-400">{event.detail}</p>
-                <p className="mt-2.5 border-t border-white/10 pt-2.5 font-mono text-[13px] tabular-nums text-white">{event.value}</p>
-              </div>
+            <div className="w-[280px] -translate-y-1/2 rounded-xl border border-zinc-200 bg-white/95 p-3.5 shadow-[0_20px_50px_-12px_rgb(10_10_10/0.25)] backdrop-blur">
+              <p className="flex items-center justify-between gap-2">
+                <span className="rounded-md bg-zinc-950 px-2 py-0.5 font-mono text-[10.5px] uppercase tracking-[0.14em]" style={{ color: ON_INK[event.tone] }}>
+                  {event.kind}
+                </span>
+                <span className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-zinc-400">{runTime}</span>
+              </p>
+              <p className="mt-2.5 text-[14px] font-semibold leading-snug text-zinc-950">{event.title}</p>
+              <p className="mt-0.5 text-[12px] text-zinc-500">{event.detail}</p>
+              <p className="mt-2.5 border-t border-zinc-100 pt-2.5 font-mono text-[13px] tabular-nums text-zinc-950">{event.value}</p>
             </div>
           </motion.div>
         )}
@@ -229,9 +226,9 @@ function IslandMap({
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            className="pointer-events-none absolute right-[6%] top-[9%] hidden rounded-full border border-white/10 bg-[#0E1208]/80 px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-zinc-300 backdrop-blur lg:block"
+            className="pointer-events-none absolute right-[6%] top-[9%] hidden items-center gap-2 rounded-full bg-zinc-950 px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-white lg:inline-flex"
           >
-            <span className="mr-2 inline-block size-2 rounded-full align-middle" style={{ background: ACCENT[focus.tone] }} />
+            <span className="inline-block size-2 rounded-full" style={{ background: ON_INK[focus.tone] }} />
             {focus.name} · {focus.stat}
           </motion.p>
         )}
@@ -241,8 +238,6 @@ function IslandMap({
 }
 
 /* ── hero ────────────────────────────────────────────────────────────── */
-
-const LINES = ["Know the market", "before it moves."];
 
 export function Hero({
   pins,
@@ -304,17 +299,14 @@ export function Hero({
     <section
       ref={ref}
       onPointerMove={onMove}
-      className="relative isolate flex min-h-[100svh] w-full flex-col overflow-hidden bg-[#080B04] text-white"
+      className="relative isolate flex min-h-[100svh] w-full flex-col overflow-hidden bg-white text-zinc-950"
       aria-label="Terminal: Aruba real estate market intelligence"
     >
-      {/* light: aurora, pointer spotlight, fine grid, grain */}
+      {/* light: faint lime wash behind the map, pointer light, fine grid */}
       <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
-        <div className="absolute inset-0 bg-[radial-gradient(1200px_700px_at_78%_38%,rgb(92_140_40/0.34),transparent_62%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(900px_600px_at_8%_100%,rgb(40_70_90/0.28),transparent_65%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(700px_420px_at_30%_0%,rgb(172_250_104/0.07),transparent_70%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(520px_circle_at_var(--hx,70%)_var(--hy,40%),rgb(172_250_104/0.09),transparent_60%)]" />
-        <div className="absolute inset-0 opacity-50 [background-image:linear-gradient(rgb(255_255_255/0.035)_1px,transparent_1px),linear-gradient(90deg,rgb(255_255_255/0.035)_1px,transparent_1px)] [background-size:72px_72px] [mask-image:radial-gradient(ellipse_at_65%_40%,black,transparent_72%)]" />
-        <div className="hero-grain absolute inset-0 opacity-[0.06] mix-blend-overlay" />
+        <div className="absolute inset-0 bg-[radial-gradient(900px_620px_at_76%_42%,rgb(172_250_104/0.16),transparent_65%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(480px_circle_at_var(--hx,70%)_var(--hy,40%),rgb(172_250_104/0.10),transparent_60%)]" />
+        <div className="absolute inset-0 [background-image:linear-gradient(rgb(10_10_10/0.045)_1px,transparent_1px),linear-gradient(90deg,rgb(10_10_10/0.045)_1px,transparent_1px)] [background-size:72px_72px] [mask-image:radial-gradient(ellipse_at_60%_45%,black,transparent_75%)]" />
       </div>
 
       <div className="relative mx-auto flex w-full max-w-[1440px] flex-1">
@@ -322,7 +314,7 @@ export function Hero({
         <motion.div
           aria-hidden
           style={reduce ? undefined : { x: px, y: py }}
-          className="pointer-events-none absolute -right-[38%] top-16 -z-[5] w-[min(125vw,720px)] opacity-35 sm:-right-[12%] sm:opacity-50 lg:right-0 lg:top-1/2 lg:w-[min(52%,calc(100svh-190px))] lg:-translate-y-[49%] lg:opacity-100"
+          className="pointer-events-none absolute -right-[38%] top-16 -z-[5] w-[min(125vw,720px)] opacity-30 sm:-right-[12%] sm:opacity-45 lg:right-0 lg:top-1/2 lg:w-[min(52%,calc(100svh-190px))] lg:-translate-y-[49%] lg:opacity-100"
         >
           <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 1.4, ease: EASE, delay: 0.2 }}>
             <IslandMap pins={pins} places={places} event={events[active]} focus={focus} still={reduce} runTime={runTime} />
@@ -336,36 +328,44 @@ export function Hero({
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, ease: EASE }}
-              className="inline-flex items-center gap-2.5 rounded-full border border-white/12 bg-white/[0.05] py-1.5 pl-2.5 pr-3.5 font-mono text-[11px] uppercase tracking-[0.14em] text-zinc-200 backdrop-blur"
+              className="inline-flex items-center gap-2.5 rounded-full border border-zinc-200 bg-white/80 py-1.5 pl-2.5 pr-3.5 font-mono text-[11px] uppercase tracking-[0.14em] text-zinc-600 shadow-sm backdrop-blur"
             >
               <span className="relative flex size-2">
-                <span className="absolute inline-flex size-full animate-ping rounded-full bg-lime opacity-70 motion-reduce:animate-none" />
-                <span className="relative inline-flex size-2 rounded-full bg-lime" />
+                <span className="absolute inline-flex size-full animate-ping rounded-full bg-lime opacity-90 motion-reduce:animate-none" />
+                <span className="relative inline-flex size-2 rounded-full bg-lime ring-1 ring-zinc-950/30" />
               </span>
               <span className="sm:hidden">Live · {runTime}</span>
               <span className="hidden sm:inline">Live · {runLabel}</span>
             </motion.p>
 
-            <h1 className="mt-5 font-display text-[clamp(42px,5.2vw,80px)] font-bold leading-[0.96] tracking-[-0.035em] sm:mt-7">
-              {LINES.map((line, i) => (
-                <span key={line} className="block overflow-hidden pb-[0.06em]">
-                  <motion.span
-                    className={`block whitespace-nowrap ${i === 1 ? "bg-gradient-to-r from-white via-[#D9FCB2] to-lime bg-clip-text text-transparent" : ""}`}
-                    initial={{ y: "105%" }}
-                    animate={{ y: 0 }}
-                    transition={{ duration: 0.9, ease: EASE, delay: 0.1 + i * 0.12 }}
-                  >
-                    {line}
-                  </motion.span>
-                </span>
-              ))}
+            <h1 className="mt-5 font-display text-[clamp(42px,5.2vw,80px)] font-bold leading-[0.98] tracking-[-0.035em] sm:mt-7">
+              <span className="block overflow-hidden pb-[0.06em]">
+                <motion.span className="block whitespace-nowrap" initial={{ y: "105%" }} animate={{ y: 0 }} transition={{ duration: 0.9, ease: EASE, delay: 0.1 }}>
+                  Know the market
+                </motion.span>
+              </span>
+              <span className="block overflow-hidden pb-[0.08em]">
+                <motion.span className="block whitespace-nowrap" initial={{ y: "105%" }} animate={{ y: 0 }} transition={{ duration: 0.9, ease: EASE, delay: 0.22 }}>
+                  before it{" "}
+                  <span className="relative inline-block">
+                    <motion.span
+                      aria-hidden
+                      className="absolute inset-x-[-0.06em] bottom-[0.08em] top-[0.52em] -z-10 origin-left rounded-[0.08em] bg-lime"
+                      initial={{ scaleX: 0 }}
+                      animate={{ scaleX: 1 }}
+                      transition={{ duration: 0.7, ease: EASE, delay: 0.9 }}
+                    />
+                    moves.
+                  </span>
+                </motion.span>
+              </span>
             </h1>
 
             <motion.p
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.7, ease: EASE, delay: 0.4 }}
-              className="mt-5 max-w-[50ch] text-[15.5px] leading-relaxed text-zinc-300/90 sm:mt-7 sm:text-[18px]"
+              className="mt-5 max-w-[50ch] text-[15.5px] leading-relaxed text-zinc-600 sm:mt-7 sm:text-[18px]"
             >
               Every home, parcel and commercial listing in Aruba, read overnight by AI. New listings, price cuts and contracts, each one priced against its comps and scored for how likely it is to still be for sale.
             </motion.p>
@@ -378,11 +378,11 @@ export function Hero({
             >
               <Link
                 href="/signup"
-                className="group relative inline-flex h-11 items-center gap-2 overflow-hidden rounded-full bg-lime pl-5 pr-3.5 font-display text-[15px] font-semibold text-zinc-950 shadow-[0_0_44px_-6px_rgb(172_250_104/0.55)] transition-transform active:scale-[0.98] sm:h-12 sm:pl-6 sm:pr-5"
+                className="group relative inline-flex h-11 items-center gap-2 overflow-hidden rounded-full bg-zinc-950 pl-5 pr-3.5 font-display text-[15px] font-semibold text-lime shadow-[0_10px_30px_-10px_rgb(10_10_10/0.5)] transition-transform active:scale-[0.98] sm:h-12 sm:pl-6 sm:pr-5"
               >
-                <span className="absolute inset-0 -translate-x-full bg-white transition-transform duration-500 ease-out group-hover:translate-x-0" aria-hidden />
+                <span className="absolute inset-0 -translate-x-full bg-zinc-800 transition-transform duration-500 ease-out group-hover:translate-x-0" aria-hidden />
                 <span className="relative">Get access</span>
-                <span className="relative grid size-6 place-items-center rounded-full bg-zinc-950 text-lime transition-transform duration-300 group-hover:translate-x-0.5">
+                <span className="relative grid size-6 place-items-center rounded-full bg-lime text-zinc-950 transition-transform duration-300 group-hover:translate-x-0.5">
                   <svg viewBox="0 0 12 12" className="size-3" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
                     <path d="M2 6h8M6.5 2.5 10 6l-3.5 3.5" strokeLinecap="square" />
                   </svg>
@@ -390,7 +390,7 @@ export function Hero({
               </Link>
               <Link
                 href="/dashboard"
-                className="inline-flex h-11 items-center gap-2 rounded-full border border-white/20 px-5 font-display text-[15px] font-semibold text-white transition-colors hover:border-white/50 hover:bg-white/[0.06] sm:h-12 sm:px-6"
+                className="inline-flex h-11 items-center gap-2 rounded-full border border-zinc-300 bg-white px-5 font-display text-[15px] font-semibold text-zinc-950 transition-colors hover:border-zinc-950 sm:h-12 sm:px-6"
               >
                 <span className="sm:hidden">Live terminal</span>
                 <span className="hidden sm:inline">Open the live terminal</span>
@@ -403,9 +403,9 @@ export function Hero({
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.7, ease: EASE, delay: 0.6 }}
-              className="mt-5 flex max-w-[460px] items-center gap-3 rounded-xl border border-white/12 bg-white/[0.04] px-4 py-3 backdrop-blur transition-colors focus-within:border-lime/60 hover:border-white/25 sm:mt-6"
+              className="mt-5 flex max-w-[460px] items-center gap-3 rounded-xl border border-zinc-200 bg-white px-4 py-3 shadow-sm transition-[border-color,box-shadow] focus-within:border-zinc-950 focus-within:shadow-[0_0_0_3px_rgb(172_250_104/0.5)] hover:border-zinc-300 sm:mt-6"
             >
-              <span className="font-mono text-[13px] text-lime" aria-hidden>
+              <span className="font-mono text-[13px] font-semibold text-zinc-950" aria-hidden>
                 &gt;
               </span>
               <label className="sr-only" htmlFor="hero-q">
@@ -415,9 +415,9 @@ export function Hero({
                 id="hero-q"
                 name="q"
                 placeholder={`Search ${total} listings or an ID`}
-                className="min-w-0 flex-1 bg-transparent font-mono text-[13px] text-white outline-none placeholder:text-zinc-500"
+                className="min-w-0 flex-1 bg-transparent font-mono text-[13px] text-zinc-950 outline-none placeholder:text-zinc-400"
               />
-              <kbd className="hidden rounded border border-white/15 px-1.5 py-0.5 font-mono text-[10.5px] text-zinc-500 sm:block">Enter</kbd>
+              <kbd className="hidden rounded border border-zinc-200 px-1.5 py-0.5 font-mono text-[10.5px] text-zinc-400 sm:block">Enter</kbd>
             </motion.form>
           </div>
         </div>
@@ -429,7 +429,7 @@ export function Hero({
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, ease: EASE, delay: 0.7 }}
         aria-label="Features"
-        className="no-scrollbar relative flex w-full snap-x snap-mandatory gap-px overflow-x-auto border-t border-white/10 bg-white/10 sm:grid sm:grid-cols-3 sm:overflow-visible lg:grid-cols-6"
+        className="no-scrollbar relative flex w-full snap-x snap-mandatory gap-px overflow-x-auto border-t border-zinc-200 bg-zinc-200 sm:grid sm:grid-cols-3 sm:overflow-visible lg:grid-cols-6"
         onMouseLeave={() => setFocusId(null)}
       >
         {features.map((f, i) => {
@@ -443,21 +443,18 @@ export function Hero({
                 onBlur={() => setFocusId(null)}
                 onClick={() => setFocusId(on ? null : f.ids.length ? f.id : null)}
                 aria-pressed={on}
-                className={`group relative block h-full w-full overflow-hidden px-5 py-4 text-left transition-colors sm:px-6 sm:py-5 ${on ? "bg-[#141B0A]" : "bg-[#080B04]/95 hover:bg-[#0F1408]"}`}
+                className={`group relative block h-full w-full overflow-hidden px-5 py-4 text-left transition-colors sm:px-6 sm:py-5 ${on ? "bg-zinc-950" : "bg-white hover:bg-zinc-50"}`}
               >
-                <span
-                  aria-hidden
-                  className="absolute inset-x-0 top-0 h-px origin-left transition-transform duration-500 ease-out"
-                  style={{ background: ACCENT[f.tone], transform: on ? "scaleX(1)" : "scaleX(0)" }}
-                />
-                <span className="flex items-center justify-between font-mono text-[10.5px] uppercase tracking-[0.16em] text-zinc-500">
+                <span aria-hidden className="absolute inset-x-0 top-0 h-[3px] origin-left bg-lime transition-transform duration-500 ease-out" style={{ transform: on ? "scaleX(1)" : "scaleX(0)" }} />
+                <span className={`flex items-center justify-between font-mono text-[10.5px] uppercase tracking-[0.16em] ${on ? "text-zinc-500" : "text-zinc-400"}`}>
                   <span>{String(i + 1).padStart(2, "0")}</span>
-                  <span className="text-right" style={{ color: ACCENT[f.tone] }}>
+                  <span className={`inline-flex items-center gap-1.5 ${on ? "text-white" : "text-zinc-700"}`}>
+                    <span className="size-1.5 rounded-full ring-1 ring-zinc-950/30" style={{ background: on ? ON_INK[f.tone] : ACCENT[f.tone] }} />
                     {f.stat}
                   </span>
                 </span>
-                <span className="mt-2.5 block font-display text-[16px] font-semibold text-white">{f.name}</span>
-                <span className="mt-1 block text-[12.5px] leading-snug text-zinc-400 transition-colors group-hover:text-zinc-300">{f.text}</span>
+                <span className={`mt-2.5 block font-display text-[16px] font-semibold ${on ? "text-white" : "text-zinc-950"}`}>{f.name}</span>
+                <span className={`mt-1 block text-[12.5px] leading-snug transition-colors ${on ? "text-zinc-400" : "text-zinc-500 group-hover:text-zinc-700"}`}>{f.text}</span>
               </button>
             </li>
           );
