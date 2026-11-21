@@ -5,6 +5,11 @@
  * Supabase implementation (sketch below) and the UI keeps working.
  */
 
+import { scoreConfidence } from "./confidence";
+
+/** True once `repository` reads the scraped `property_master` data from Supabase. */
+export const LIVE_DATA = false;
+
 /* ─────────────────────────────────────────────────────────────────────────
  * Types — mirror the Supabase Postgres tables (snake_case on the wire)
  * ──────────────────────────────────────────────────────────────────────── */
@@ -189,6 +194,8 @@ export interface ListingBase {
   days_on_market: number;
   first_seen: string; // ISO date
   last_scraped: string; // ISO timestamp
+  last_found_at: string; // ISO timestamp the scraper last found it on its source site (property_master.last_scraped_at)
+  confidence_score: number; // 0-100, see lib/confidence.ts; 0 = flagged delisted (hidden)
   source: string; // listing agency name (= agency.name)
   source_url: string | null; // the listing's own page on the agency's site
   agency: Agency;
@@ -487,7 +494,10 @@ function scrapeMeta(
   changePct: number,
   dom: number,
   kind: string, // property type, "Land", or commercial use
-): Pick<ListingBase, "tenure" | "lease_years_left" | "is_new" | "price_history" | "last_price_change" | "status" | "status_changed" | "pool"> {
+): Pick<
+  ListingBase,
+  "tenure" | "lease_years_left" | "is_new" | "price_history" | "last_price_change" | "status" | "status_changed" | "pool" | "last_found_at" | "confidence_score"
+> {
   const h = hashId(id);
   const status = STATUS_CHANGES[id];
   const tenure: Tenure = (h % 100) / 100 < ERFPACHT_SHARE[category] ? "Erfpacht" : "Eigendom";
@@ -509,7 +519,13 @@ function scrapeMeta(
       });
     }
   }
+  // Mock: some long-running listings have dropped off their source site for a few weeks.
+  const weeksMissing = dom >= 14 && (h >>> 4) % 3 === 0 ? 1 + ((h >>> 7) % 10) : 0;
+  const lastFoundAt = new Date(Date.parse(SCRAPED_AT) - weeksMissing * 7 * DAY).toISOString();
+  const lastMove = history[history.length - 1].date;
   return {
+    last_found_at: lastFoundAt,
+    confidence_score: scoreConfidence({ lastFoundAt, daysOnMarket: dom, lastPriceChangeAt: `${lastMove}T00:00:00Z`, asOf: SCRAPED_AT }).score,
     tenure,
     lease_years_left: tenure === "Erfpacht" ? 22 + (h % 37) : null,
     is_new: dom === 0,

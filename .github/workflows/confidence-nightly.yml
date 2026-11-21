@@ -1,0 +1,35 @@
+# Nightly Confidence Score: rescores every active listing in Supabase.
+# Needs two repository secrets (Settings → Secrets and variables → Actions):
+#   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+# Until they are added the job runs and skips without writing anything.
+name: Confidence score (nightly)
+
+on:
+  schedule:
+    - cron: "0 7 * * *" # 03:00 in Aruba (UTC-4), after the morning scrape is planned
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Score and print only, write nothing"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  score:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Self-test the scoring rules
+        run: python3 scripts/confidence_score.py --self-test
+      - name: Rescore listings
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python3 scripts/confidence_score.py ${{ inputs.dry_run && '--dry-run' || '' }}

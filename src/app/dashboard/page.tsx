@@ -21,6 +21,9 @@ import { Wordmark } from "@/components/logo";
 import { FeedView } from "@/components/feed/feed-view";
 import { ProfileDialog } from "@/components/feed/profile-dialog";
 import { useProfile } from "@/lib/profile";
+import { Dialog } from "@/components/feed/profile-dialog";
+import { BAND_COLOR, CONFIDENCE_RULES, confidenceBand, scoreConfidence } from "@/lib/confidence";
+import { FLAG_REASONS, UNDO_MINUTES, canUndo, useFlags, type FlagReason } from "@/lib/flags";
 import { useWatchlist, type WatchEntry } from "@/lib/watchlist";
 import { useInterestedClients, type ClientInput, type InterestedClient } from "@/lib/clients";
 import { useListingNote, useMarketBrief } from "@/lib/use-signal";
@@ -60,6 +63,9 @@ import {
   ArrowUp,
   Bell,
   ChevronDown,
+  Flag,
+  ShieldCheck,
+  Undo2,
   LayoutList,
   Megaphone,
   Pencil,
@@ -471,7 +477,7 @@ function SignalBadge({ signal }: { signal: Signal }) {
  * ──────────────────────────────────────────────────────────────────────── */
 
 type Category = "All" | "Property" | "Land" | "Commercial";
-type SortKey = "name" | "district" | "beds" | "baths" | "built" | "lot" | "asking" | "psf" | "adr" | "yield" | "vsDistrict" | "listed" | "status";
+type SortKey = "name" | "district" | "beds" | "baths" | "built" | "lot" | "asking" | "psf" | "adr" | "yield" | "vsDistrict" | "listed" | "status" | "confidence";
 
 /** Sort choices for the phone layout (no column headers there). */
 const MOBILE_SORTS: Array<[SortKey, "asc" | "desc", string]> = [
@@ -483,6 +489,7 @@ const MOBILE_SORTS: Array<[SortKey, "asc" | "desc", string]> = [
   ["beds", "desc", "Most bedrooms"],
   ["built", "desc", "Largest built-up"],
   ["lot", "desc", "Largest lot"],
+  ["confidence", "desc", "Most reliable first"],
 ];
 
 const SORT_VALUE: Record<SortKey, (l: Listing) => number | string | null> = {
@@ -493,6 +500,7 @@ const SORT_VALUE: Record<SortKey, (l: Listing) => number | string | null> = {
   built: (l) => (l.category === "Land" ? null : l.built_sqft),
   lot: (l) => l.lot_sqft ?? null,
   status: (l) => LISTING_STATUSES.indexOf(l.status),
+  confidence: (l) => l.confidence_score,
   asking: (l) => l.asking_price_usd,
   psf: (l) => l.price_per_sqft_usd,
   adr: (l) => (l.category === "Property" ? l.sequence_adr_usd : null),
@@ -677,6 +685,210 @@ function DetailItem({ label, value, color }: { label: string; value: React.React
       <dd className={`${MONO} mt-1.5 text-[13px] text-zinc-900`} style={color ? { color } : undefined}>
         {value}
       </dd>
+    </div>
+  );
+}
+
+/* ── Confidence Score + Kill Switch ───────────────────────────────────── */
+
+function confidenceReasons(l: Listing) {
+  const lastMove = l.price_history[l.price_history.length - 1]?.date ?? l.first_seen;
+  return scoreConfidence({
+    lastFoundAt: l.last_found_at,
+    daysOnMarket: l.days_on_market,
+    lastPriceChangeAt: `${lastMove}T00:00:00Z`,
+    asOf: l.last_scraped,
+  }).reasons;
+}
+
+/** Score pill: a 0-100 meter, coloured by band. */
+function ConfidenceBadge({ l, align = "end" }: { l: Listing; align?: "start" | "end" }) {
+  const s = l.confidence_score;
+  const band = confidenceBand(s);
+  const color = BAND_COLOR[band];
+  const why = confidenceReasons(l);
+  return (
+    <span
+      className={`inline-flex flex-col gap-1 ${align === "end" ? "items-end" : "items-start"}`}
+      title={`Confidence ${s}/100 (${band}). ${why.length ? why.map((r) => `${r.label} (${r.points})`).join("; ") : "Found on its source site in the latest scrape, price active."}`}
+    >
+      <span className={`${MONO} inline-flex items-center gap-1.5 text-[12px] font-semibold`} style={{ color }}>
+        <span className="relative h-1.5 w-10 overflow-hidden rounded-full bg-zinc-100">
+          <span className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${s}%`, background: color }} />
+        </span>
+        {s}%
+      </span>
+      <span className="text-[10px] uppercase tracking-wide text-zinc-400">{band}</span>
+    </span>
+  );
+}
+
+/** Detail panel: the score, why it is not 100, and the Kill Switch. */
+function ConfidencePanel({ l }: { l: Listing }) {
+  const why = confidenceReasons(l);
+  const band = confidenceBand(l.confidence_score);
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mb-6 rounded-xl border border-zinc-200 bg-white p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-500">
+            <ShieldCheck size={12} /> Confidence score
+          </p>
+          <p className="mt-1.5 flex items-baseline gap-2">
+            <span className={`${MONO} font-display text-[22px] font-bold`} style={{ color: BAND_COLOR[band] }}>
+              {l.confidence_score}%
+            </span>
+            <span className="text-[12px] text-zinc-500">{band} chance this is still for sale</span>
+          </p>
+          <ul className="mt-2 space-y-1 text-[12px] text-zinc-600">
+            {why.length ? (
+              why.map((r) => (
+                <li key={r.label} className="flex gap-2">
+                  <span className={`${MONO} w-9 shrink-0 text-right font-semibold text-[#B42318]`}>{r.points}</span>
+                  {r.label}
+                </li>
+              ))
+            ) : (
+              <li>Found on {l.agency.name}&apos;s site in the latest scrape, last seen {fmtTimestamp(l.last_found_at)}.</li>
+            )}
+          </ul>
+          <p className="mt-2 text-[11px] text-zinc-400">
+            Rescored every night: −{CONFIDENCE_RULES.missingPerWeek} for each week it is missing from the source site, less for long time on market and a price that never moves.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-zinc-300 px-3.5 py-2 text-[12px] font-semibold text-zinc-700 transition-colors hover:border-[#B42318] hover:text-[#B42318]"
+        >
+          <Flag size={13} strokeWidth={2} /> Flag delisted
+        </button>
+      </div>
+      <FlagDialog l={l} open={open} onClose={() => setOpen(false)} />
+    </div>
+  );
+}
+
+function FlagDialog({ l, open, onClose }: { l: Listing; open: boolean; onClose: () => void }) {
+  const { flag, live } = useFlags();
+  const { user } = useUser();
+  const [reason, setReason] = useState<FlagReason | null>(null);
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const needsAccount = live && !user;
+  return (
+    <Dialog open={open} onClose={onClose} title="Flag as delisted">
+      <form
+        className="space-y-4 px-5 py-5"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          if (!reason) return setError("Pick what happened to this listing.");
+          setBusy(true);
+          setError(null);
+          try {
+            await flag(l.listing_id, reason, note);
+            onClose();
+          } catch (err) {
+            setError(err instanceof Error ? err.message : "Could not flag this listing.");
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        <div className="rounded-xl bg-zinc-50 p-3">
+          <p className="text-[13.5px] font-semibold text-zinc-950">{l.asset_name}</p>
+          <p className="text-[12px] text-zinc-500">
+            {l.listing_id} · {l.district} · {fmtUsdCompact(l.asking_price_usd)} · {l.agency.name}
+          </p>
+        </div>
+        <fieldset>
+          <legend className="mb-2 text-[12.5px] font-medium text-zinc-700">What happened?</legend>
+          <div className="grid gap-2">
+            {(Object.keys(FLAG_REASONS) as FlagReason[]).map((k) => (
+              <label
+                key={k}
+                className={`flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 text-[13px] transition-colors ${
+                  reason === k ? "border-zinc-950 bg-zinc-950 text-mint" : "border-zinc-300 text-zinc-800 hover:border-zinc-500"
+                }`}
+              >
+                <input type="radio" name="flag-reason" className="sr-only" checked={reason === k} onChange={() => setReason(k)} />
+                <span className={`grid size-4 place-items-center rounded-full border ${reason === k ? "border-mint" : "border-zinc-400"}`}>
+                  {reason === k && <span className="size-2 rounded-full bg-mint" />}
+                </span>
+                {FLAG_REASONS[k]}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+        <label className="block">
+          <span className="mb-1.5 block text-[12.5px] font-medium text-zinc-700">How do you know? (optional)</span>
+          <textarea
+            value={note}
+            maxLength={280}
+            onChange={(e) => setNote(e.target.value)}
+            className="min-h-[72px] w-full resize-y rounded-lg border border-zinc-300 px-3 py-2 text-[13px] outline-none placeholder:text-zinc-400 focus:border-zinc-950"
+            placeholder="e.g. Closed in cash last week, I represented the buyer."
+          />
+        </label>
+        <p className="rounded-lg border border-[#F3C9C9] bg-[#FDF2F2] px-3 py-2.5 text-[12px] leading-relaxed text-[#9B2C2C]">
+          This removes the listing from Terminal for every member right away and sets its confidence to 0. Your account is recorded with the flag, and you can undo it for {UNDO_MINUTES} minutes.
+        </p>
+        {!live && <p className="text-[11.5px] text-zinc-500">Preview: flags are saved on this device until live listing data is connected.</p>}
+        {error && <p className="rounded-lg bg-[#FBE9E9] px-3 py-2 text-[12.5px] text-[#B23A3A]">{error}</p>}
+        <div className="flex justify-end gap-2 border-t border-zinc-100 pt-4">
+          <button type="button" onClick={onClose} className="rounded-full px-4 py-2 text-[13px] font-semibold text-zinc-600 hover:text-zinc-950">
+            Cancel
+          </button>
+          {needsAccount ? (
+            <Link href="/login" className="rounded-full bg-zinc-950 px-5 py-2 text-[13px] font-semibold text-mint">
+              Log in to flag
+            </Link>
+          ) : (
+            <button type="submit" disabled={busy} className="inline-flex items-center gap-2 rounded-full bg-[#B42318] px-5 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-[#8F1C13] disabled:opacity-60">
+              <Flag size={13} /> {busy ? "Removing…" : "Remove from Terminal"}
+            </button>
+          )}
+        </div>
+      </form>
+    </Dialog>
+  );
+}
+
+/** After a flag: "Removed for everyone" with Undo while the undo window is open. */
+function FlagToast({ listings }: { listings?: Listing[] }) {
+  const { flags, undo } = useFlags();
+  const [dismissed, setDismissed] = useState<string | null>(null);
+  const [, tick] = useState(0);
+  const latest = Object.entries(flags).sort((a, b) => Date.parse(b[1].at) - Date.parse(a[1].at))[0];
+  const fresh = latest && Date.now() - Date.parse(latest[1].at) < 12_000 && dismissed !== latest[0];
+  useEffect(() => {
+    if (!fresh) return;
+    const t = window.setTimeout(() => tick((n) => n + 1), 12_000);
+    return () => window.clearTimeout(t);
+  }, [fresh, latest]);
+  if (!fresh || !latest) return null;
+  const [id, f] = latest;
+  const name = listings?.find((l) => l.listing_id === id)?.asset_name ?? id;
+  return (
+    <div role="status" className="fixed inset-x-4 bottom-4 z-[1100] mx-auto flex max-w-md items-center gap-3 rounded-xl bg-zinc-950 px-4 py-3 text-[13px] text-white shadow-2xl">
+      <Flag size={14} className="shrink-0 text-mint" />
+      <span className="min-w-0 flex-1">
+        <b className="font-semibold">{name}</b> removed for every member · {FLAG_REASONS[f.reason]}
+      </span>
+      {canUndo(f) && (
+        <button
+          type="button"
+          onClick={() => {
+            setDismissed(id);
+            void undo(id).catch((e) => window.alert(e instanceof Error ? e.message : "Could not undo."));
+          }}
+          className="inline-flex shrink-0 items-center gap-1 font-semibold text-mint hover:underline"
+        >
+          <Undo2 size={13} /> Undo
+        </button>
+      )}
     </div>
   );
 }
@@ -1419,6 +1631,7 @@ function ListingDetails({ l, marketYield }: { l: Listing; marketYield?: number }
       />
       <DetailItem label="First seen" value={fmtDate(l.first_seen)} />
       <DetailItem label="Last scraped" value={fmtTimestamp(l.last_scraped)} />
+      <DetailItem label="Last found on source" value={fmtTimestamp(l.last_found_at)} />
     </>
   );
 
@@ -1517,6 +1730,7 @@ function ListingDetails({ l, marketYield }: { l: Listing; marketYield?: number }
             <WatchButton l={l} />
           </div>
           <AINote l={l} />
+          <ConfidencePanel l={l} />
           <dl className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-3 xl:grid-cols-4">
             {facts}
             {shared}
@@ -1558,6 +1772,7 @@ function ActiveListings({
   const [sizeMin, setSizeMin] = useState(0);
   const [newOnly, setNewOnly] = useState(false);
   const [dropsOnly, setDropsOnly] = useState(false);
+  const [reliableOnly, setReliableOnly] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "listed", dir: "asc" });
   const [openId, setOpenId] = useState<string | null>(initialOpenId ?? null);
@@ -1601,6 +1816,7 @@ function ActiveListings({
         (!sizeMin || size >= sizeMin) &&
         (!newOnly || l.days_on_market <= 7) &&
         (!dropsOnly || l.price_change_pct < 0) &&
+        (!reliableOnly || l.confidence_score >= 80) &&
         (!q || `${l.asset_name} ${l.district} ${l.listing_id} ${l.source} ${typeLine(l)} ${l.tenure}`.toLowerCase().includes(q))
       );
     });
@@ -1614,7 +1830,7 @@ function ActiveListings({
       if (y === null) return -1;
       return (typeof x === "string" ? x.localeCompare(y as string) : x - (y as number)) * dir;
     });
-  }, [listings, query, category, subtypes, district, signal, priceMin, priceMax, bedsMin, sizeMin, newOnly, dropsOnly, sort, tenure, newToday, status, pool]);
+  }, [listings, query, category, subtypes, district, signal, priceMin, priceMax, bedsMin, sizeMin, newOnly, dropsOnly, reliableOnly, sort, tenure, newToday, status, pool]);
 
   const stats = useMemo(() => {
     const props = rows.filter((r): r is ListingSignal => r.category === "Property");
@@ -1646,7 +1862,7 @@ function ActiveListings({
   const toggleSubtype = (t: string) => setSubtypes((xs) => (xs.includes(t) ? xs.filter((x) => x !== t) : [...xs, t]));
 
   const moreCount =
-    [priceMin, priceMax, bedsMin, sizeMin].filter(Boolean).length + (newOnly ? 1 : 0) + (dropsOnly ? 1 : 0) + (pool !== "Any" ? 1 : 0);
+    [priceMin, priceMax, bedsMin, sizeMin].filter(Boolean).length + (newOnly ? 1 : 0) + (dropsOnly ? 1 : 0) + (reliableOnly ? 1 : 0) + (pool !== "Any" ? 1 : 0);
   const filtersActive = Boolean(query) || tenure !== "All" || status !== "All" || newToday || category !== "All" || subtypes.length > 0 || district !== "All" || signal !== "ALL" || moreCount > 0;
   const clearAll = () => {
     setQuery("");
@@ -1663,6 +1879,7 @@ function ActiveListings({
     setSizeMin(0);
     setNewOnly(false);
     setDropsOnly(false);
+    setReliableOnly(false);
   };
 
   const selectFromMap = (id: string) => {
@@ -1684,7 +1901,7 @@ function ActiveListings({
   const td = "px-3 py-4 border-b border-zinc-200 align-top";
   const num = `${td} ${MONO} text-right text-[13px] text-zinc-800`;
   // listing, district, status, asking, $/sqft, signal, listed, chevron + the category-dependent columns
-  const colCount = 8 + (nonResidential ? 1 : 2) + (landOnly ? 1 : 2) + 1;
+  const colCount = 9 + (nonResidential ? 1 : 2) + (landOnly ? 1 : 2) + 1;
 
   return (
     <>
@@ -1878,6 +2095,9 @@ function ActiveListings({
             <button type="button" onClick={() => setDropsOnly((v) => !v)} aria-pressed={dropsOnly} className={toggleCls(dropsOnly)}>
               Price drops
             </button>
+            <button type="button" onClick={() => setReliableOnly((v) => !v)} aria-pressed={reliableOnly} className={toggleCls(reliableOnly)} title="Confidence score 80% or higher">
+              <ShieldCheck size={13} /> High confidence only
+            </button>
           </div>
         )}
       </div>
@@ -1975,6 +2195,7 @@ function ActiveListings({
                     <span className="flex flex-col items-end gap-1">
                       <StatusBadge l={l} align="end" />
                       <SignalBadge signal={l.signal} />
+                      <ConfidenceBadge l={l} />
                     </span>
                   </span>
                   <span className="mt-2 block truncate text-[11px] text-zinc-500">
@@ -2021,6 +2242,7 @@ function ActiveListings({
                 <SortHeader label="Proj. Yield" k="yield" sort={sort} onSort={onSort} />
               )}
               <SortHeader label="Status" k="status" sort={sort} onSort={onSort} />
+              <SortHeader label="Confidence" k="confidence" sort={sort} onSort={onSort} />
               <PlainHeader label="Value" />
               <SortHeader label="Listed" k="listed" sort={sort} onSort={onSort} />
               <th className="w-20 border-b border-zinc-300 pr-4" aria-label="Watch and details" />
@@ -2133,6 +2355,9 @@ function ActiveListings({
                     )}
                     <td className={`${td} text-right`}>
                       <StatusBadge l={l} align="end" />
+                    </td>
+                    <td className={`${td} text-right`}>
+                      <ConfidenceBadge l={l} />
                     </td>
                     <td className={`${td} text-right`}>
                       <SignalBadge signal={l.signal} />
@@ -2746,6 +2971,9 @@ function Dashboard() {
   const toggleBoard = useCallback(() => setBoardOpen((o) => !o), []);
   const updatesToday = SCRAPE_RUNS[0].new_listings.length + SCRAPE_RUNS[0].price_changes.length + SCRAPE_RUNS[0].status_changes.length;
   const { data, error } = useDashboardData(MARKET_ID);
+  // Master Market view: flagged (archived) and zero-confidence listings are gone for everyone.
+  const { flags } = useFlags();
+  const market = useMemo(() => data?.allListings.filter((l) => l.confidence_score > 0 && !flags[l.listing_id]), [data, flags]);
   const watchCount = useWatchlist().entries.length;
   const me = useProfile();
   const [profileOpen, setProfileOpen] = useState(false);
@@ -2785,7 +3013,7 @@ function Dashboard() {
             <TerminalUpdates runs={SCRAPE_RUNS} allListings={ALL_LISTINGS} open={boardOpen} onToggle={toggleBoard} onOpenListing={openListing} onShowNew={showNewToday} />
             <ActiveListings
               key={listingsView.key}
-              listings={data?.allListings}
+              listings={market}
               marketYield={data?.snapshot.est_gross_yield_pct}
               initialDistrict={listingsView.district}
               initialQuery={listingsView.query}
@@ -2796,10 +3024,11 @@ function Dashboard() {
         ) : tab === "Feed" ? (
           <FeedView profile={me.profile} profileLoading={me.loading} shared={me.shared} onEditProfile={openProfile} />
         ) : (
-          <Watchlist listings={data?.allListings} marketYield={data?.snapshot.est_gross_yield_pct} onOpenListing={openListing} onBrowse={() => setTab("Listings")} />
+          <Watchlist listings={market} marketYield={data?.snapshot.est_gross_yield_pct} onOpenListing={openListing} onBrowse={() => setTab("Listings")} />
         )}
       </main>
 
+      <FlagToast listings={data?.allListings} />
       <ProfileDialog open={profileOpen} onClose={() => setProfileOpen(false)} initial={me.draft} onSave={me.save} shared={me.shared} />
 
       <footer className="border-t border-zinc-200">
