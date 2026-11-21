@@ -9,7 +9,6 @@
  */
 
 import dynamic from "next/dynamic";
-import Image from "next/image";
 import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
@@ -186,7 +185,6 @@ export function Hero({
   events,
   kpis,
   brief,
-  backdrop,
   runTime,
   total,
 }: {
@@ -194,7 +192,6 @@ export function Hero({
   events: HeroEvent[];
   kpis: HeroKpi[];
   brief: string;
-  backdrop: string;
   runLabel?: string;
   runTime: string;
   total: number;
@@ -260,8 +257,11 @@ export function Hero({
           transition={{ duration: 1, ease: EASE, delay: 0.35 }}
           className="relative overflow-hidden rounded-t-2xl sm:mx-0"
         >
-          <Image src={`${backdrop}?auto=format&fit=crop&w=2400&h=1400&q=70`} alt="" fill priority unoptimized className="object-cover" />
-          <div aria-hidden className="absolute inset-0 bg-gradient-to-b from-white/10 to-white/0" />
+          {/* brand backdrop: ink black, a faint grid and a soft lime light under the window */}
+          <div aria-hidden className="absolute inset-0 bg-[#0B0C0A]">
+            <div className="absolute inset-0 [background-image:linear-gradient(rgb(255_255_255/0.055)_1px,transparent_1px),linear-gradient(90deg,rgb(255_255_255/0.055)_1px,transparent_1px)] [background-size:56px_56px] [mask-image:radial-gradient(ellipse_at_50%_0%,black,transparent_75%)]" />
+            <div className="absolute left-1/2 top-[38%] h-[520px] w-[900px] -translate-x-1/2 rounded-full bg-[radial-gradient(ellipse,rgb(172_250_104/0.22),transparent_62%)]" />
+          </div>
           <div className="relative px-3 pt-10 sm:px-12 sm:pt-16 lg:px-20 lg:pt-20">
             <div className="h-[440px] sm:h-[560px] lg:h-[620px]">
               <TerminalWindow listings={listings} events={events} step={step} onStep={setStep} running={running} kpis={kpis} brief={brief} runTime={runTime} total={total} />

@@ -460,7 +460,7 @@ export default function Home() {
       <SiteHeader />
 
       <main id="main">
-        <Hero listings={ALL_LISTINGS} events={HERO.events} kpis={HERO.kpis} brief={BRIEF.headline} backdrop={ARUBA_PHOTOS.aerial} runLabel={HERO.runLabel} runTime={PREVIEW.run.time} total={ALL_LISTINGS.length} />
+        <Hero listings={ALL_LISTINGS} events={HERO.events} kpis={HERO.kpis} brief={BRIEF.headline} runLabel={HERO.runLabel} runTime={PREVIEW.run.time} total={ALL_LISTINGS.length} />
 
         {/* coverage */}
         <section aria-label="Coverage" className="border-y border-zinc-200 bg-white">
