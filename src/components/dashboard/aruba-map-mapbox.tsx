@@ -131,7 +131,7 @@ export default function ArubaMapMapbox(props: ArubaMapProps) {
   if (!TOKEN) return null;
 
   return (
-    <div className={`relative overflow-hidden ${interactive && !fill ? "rounded-2xl border border-zinc-200" : ""}`} style={{ height: fill ? "100%" : interactiveHeight(height) }}>
+    <div data-lenis-prevent={interactive || undefined} className={`relative overflow-hidden ${interactive && !fill ? "rounded-2xl border border-zinc-200" : ""}`} style={{ height: fill ? "100%" : interactiveHeight(height) }}>
       <Map
         ref={mapRef}
         mapboxAccessToken={TOKEN}
@@ -141,7 +141,7 @@ export default function ArubaMapMapbox(props: ArubaMapProps) {
         minZoom={9.5}
         maxZoom={17}
         interactive={interactive}
-        scrollZoom={false}
+        scrollZoom={interactive}
         dragRotate={interactive}
         pitchWithRotate={interactive}
         touchPitch={interactive}
@@ -287,7 +287,7 @@ export default function ArubaMapMapbox(props: ArubaMapProps) {
       </Map>
 
       {interactive && (
-        <div className="absolute left-[52px] top-[10px] z-[2] flex gap-1.5">
+        <div className={`absolute z-[2] flex gap-1.5 ${fill ? "bottom-[30px] right-[52px]" : "left-[52px] top-[10px]"}`}>
           <button
             type="button"
             onClick={toggle3d}

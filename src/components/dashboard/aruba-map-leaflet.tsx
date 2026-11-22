@@ -73,7 +73,7 @@ export default function ArubaMapLeaflet(props: ArubaMapProps) {
         minZoom={10}
         maxBounds={ARUBA_BOUNDS}
         maxBoundsViscosity={0.8}
-        scrollWheelZoom={false}
+        scrollWheelZoom={interactive}
         dragging={interactive}
         zoomControl={interactive}
         doubleClickZoom={interactive}
