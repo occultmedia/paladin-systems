@@ -454,7 +454,7 @@ const FAQ: FaqItem[] = [
   },
   {
     q: "Who can see my watchlist, clients and Deals posts?",
-    a: "Your watchlist and the interested clients you save on a listing are yours alone. Posts on the Deals board (off-market deals, buyer requests and rentals) are shared with every member, because that is what the board is for.",
+    a: "Your watchlist and the interested clients you save on a listing are yours alone. Posts on the Deals board (off-market deals, buyer requests and rentals) are shared with every member for 14 days. Post blind and members only see your role: they tap “I’m interested”, and you decide who to contact.",
   },
   {
     q: "How much does it cost?",

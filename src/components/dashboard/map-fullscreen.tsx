@@ -20,7 +20,7 @@ import { GrainField } from "@/components/landing/grain-field";
 import { PostCard } from "@/components/feed/feed-view";
 import { BAND_COLOR, confidenceBand } from "@/lib/confidence";
 import type { Listing } from "@/lib/aruba-data";
-import { POST_KINDS, useFeed, type PostKind } from "@/lib/feed";
+import { DEAL_TTL_DAYS, POST_KINDS, useFeed, type PostKind } from "@/lib/feed";
 import { useWatchlist } from "@/lib/watchlist";
 import { HotFlame, AgencyLogo, SIGNAL_COLOR, SIGNAL_LABEL } from "./map-shared";
 import { ListingPopup, ViewToggle, kindOf, usdShort } from "./listing-popup";
@@ -200,7 +200,7 @@ function WatchPanel({
 
 /** Deals in full-screen mode: no map, just the deal and offer cards. */
 function DealsBoard({ onPick, onNewPost, tabs }: { onPick: (id: string) => void; onNewPost: () => void; tabs?: React.ReactNode }) {
-  const { posts, remove, loading } = useFeed(null);
+  const { posts, remove, setInterest, responders, loading } = useFeed(null);
   const [kind, setKind] = useState<PostKind | "All">("All");
   const [q, setQ] = useState("");
   const shown = useMemo(() => {
@@ -208,7 +208,7 @@ function DealsBoard({ onPick, onNewPost, tabs }: { onPick: (id: string) => void;
     return posts.filter(
       (p) =>
         (kind === "All" || p.kind === kind) &&
-        (!t || [p.title, p.body, p.district, p.author.name, p.author.company, p.listing_id].some((x) => x?.toLowerCase().includes(t))),
+        (!t || [p.title, p.body, p.district, p.blind ? null : p.author.name, p.blind ? null : p.author.company, p.listing_id].some((x) => x?.toLowerCase().includes(t))),
     );
   }, [posts, kind, q]);
 
@@ -249,8 +249,8 @@ function DealsBoard({ onPick, onNewPost, tabs }: { onPick: (id: string) => void;
                   on ? "bg-zinc-950 text-lime" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200 hover:text-zinc-950"
                 }`}
               >
-                {k === "Update" ? "Updates" : k}
-                <span className={`tabular-nums text-[11px] ${on ? "text-zinc-400" : "text-zinc-400"}`}>{n}</span>
+                {k}
+                <span className="tabular-nums text-[11px] text-zinc-400">{n}</span>
               </button>
             );
           })}
@@ -267,11 +267,11 @@ function DealsBoard({ onPick, onNewPost, tabs }: { onPick: (id: string) => void;
         ) : shown.length ? (
           <div className="mx-auto max-w-[1600px] columns-1 gap-4 md:columns-2 2xl:columns-3 [&>*]:mb-4 [&>*]:break-inside-avoid">
             {shown.map((p) => (
-              <PostCard key={p.id} post={p} onOpenListing={onPick} onDelete={(id) => void remove(id).catch((e) => window.alert(e instanceof Error ? e.message : "Could not delete."))} />
+              <PostCard key={p.id} post={p} onOpenListing={onPick} onInterest={setInterest} loadResponders={responders} onDelete={(id) => void remove(id).catch((e) => window.alert(e instanceof Error ? e.message : "Could not delete."))} />
             ))}
           </div>
         ) : (
-          <Empty title={posts.length ? "No deals match" : "No deals in the last 48 hours"} text={posts.length ? "Try another type or search." : "Be the first to post one."} />
+          <Empty title={posts.length ? "No deals match" : `No deals in the last ${DEAL_TTL_DAYS} days`} text={posts.length ? "Try another type or search." : "Be the first to post one."} />
         )}
       </div>
     </div>

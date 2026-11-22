@@ -20,6 +20,8 @@
 --                      (trigger archives the listing and zeroes its score)
 --   deal_desk_posts    the blind bid/ask feed     insert/update/delete own,
 --                      (14-day TTL)               read via deal_desk_feed
+--   deal_desk_interest "I'm interested" on a      insert/delete own; the poster
+--                      blind post                 sees who (v_deal_desk_interest)
 --
 -- RLS is on for every table. Only the service role (the scraper and the
 -- nightly jobs) writes raw_listings, property_master, listing_events,
@@ -612,6 +614,30 @@ $$;
 
 select cron.schedule('deal-desk-expire-14d', '7 * * * *', $$select public.purge_expired_deal_desk_posts()$$);
 
+-- "I'm interested": how members respond to a blind post. The responder stays
+-- visible only to the poster, who decides whether to reach out.
+create table public.deal_desk_interest (
+  post_id     uuid not null references public.deal_desk_posts (id) on delete cascade,
+  user_id     uuid not null default auth.uid() references public.profiles (id) on delete cascade,
+  note        text check (char_length(note) <= 280),
+  created_at  timestamptz not null default now(),
+  primary key (post_id, user_id)
+);
+
+create index deal_desk_interest_user_idx on public.deal_desk_interest (user_id, created_at desc);
+
+-- A live post by someone else (members cannot read other members' rows in
+-- deal_desk_posts, so the insert policy asks this definer function).
+create or replace function public.deal_post_open_for_interest(p_post_id uuid)
+returns boolean
+language sql
+stable
+security definer set search_path = ''
+as $$
+  select exists (select 1 from public.deal_desk_posts d
+                  where d.id = p_post_id and d.expires_at > now() and d.author_id <> auth.uid());
+$$;
+
 -- The feed members read. Blind posts show the poster's role only (Agent,
 -- Investor, Brokerage); name, company and contact stay hidden. Members never
 -- read the base table directly except their own rows (author_id stays private).
@@ -633,12 +659,25 @@ select d.id,
        case when d.is_blind then null else p.logo_url end as author_logo_url,
        case when d.is_blind then null else p.email    end as author_email,
        case when d.is_blind then null else p.phone    end as author_phone,
-       case when d.is_blind then null else p.whatsapp end as author_whatsapp
+       case when d.is_blind then null else p.whatsapp end as author_whatsapp,
+       case when d.author_id = auth.uid()
+            then (select count(*)::integer from public.deal_desk_interest i where i.post_id = d.id) end as interest_count,
+       exists (select 1 from public.deal_desk_interest i where i.post_id = d.id and i.user_id = auth.uid()) as i_am_interested
   from public.deal_desk_posts d
   join public.profiles p on p.id = d.author_id
   left join public.property_master pm on pm.id = d.listing_id
  where auth.uid() is not null
    and d.expires_at > now();
+
+-- The poster's list of members interested in their posts, with contact details.
+create view public.v_deal_desk_interest
+with (security_invoker = true) as
+select i.post_id, i.user_id, i.note, i.created_at,
+       p.name, p.role, p.company, p.title, p.email, p.phone, p.whatsapp, p.photo_url, p.logo_url
+  from public.deal_desk_interest i
+  join public.deal_desk_posts d on d.id = i.post_id
+  join public.profiles p on p.id = i.user_id
+ where d.author_id = auth.uid();
 
 -- ════════════════════════════════════════════════════════════════════════
 -- 5. What the UI reads
@@ -737,6 +776,7 @@ alter table public.property_master  enable row level security;
 alter table public.listing_events   enable row level security;
 alter table public.property_flags   enable row level security;
 alter table public.deal_desk_posts  enable row level security;
+alter table public.deal_desk_interest enable row level security;
 
 -- Extraction layer: backend only. No policies = no access for anon or
 -- authenticated; the service role bypasses RLS. Grants removed as well.
@@ -800,9 +840,22 @@ create policy "Members delete their own Deal Desk posts"
 revoke all on public.deal_desk_posts from anon;
 grant select, insert, update, delete on public.deal_desk_posts to authenticated;
 
+create policy "Members show interest as themselves in live posts"
+  on public.deal_desk_interest for insert to authenticated
+  with check (user_id = auth.uid() and public.deal_post_open_for_interest(post_id));
+create policy "Members read their own interest and interest in their posts"
+  on public.deal_desk_interest for select to authenticated
+  using (user_id = auth.uid()
+         or exists (select 1 from public.deal_desk_posts d where d.id = post_id and d.author_id = auth.uid()));
+create policy "Members withdraw their own interest"
+  on public.deal_desk_interest for delete to authenticated
+  using (user_id = auth.uid());
+revoke all on public.deal_desk_interest from anon;
+revoke update on public.deal_desk_interest from authenticated;
+
 -- Views
-revoke all on public.v_master_market, public.v_market_events, public.deal_desk_feed from anon;
-grant select on public.v_master_market, public.v_market_events, public.deal_desk_feed to authenticated;
+revoke all on public.v_master_market, public.v_market_events, public.deal_desk_feed, public.v_deal_desk_interest from anon;
+grant select on public.v_master_market, public.v_market_events, public.deal_desk_feed, public.v_deal_desk_interest to authenticated;
 revoke all on public.v_flag_review from anon, authenticated;
 
 -- Functions: lock everything down, then open what the UI calls.
@@ -810,6 +863,8 @@ revoke all on function public.flag_delisted(text, text, text) from public, anon;
 revoke all on function public.undo_flag(text) from public, anon;
 revoke all on function public.mark_raw_processed(bigint, uuid, text) from public, anon, authenticated;
 revoke all on function public.purge_expired_deal_desk_posts() from public, anon, authenticated;
+revoke all on function public.deal_post_open_for_interest(uuid) from public, anon;
+grant execute on function public.deal_post_open_for_interest(uuid) to authenticated;
 revoke all on function public.property_master_capture_events() from public, anon, authenticated;
 revoke all on function public.raw_listings_touch_master() from public, anon, authenticated;
 revoke all on function public.property_flags_before_insert() from public, anon, authenticated;

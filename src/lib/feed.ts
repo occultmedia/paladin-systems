@@ -1,37 +1,42 @@
 "use client";
 
 /*
- * The Feed: members post updates and offers (off-market deals, listings for
- * co-broke, buyer requests, rentals, partnerships) that every Sequence
- * Terminal member can see and respond to by contacting the poster directly.
- * No chat, no comments. Every post deletes itself 48 hours after it goes up.
+ * Deals (the Deal Desk): a blind bid/ask board for members. Sellers post
+ * asks (off-market, for sale, for rent, partnerships), buyers post bids
+ * (buyer requests) with a budget range. Blind posts hide who posted: other
+ * members tap "I'm interested", and only the poster sees who responded and
+ * decides whether to reach out. Every post deletes itself after 14 days.
  *
- * Same two backends as profiles:
- *  - Supabase `feed_posts` (joined to `profiles`) once accounts are live.
- *  - This browser until then, plus sample posts so the Feed is not empty.
+ * Two backends:
+ *  - Supabase `deal_desk_feed` / `deal_desk_posts` / `deal_desk_interest`
+ *    (see supabase/migrations/20261122000000_delta_pipeline.sql) once
+ *    accounts are live.
+ *  - This browser until then, plus sample posts so Deals is not empty.
  */
 
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { supabase, useUser } from "./auth";
+import type { AssetClass, DealDeskFeedRow, DealSide, DealInterestRow } from "./database.types";
 import { rowToProfile, type Profile } from "./profile";
 
-export const POST_KINDS = ["Update", "Off-market", "For sale", "Buyer request", "For rent", "Partnership"] as const;
+export const POST_KINDS = ["Off-market", "For sale", "Buyer request", "For rent", "Partnership"] as const;
 export type PostKind = (typeof POST_KINDS)[number];
+export const ASSET_CLASSES: AssetClass[] = ["Property", "Land", "Commercial"];
+export const ASSET_CLASS_LABEL: Record<AssetClass, string> = { Property: "Home / condo", Land: "Land", Commercial: "Commercial" };
 
-/** Post types that are offers (they can carry a price). "Update" is a plain post. */
-export const isOffer = (k: PostKind) => k !== "Update";
+/** Buyer requests are bids; everything else is an ask. Matches the SQL check. */
+export const sideOf = (k: PostKind): DealSide => (k === "Buyer request" ? "bid" : "ask");
+export const SIDE_LABEL: Record<DealSide, string> = { bid: "Buying", ask: "Selling" };
 
 /** Posts are removed automatically this long after they are published. */
-export const FEED_TTL_HOURS = 48;
-const TTL_MS = FEED_TTL_HOURS * 36e5;
-export const expiresAt = (iso: string) => Date.parse(iso) + TTL_MS;
-const isLive = (iso: string, now = Date.now()) => expiresAt(iso) > now;
+export const DEAL_TTL_DAYS = 14;
+const TTL_MS = DEAL_TTL_DAYS * 864e5;
+const isLive = (p: { expires_at: string }, now = Date.now()) => Date.parse(p.expires_at) > now;
 
 export const POST_KIND_HINT: Record<PostKind, string> = {
-  Update: "Market news, a sale you closed, an open house, anything members should know",
   "Off-market": "A property you can sell quietly, not on public sites",
   "For sale": "A listing you want other agents to bring buyers to",
-  "Buyer request": "A client looking for something specific",
+  "Buyer request": "A client looking for something specific, with a budget",
   "For rent": "A long-term or vacation rental that is available",
   Partnership: "Co-broke, joint venture or an investor wanted",
 };
@@ -41,24 +46,42 @@ export type FeedAuthor = Pick<Profile, "name" | "role" | "company" | "title" | "
 export interface FeedPost {
   id: string;
   created_at: string; // ISO
+  expires_at: string; // ISO, at most 14 days after created_at
   kind: PostKind;
+  side: DealSide;
+  asset_class: AssetClass;
   title: string;
-  body: string;
-  price_usd: number | null; // asking price, or budget for buyer requests
+  body: string; // notes
+  budget_min: number | null; // bid: low end of the budget
+  budget_max: number | null; // bid: ceiling / ask: asking price, rent or capital needed
   district: string | null;
-  listing_id?: string | null; // a Terminal listing attached to the post
-  author: FeedAuthor;
+  listing_id?: string | null; // public ref of an attached Terminal listing ('AW-0388')
+  blind: boolean; // poster hidden: only the role shows
+  author: FeedAuthor; // on blind posts only `role` is real
   mine?: boolean;
   sample?: boolean; // demo content: contact details are hidden
+  interested?: boolean; // you tapped "I'm interested"
+  interest_count?: number | null; // your own posts only
 }
 
 export interface NewPost {
   kind: PostKind;
+  asset_class: AssetClass;
   title: string;
   body: string;
-  price_usd: number | null;
+  budget_min: number | null;
+  budget_max: number | null;
   district: string | null;
   listing_id?: string | null;
+  blind: boolean;
+}
+
+/** A member who responded to one of your posts. */
+export interface Responder {
+  user_id: string;
+  note: string | null;
+  created_at: string;
+  profile: FeedAuthor;
 }
 
 export const TITLE_MAX = 90;
@@ -67,91 +90,111 @@ export const BODY_MAX = 600;
 /* ── sample posts (fictional people and companies) ─────────────────────── */
 
 const ago = (h: number) => new Date(Date.now() - h * 36e5).toISOString();
+const sample = (p: Omit<FeedPost, "expires_at" | "side" | "sample">): FeedPost => ({
+  ...p,
+  side: sideOf(p.kind),
+  expires_at: new Date(Date.parse(p.created_at) + TTL_MS).toISOString(),
+  sample: true,
+});
 
 const SAMPLES: FeedPost[] = [
-  {
+  sample({
     id: "sample-1",
     created_at: ago(2),
     kind: "Off-market",
+    asset_class: "Property",
     title: "4-bed villa in Malmok, owner wants a quiet sale",
     body: "Ocean-view villa on a 1,100 m² lot, private pool, renovated 2023. Not listed anywhere. Owner will consider serious offers with proof of funds. Happy to co-broke 50/50.",
-    price_usd: 2_150_000,
+    budget_min: 1_950_000,
+    budget_max: 2_150_000,
     district: "Malmok",
-    author: { name: "Daniela Ruiz", role: "Agent", company: "Brightwater Realty", title: "Senior agent" },
-    sample: true,
-  },
-  {
+    blind: true,
+    author: { name: "", role: "Agent", company: "" },
+  }),
+  sample({
     id: "sample-2",
     created_at: ago(5),
     kind: "Buyer request",
+    asset_class: "Property",
     title: "Client looking for a beachfront condo, Eagle Beach",
     body: "2-bed condo, walking distance to the beach, rental program allowed. Cash buyer from Toronto, can close within 60 days.",
-    price_usd: 900_000,
+    budget_min: 700_000,
+    budget_max: 900_000,
     district: "Eagle Beach",
+    blind: false,
     author: { name: "Marcus Hale", role: "Agent", company: "Northshore Property Group" },
-    sample: true,
-  },
-  {
+  }),
+  sample({
     id: "sample-3",
-    created_at: ago(11),
+    created_at: ago(30),
     kind: "Partnership",
+    asset_class: "Land",
     title: "Investor wanted: 6-unit rental project in Noord",
     body: "Land secured and permits submitted for six 1-bed vacation units. Looking for a capital partner for 40%. Projections and drawings available on request.",
-    price_usd: 650_000,
+    budget_min: null,
+    budget_max: 650_000,
     district: "Noord",
+    blind: false,
     author: { name: "Elena Vos", role: "Investor", company: "Coastline Ventures" },
-    sample: true,
-  },
-  {
+  }),
+  sample({
     id: "sample-4",
-    created_at: ago(26),
-    kind: "For rent",
-    title: "Furnished 3-bed house, long-term, Tierra del Sol",
-    body: "Available from January. Golf course view, 12-month minimum. Suits a relocating family or executive.",
-    price_usd: 4_200,
-    district: "Tierra del Sol",
-    author: { name: "Ricardo Lopes", role: "Brokerage", company: "Island Key Homes" },
-    sample: true,
-  },
-  {
-    id: "sample-6",
-    created_at: ago(8),
-    kind: "Update",
-    title: "Open house Saturday 10am to 1pm, Palm Beach condo",
-    body: "Agents welcome to bring clients. Corner unit, 2 bed, pool view. Coffee and floor plans on site.",
-    price_usd: null,
+    created_at: ago(76),
+    kind: "Buyer request",
+    asset_class: "Land",
+    title: "Tourism-zoned plot wanted for a boutique hotel",
+    body: "Fund client looking for 30,000+ ft² of tourism-zoned land within 10 minutes of Palm Beach. Eigendom preferred, erfpacht considered.",
+    budget_min: 1_500_000,
+    budget_max: 3_000_000,
     district: "Palm Beach",
-    listing_id: "AW-0611",
-    author: { name: "Daniela Ruiz", role: "Agent", company: "Brightwater Realty", title: "Senior agent" },
-    sample: true,
-  },
-  {
+    blind: true,
+    author: { name: "", role: "Investor", company: "" },
+  }),
+  sample({
     id: "sample-5",
-    created_at: ago(40),
+    created_at: ago(140),
     kind: "For sale",
+    asset_class: "Commercial",
     title: "Commercial unit on main road, Oranjestad: co-broke welcome",
     body: "Ground floor retail, 180 m², currently leased until 2027. Good yield for an investor client. 3% to the buyer's agent.",
-    price_usd: 780_000,
+    budget_min: null,
+    budget_max: 780_000,
     district: "Oranjestad",
+    blind: false,
     author: { name: "Sofia Martens", role: "Agent", company: "Harbor Lane Real Estate" },
-    sample: true,
-  },
+  }),
+  sample({
+    id: "sample-6",
+    created_at: ago(210),
+    kind: "For rent",
+    asset_class: "Property",
+    title: "Furnished 3-bed house, long-term, Tierra del Sol",
+    body: "Available from January. Golf course view, 12-month minimum. Suits a relocating family or executive.",
+    budget_min: null,
+    budget_max: 4_200,
+    district: "Tierra del Sol",
+    blind: false,
+    author: { name: "Ricardo Lopes", role: "Brokerage", company: "Island Key Homes" },
+  }),
 ];
 
 /* ── local (this browser) ─────────────────────────────────────────────── */
 
-const KEY = "signal.feed.v1";
+const KEY = "terminal.deals.v2";
+const INTEREST_KEY = "terminal.deals.interest.v1";
 const EMPTY: FeedPost[] = [];
+const EMPTY_SET: string[] = [];
 const listeners = new Set<() => void>();
 let cache: FeedPost[] | null = null;
+let interestCache: string[] | null = null;
 
 function readLocal(): FeedPost[] {
   if (cache) return cache;
   try {
     const raw = window.localStorage.getItem(KEY);
     const parsed = raw ? (JSON.parse(raw) as unknown) : [];
-    const all = Array.isArray(parsed) ? (parsed as FeedPost[]).filter((p) => p && typeof p.id === "string") : [];
-    cache = all.filter((p) => isLive(p.created_at));
+    const all = Array.isArray(parsed) ? (parsed as FeedPost[]).filter((p) => p && typeof p.id === "string" && typeof p.expires_at === "string") : [];
+    cache = all.filter((p) => isLive(p));
     // Expired posts are deleted, not just hidden.
     if (cache.length !== all.length) window.localStorage.setItem(KEY, JSON.stringify(cache));
   } catch {
@@ -160,23 +203,43 @@ function readLocal(): FeedPost[] {
   return cache;
 }
 
-function writeLocal(next: FeedPost[]) {
+function readInterest(): string[] {
+  if (interestCache) return interestCache;
   try {
-    window.localStorage.setItem(KEY, JSON.stringify(next));
+    const parsed = JSON.parse(window.localStorage.getItem(INTEREST_KEY) ?? "[]") as unknown;
+    interestCache = Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === "string") : [];
+  } catch {
+    interestCache = [];
+  }
+  return interestCache;
+}
+
+function save(key: string, value: unknown) {
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
   } catch {
     throw new Error("Your browser storage is full.");
   }
+}
+
+function writeLocal(next: FeedPost[]) {
+  save(KEY, next);
   cache = next;
+  listeners.forEach((l) => l());
+}
+
+function writeInterest(next: string[]) {
+  save(INTEREST_KEY, next);
+  interestCache = next;
   listeners.forEach((l) => l());
 }
 
 function subscribe(cb: () => void) {
   listeners.add(cb);
   const onStorage = (e: StorageEvent) => {
-    if (e.key === KEY) {
-      cache = null;
-      cb();
-    }
+    if (e.key === KEY) cache = null;
+    if (e.key === INTEREST_KEY) interestCache = null;
+    if (e.key === KEY || e.key === INTEREST_KEY) cb();
   };
   window.addEventListener("storage", onStorage);
   return () => {
@@ -187,33 +250,43 @@ function subscribe(cb: () => void) {
 
 /* ── Supabase ─────────────────────────────────────────────────────────── */
 
-const SELECT =
-  "id, created_at, kind, title, body, price_usd, district, listing_id, author_id, author:profiles(name, role, company, title, email, phone, whatsapp, photo_url, logo_url)";
+const num = (n: number | null) => (n === null ? null : Number(n));
 
-interface PostRow {
-  id: string;
-  created_at: string;
-  kind: PostKind;
-  title: string;
-  body: string;
-  price_usd: number | null;
-  district: string | null;
-  listing_id: string | null;
-  author_id: string;
-  author: Parameters<typeof rowToProfile>[0] | null;
-}
-
-const fromRow = (r: PostRow, uid: string): FeedPost => ({
+const fromRow = (r: DealDeskFeedRow): FeedPost => ({
   id: r.id,
   created_at: r.created_at,
+  expires_at: r.expires_at,
   kind: r.kind,
+  side: r.side,
+  asset_class: r.asset_class,
   title: r.title,
-  body: r.body,
-  price_usd: r.price_usd === null ? null : Number(r.price_usd),
+  body: r.notes,
+  budget_min: num(r.budget_min),
+  budget_max: num(r.budget_max),
   district: r.district,
-  listing_id: r.listing_id,
-  author: r.author ? rowToProfile(r.author) : { name: "Member", role: "Agent", company: "" },
-  mine: r.author_id === uid,
+  listing_id: r.listing_ref,
+  blind: r.is_blind,
+  author: {
+    name: r.author_name ?? "",
+    role: r.author_role,
+    company: r.author_company ?? "",
+    title: r.author_title ?? undefined,
+    photo: r.author_photo_url ?? undefined,
+    logo: r.author_logo_url ?? undefined,
+    email: r.author_email ?? undefined,
+    phone: r.author_phone ?? undefined,
+    whatsapp: r.author_whatsapp ?? undefined,
+  },
+  mine: r.is_mine,
+  interested: r.i_am_interested,
+  interest_count: r.interest_count,
+});
+
+const responderFromRow = (r: DealInterestRow): Responder => ({
+  user_id: r.user_id,
+  note: r.note,
+  created_at: r.created_at,
+  profile: rowToProfile(r),
 });
 
 /* ── hook ─────────────────────────────────────────────────────────────── */
@@ -221,6 +294,7 @@ const fromRow = (r: PostRow, uid: string): FeedPost => ({
 export function useFeed(author: Profile | null) {
   const { user, ready } = useUser();
   const local = useSyncExternalStore(subscribe, readLocal, () => EMPTY);
+  const localInterest = useSyncExternalStore(subscribe, readInterest, () => EMPTY_SET);
   const [remote, setRemote] = useState<{ uid: string; posts: FeedPost[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const remoteMode = Boolean(user && supabase());
@@ -228,11 +302,10 @@ export function useFeed(author: Profile | null) {
   const load = useCallback(async () => {
     const sb = supabase();
     if (!user || !sb) return;
-    const since = new Date(Date.now() - TTL_MS).toISOString();
-    const { data, error: e } = await sb.from("feed_posts").select(SELECT).gt("created_at", since).order("created_at", { ascending: false }).limit(200);
+    const { data, error: e } = await sb.from("deal_desk_feed").select("*").order("created_at", { ascending: false }).limit(200);
     if (e) return setError(e.message);
     setError(null);
-    setRemote({ uid: user.id, posts: ((data ?? []) as unknown as PostRow[]).map((r) => fromRow(r, user.id)) });
+    setRemote({ uid: user.id, posts: (data ?? []).map(fromRow) });
   }, [user]);
 
   useEffect(() => {
@@ -244,11 +317,38 @@ export function useFeed(author: Profile | null) {
       const sb = supabase();
       if (!author) throw new Error("Set up your profile before posting.");
       if (user && sb) {
-        const { error: e } = await sb.from("feed_posts").insert({ ...p, author_id: user.id });
+        // The attached listing is stored by its database id.
+        let listingUuid: string | null = null;
+        if (p.listing_id) {
+          const { data } = await sb.from("v_master_market").select("property_id").eq("listing_id", p.listing_id).maybeSingle();
+          listingUuid = data?.property_id ?? null;
+        }
+        const { error: e } = await sb.from("deal_desk_posts").insert({
+          side: sideOf(p.kind),
+          kind: p.kind,
+          asset_class: p.asset_class,
+          title: p.title,
+          notes: p.body,
+          budget_min: p.budget_min,
+          budget_max: p.budget_max,
+          district: p.district,
+          listing_id: listingUuid,
+          is_blind: p.blind,
+        });
         if (e) throw new Error(e.message);
         return load();
       }
-      const post: FeedPost = { ...p, id: `local-${Date.now()}`, created_at: new Date().toISOString(), author, mine: true };
+      const now = new Date();
+      const post: FeedPost = {
+        ...p,
+        side: sideOf(p.kind),
+        id: `local-${now.getTime()}`,
+        created_at: now.toISOString(),
+        expires_at: new Date(now.getTime() + TTL_MS).toISOString(),
+        author,
+        mine: true,
+        interest_count: 0,
+      };
       writeLocal([post, ...readLocal()]);
     },
     [author, user, load],
@@ -258,7 +358,7 @@ export function useFeed(author: Profile | null) {
     async (id: string) => {
       const sb = supabase();
       if (user && sb) {
-        const { error: e } = await sb.from("feed_posts").delete().eq("id", id).eq("author_id", user.id);
+        const { error: e } = await sb.from("deal_desk_posts").delete().eq("id", id);
         if (e) throw new Error(e.message);
         return load();
       }
@@ -267,7 +367,36 @@ export function useFeed(author: Profile | null) {
     [user, load],
   );
 
-  // Re-check expiry every minute so posts drop off the Feed at 48 hours.
+  /** "I'm interested" on someone else's post (toggle). */
+  const setInterest = useCallback(
+    async (id: string, on: boolean, note?: string) => {
+      const sb = supabase();
+      if (user && sb) {
+        const { error: e } = on
+          ? await sb.from("deal_desk_interest").insert({ post_id: id, note: note?.trim() || null })
+          : await sb.from("deal_desk_interest").delete().eq("post_id", id).eq("user_id", user.id);
+        if (e) throw new Error(e.message);
+        return load();
+      }
+      const cur = readInterest();
+      writeInterest(on ? [...new Set([...cur, id])] : cur.filter((x) => x !== id));
+    },
+    [user, load],
+  );
+
+  /** Who responded to one of your posts (live accounts only). */
+  const responders = useCallback(
+    async (id: string): Promise<Responder[]> => {
+      const sb = supabase();
+      if (!user || !sb) return [];
+      const { data, error: e } = await sb.from("v_deal_desk_interest").select("*").eq("post_id", id).order("created_at", { ascending: false });
+      if (e) throw new Error(e.message);
+      return (data ?? []).map(responderFromRow);
+    },
+    [user],
+  );
+
+  // Re-check expiry every minute so posts drop off at 14 days.
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const t = window.setInterval(() => setNow(Date.now()), 60_000);
@@ -280,14 +409,16 @@ export function useFeed(author: Profile | null) {
       ? remote && remote.uid === user?.id
         ? remote.posts
         : []
-      : [...local.map((p) => (author ? { ...p, author } : p)), ...SAMPLES];
-    return all.filter((p) => isLive(p.created_at, now)).sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
-  }, [remoteMode, remote, user, local, author, now]);
+      : [...local.map((p) => (author ? { ...p, author } : p)), ...SAMPLES].map((p) => ({ ...p, interested: localInterest.includes(p.id) }));
+    return all.filter((p) => isLive(p, now)).sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+  }, [remoteMode, remote, user, local, localInterest, author, now]);
 
   return {
     posts,
     create,
     remove,
+    setInterest,
+    responders,
     refresh: load,
     error,
     loading: !ready || (remoteMode && remote?.uid !== user?.id && !error),

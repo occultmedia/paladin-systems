@@ -444,8 +444,43 @@ export type Database = {
           { foreignKeyName: "deal_desk_posts_listing_id_fkey"; columns: ["listing_id"]; isOneToOne: false; referencedRelation: "property_master"; referencedColumns: ["id"] },
         ];
       };
+      deal_desk_interest: {
+        Row: {
+          post_id: string;
+          user_id: string;
+          note: string | null;
+          created_at: string;
+        };
+        Insert: {
+          post_id: string;
+          user_id?: string;
+          note?: string | null;
+        };
+        Update: never;
+        Relationships: [
+          { foreignKeyName: "deal_desk_interest_post_id_fkey"; columns: ["post_id"]; isOneToOne: false; referencedRelation: "deal_desk_posts"; referencedColumns: ["id"] },
+        ];
+      };
     };
     Views: {
+      v_deal_desk_interest: {
+        Row: {
+          post_id: string;
+          user_id: string;
+          note: string | null;
+          created_at: string;
+          name: string;
+          role: MemberRole;
+          company: string;
+          title: string | null;
+          email: string | null;
+          phone: string | null;
+          whatsapp: string | null;
+          photo_url: string | null;
+          logo_url: string | null;
+        };
+        Relationships: [];
+      };
       v_master_market: {
         Row: {
           property_id: string;
@@ -552,6 +587,9 @@ export type Database = {
           author_email: string | null;
           author_phone: string | null;
           author_whatsapp: string | null;
+          /** only on your own posts */
+          interest_count: number | null;
+          i_am_interested: boolean;
         };
         Relationships: [];
       };
@@ -582,6 +620,7 @@ export type Database = {
       undo_flag: { Args: { p_listing_id: string }; Returns: undefined };
       mark_raw_processed: { Args: { p_raw_id: number; p_property_id: string | null; p_error?: string | null }; Returns: undefined };
       purge_expired_deal_desk_posts: { Args: Record<PropertyKey, never>; Returns: number };
+      deal_post_open_for_interest: { Args: { p_post_id: string }; Returns: boolean };
       aruba_today: { Args: Record<PropertyKey, never>; Returns: string };
     };
     Enums: { [_ in never]: never };
@@ -597,3 +636,4 @@ export type Views<T extends keyof PublicSchema["Views"]> = PublicSchema["Views"]
 
 export type MasterMarketRow = Views<"v_master_market">;
 export type DealDeskFeedRow = Views<"deal_desk_feed">;
+export type DealInterestRow = Views<"v_deal_desk_interest">;
