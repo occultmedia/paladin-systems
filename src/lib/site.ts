@@ -1,5 +1,9 @@
-/* Canonical site configuration. Update SITE_URL when the real domain is live. */
-export const SITE_URL = "https://paladin-systems.vercel.app";
+/*
+ * Canonical site configuration. SITE_URL is used for link previews, the
+ * sitemap and search engines. When a custom domain is live, set
+ * NEXT_PUBLIC_SITE_URL in Vercel (no code change needed).
+ */
+export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://sequence-labs-psi.vercel.app").replace(/\/$/, "");
 export const SITE_NAME = "Terminal";
 export const SITE_TITLE =
   "Terminal · Aruba Real Estate Market Intelligence | Powered by Sequence Data";
