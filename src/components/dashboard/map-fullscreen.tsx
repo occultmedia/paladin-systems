@@ -109,14 +109,18 @@ function Row({
             {SIGNAL_LABEL[l.signal]}
             {l.signal === "UNDERVALUED" && <HotFlame size={12} />}
           </span>
-          {extra ?? (
+          {extra ?? (l.member ? (
+            <span className={`rounded px-1.5 py-px text-[9.5px] font-semibold tracking-wide ${l.member.visibility === "private" ? "bg-zinc-200 text-zinc-700" : "bg-lime text-zinc-950"}`}>
+              {l.member.visibility === "private" ? "ONLY ME" : "OFF-MARKET"}
+            </span>
+          ) : (
             <span
               className="tabular-nums"
               style={{ color: on ? "#ACFA68" : BAND_COLOR[band] }}
             >
               {l.confidence_score}% conf.
             </span>
-          )}
+          ))}
         </span>
       </span>
       <span className="shrink-0 text-right font-display text-[14px] font-bold tabular-nums">
@@ -333,6 +337,7 @@ export function MapFullscreen({
   onHover,
   onExit,
   renderDetails,
+  onAddListing,
 }: {
   open: boolean;
   listings: Listing[];
@@ -345,6 +350,8 @@ export function MapFullscreen({
   onExit: (tab: FullPanel) => void;
   /** The full property details, shown in a glass window over the map. */
   renderDetails: (l: Listing) => React.ReactNode;
+  /** Opens the Add listing form (agents adding a property by hand). */
+  onAddListing?: () => void;
 }) {
   const [panel, setPanel] = useState<FullPanel>("Listings");
   const [mobileView, setMobileView] = useState<"Map" | FullPanel>("Map");
@@ -386,7 +393,23 @@ export function MapFullscreen({
 
   const list = (p: FullPanel) =>
     p === "Listings" ? (
-      listings.length ? (
+      <>
+      {onAddListing && (
+        <button
+          type="button"
+          onClick={onAddListing}
+          className="mb-1 flex w-full items-center gap-3 rounded-xl border border-dashed border-zinc-300 p-2.5 text-left transition-colors hover:border-zinc-950 hover:bg-white/70"
+        >
+          <span className="grid h-12 w-16 shrink-0 place-items-center rounded-lg bg-zinc-950 text-lime">
+            <Plus size={16} strokeWidth={2.2} />
+          </span>
+          <span className="min-w-0">
+            <span className="block text-[13px] font-semibold text-zinc-950">Add a listing</span>
+            <span className="block text-[11.5px] text-zinc-500">Off-market or private. We check for duplicates.</span>
+          </span>
+        </button>
+      )}
+      {listings.length ? (
         listings.map((l) => (
           <Row
             key={l.listing_id}
@@ -401,7 +424,8 @@ export function MapFullscreen({
           title="No listings match"
           text="Exit and loosen your filters to see more."
         />
-      )
+      )}
+      </>
     ) : p === "Watchlist" ? (
       <WatchPanel
         all={allListings}

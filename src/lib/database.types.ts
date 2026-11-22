@@ -28,6 +28,61 @@ export type DealKind = "Off-market" | "For sale" | "Buyer request" | "For rent" 
 export type MemberRole = "Agent" | "Investor" | "Brokerage";
 export type FeedKind = "Update" | DealKind;
 export type ScrapeRunStatus = "running" | "succeeded" | "failed";
+export type AgentListingVisibility = "members" | "private";
+export type AgentListingStatus = "For sale" | "Under contract" | "Sold" | "Withdrawn";
+
+/** Columns an agent fills in (table: agent_listings). */
+export type AgentListingFields = {
+  visibility: AgentListingVisibility;
+  asset_class: AssetClass;
+  property_type: PropertyTypeDb;
+  commercial_use: CommercialUseDb | null;
+  zoning: ZoningDb | null;
+  asset_name: string;
+  bedrooms: number | null;
+  bathrooms: number | null;
+  built_sqft: number | null;
+  lot_sqft: number | null;
+  pool: PoolDb | null;
+  tenure: TenureDb;
+  lease_years_left: number | null;
+  district: string;
+  address: string | null;
+  lat: number | null;
+  lng: number | null;
+  asking_price_usd: number;
+  listing_status: AgentListingStatus;
+  notes: string | null;
+  photo_url: string | null;
+  dup_acknowledged: boolean;
+};
+
+export type AgentListingRow = AgentListingFields & {
+  id: string;
+  ref: string; // 'AG-1A2B3C4D'
+  owner_id: string;
+  market_id: string;
+  match_kind: "market" | "member" | null;
+  match_ref: string | null;
+  match_name: string | null;
+  match_score: number | null;
+  market_listing_id: string | null;
+  went_public_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AgentListingViewRow = AgentListingRow & {
+  owner_name: string;
+  owner_role: MemberRole;
+  owner_company: string;
+  owner_title: string | null;
+  owner_email: string | null;
+  owner_phone: string | null;
+  owner_whatsapp: string | null;
+  owner_photo_url: string | null;
+  owner_logo_url: string | null;
+};
 
 export type Database = {
   public: {
@@ -403,6 +458,14 @@ export type Database = {
           { foreignKeyName: "property_flags_property_id_fkey"; columns: ["property_id"]; isOneToOne: false; referencedRelation: "property_master"; referencedColumns: ["id"] },
         ];
       };
+      agent_listings: {
+        Row: AgentListingRow;
+        Insert: Partial<AgentListingFields> & Pick<AgentListingFields, "asset_class" | "property_type" | "asset_name" | "district" | "asking_price_usd"> & { owner_id?: string; market_id?: string };
+        Update: Partial<AgentListingFields>;
+        Relationships: [
+          { foreignKeyName: "agent_listings_owner_id_fkey"; columns: ["owner_id"]; isOneToOne: false; referencedRelation: "profiles"; referencedColumns: ["id"] },
+        ];
+      };
       deal_desk_posts: {
         Row: {
           id: string;
@@ -463,6 +526,10 @@ export type Database = {
       };
     };
     Views: {
+      v_agent_listings: {
+        Row: AgentListingViewRow;
+        Relationships: [];
+      };
       v_deal_desk_interest: {
         Row: {
           post_id: string;
@@ -616,6 +683,14 @@ export type Database = {
       };
     };
     Functions: {
+      listing_match_score: {
+        Args: {
+          a_class: string; b_class: string; a_lat: number | null; a_lng: number | null; b_lat: number | null; b_lng: number | null;
+          a_district: string; b_district: string; a_beds: number | null; b_beds: number | null; a_built: number | null; b_built: number | null;
+          a_lot: number | null; b_lot: number | null; a_price: number; b_price: number; a_name: string; b_name: string;
+        };
+        Returns: number;
+      };
       flag_delisted: { Args: { p_listing_id: string; p_reason: FlagType; p_note?: string | null }; Returns: undefined };
       undo_flag: { Args: { p_listing_id: string }; Returns: undefined };
       mark_raw_processed: { Args: { p_raw_id: number; p_property_id: string | null; p_error?: string | null }; Returns: undefined };

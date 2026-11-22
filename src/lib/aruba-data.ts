@@ -204,6 +204,25 @@ export interface ListingBase {
   lat: number;
   lng: number;
   photo_url: string | null; // main listing photo (scraped)
+  /** Set on listings an agent added by hand (table: agent_listings); absent on scraped ones. */
+  member?: MemberListingMeta;
+}
+
+/** Extra details of a listing an agent uploaded to the Terminal. */
+export interface MemberListingMeta {
+  id: string; // agent_listings.id
+  visibility: "members" | "private"; // Off-market for every member, or only the agent
+  mine: boolean; // the signed-in member added it
+  owner_id: string;
+  pinned: boolean; // lat/lng are the agent's own pin (false = placed in the district)
+  address: string | null;
+  notes: string | null;
+  raw_status: "For sale" | "Under contract" | "Sold" | "Withdrawn";
+  /** The scraper later found it on a public site (Master Market listing ref). */
+  went_public: { listing_id: string; at: string } | null;
+  /** Best duplicate match when it was saved (score >= 50). */
+  match: { kind: "market" | "member"; ref: string; name: string; score: number } | null;
+  dup_acknowledged: boolean;
 }
 
 /** A house, villa or condo: scored on price per sq ft against comparable listings. */

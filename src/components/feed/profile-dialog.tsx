@@ -12,15 +12,20 @@ import { initialsOf, profileComplete, type Profile } from "@/lib/profile";
 const EASE = [0.22, 1, 0.36, 1] as const;
 
 /** Modal shell: bottom sheet on phones, centred card on larger screens. */
-export function Dialog({ open, onClose, title, children, wide = false }: { open: boolean; onClose: () => void; title: string; children: React.ReactNode; wide?: boolean }) {
+export function Dialog({ open, onClose, title, children, wide = false, top = false }: { open: boolean; onClose: () => void; title: string; children: React.ReactNode; wide?: boolean; /** Above the full-screen map. */ top?: boolean }) {
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    document.addEventListener("keydown", onKey);
+    // Capture phase: Esc closes this dialog only, not the full-screen map underneath.
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      onClose();
+    };
+    document.addEventListener("keydown", onKey, true);
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
-      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("keydown", onKey, true);
       document.body.style.overflow = prev;
     };
   }, [open, onClose]);
@@ -29,7 +34,7 @@ export function Dialog({ open, onClose, title, children, wide = false }: { open:
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed inset-0 z-[1200] flex items-end justify-center bg-zinc-950/60 backdrop-blur-sm sm:items-center sm:p-6"
+          className={`fixed inset-0 ${top ? "z-[1400]" : "z-[1200]"} flex items-end justify-center bg-zinc-950/60 backdrop-blur-sm sm:items-center sm:p-6`}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}

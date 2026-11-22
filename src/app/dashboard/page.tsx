@@ -12,7 +12,7 @@
  */
 
 import { RunLine } from "@/components/run-line";
-import { Fragment, Suspense, useCallback, useDeferredValue, useEffect, useId, useMemo, useRef, useState } from "react";
+import { Fragment, Suspense, createContext, useCallback, useContext, useDeferredValue, useEffect, useId, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
@@ -26,6 +26,8 @@ import { GrainField } from "@/components/landing/grain-field";
 import { useProfile } from "@/lib/profile";
 import { Dialog } from "@/components/feed/profile-dialog";
 import { MapFullscreen, type FullPanel } from "@/components/dashboard/map-fullscreen";
+import { AddListingDialog } from "@/components/dashboard/add-listing";
+import { VISIBILITY_HINT, VISIBILITY_LABEL, agentRowToListing, useAgentListings } from "@/lib/agent-listings";
 import { BAND_COLOR, CONFIDENCE_RULES, confidenceBand, scoreConfidence } from "@/lib/confidence";
 import { FLAG_REASONS, UNDO_MINUTES, canUndo, useFlags, type FlagReason } from "@/lib/flags";
 import { useWatchlist, type WatchEntry } from "@/lib/watchlist";
@@ -71,6 +73,7 @@ import {
   ChevronRight,
   Flag,
   Info,
+  Lock,
   Settings as SettingsIcon,
   ShieldCheck,
   Undo2,
@@ -820,6 +823,13 @@ function confidenceReasons(l: Listing) {
 
 /** Score pill: a 0-100 meter, coloured by band. */
 function ConfidenceBadge({ l, align = "end" }: { l: Listing; align?: "start" | "end" }) {
+  if (l.member)
+    return (
+      <span className={`inline-flex flex-col gap-1 ${align === "end" ? "items-end" : "items-start"}`} title="Added by the listing agent, not scraped">
+        <span className="whitespace-nowrap text-[12px] font-semibold text-zinc-950">Agent</span>
+        <span className="text-[10px] uppercase tracking-wide text-zinc-400">direct</span>
+      </span>
+    );
   const s = l.confidence_score;
   const band = confidenceBand(s);
   const color = BAND_COLOR[band];
@@ -837,6 +847,51 @@ function ConfidenceBadge({ l, align = "end" }: { l: Listing; align?: "start" | "
       </span>
       <span className="text-[10px] uppercase tracking-wide text-zinc-400">{band}</span>
     </span>
+  );
+}
+
+/** Detail panel for a listing an agent added: who sees it, the duplicate watch, notes. */
+function MemberListingPanel({ l }: { l: Listing }) {
+  const actions = useContext(MemberListingActions);
+  const m = l.member!;
+  const priv = m.visibility === "private";
+  return (
+    <div className="mb-6 rounded-xl border border-zinc-200 bg-white p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-500">
+            {priv ? <Lock size={12} /> : <Users size={12} />} {VISIBILITY_LABEL[m.visibility]} listing
+          </p>
+          <p className="mt-1.5 text-[13px] text-zinc-700">{VISIBILITY_HINT[m.visibility]}</p>
+          {m.went_public && (
+            <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
+              Now also on a public site: the scraper found it as{" "}
+              <button type="button" onClick={() => actions?.openListing(m.went_public!.listing_id)} className="font-semibold underline underline-offset-2">
+                {m.went_public.listing_id}
+              </button>{" "}
+              on {fmtDate(m.went_public.at.slice(0, 10))}.
+            </p>
+          )}
+          {m.match && m.dup_acknowledged && (
+            <p className="mt-2 text-[12px] text-zinc-500">
+              Similar to {m.match.name} ({m.match.ref}, {m.match.score}% match). The agent confirmed it is a different property.
+            </p>
+          )}
+          {m.address && <p className="mt-2 text-[12px] text-zinc-600">Address: {m.address}{m.pinned ? "" : " · map position is approximate"}</p>}
+          {!m.address && !m.pinned && <p className="mt-2 text-[12px] text-zinc-500">Map position is approximate (district only).</p>}
+          {m.notes && <p className="mt-3 whitespace-pre-line rounded-lg bg-zinc-50 px-3 py-2 text-[12.5px] leading-relaxed text-zinc-700">{m.notes}</p>}
+        </div>
+        {m.mine && actions && (
+          <button
+            type="button"
+            onClick={() => actions.edit(m.id)}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-zinc-300 px-3.5 py-2 text-[12px] font-semibold text-zinc-700 transition-colors hover:border-zinc-950 hover:text-zinc-950"
+          >
+            <Pencil size={13} strokeWidth={2} /> Edit
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -1026,12 +1081,13 @@ function FlagToast({ listings }: { listings?: Listing[] }) {
 
 /** Who is listing it: agency logo + name, linking to the listing on the agency's own site. */
 function ListedBy({ l }: { l: Listing }) {
+  const actions = useContext(MemberListingActions);
   const href = l.source_url ?? l.agency.website;
   const body = (
     <>
       <AgencyLogo agency={l.agency} size={36} rounded={8} />
       <span className="min-w-0">
-        <span className="block text-[10px] uppercase tracking-[0.14em] text-zinc-500">Listed by</span>
+        <span className="block text-[10px] uppercase tracking-[0.14em] text-zinc-500">{l.member ? "Added by member" : "Listed by"}</span>
         <span className="block truncate font-display text-[14px] font-bold text-zinc-950">{l.agency.name}</span>
       </span>
     </>
@@ -1040,7 +1096,19 @@ function ListedBy({ l }: { l: Listing }) {
     <div className="rounded-xl border border-zinc-200 bg-white">
     <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2.5">
       <div className="flex min-w-0 items-center gap-3">{body}</div>
-      {href ? (
+      {l.member ? (
+        l.member.mine && actions ? (
+          <button
+            type="button"
+            onClick={(e) => (e.stopPropagation(), actions.edit(l.member!.id))}
+            className="inline-flex items-center gap-1.5 rounded-md border border-zinc-950 px-3 py-1.5 text-[12px] font-medium text-zinc-950 transition-colors hover:bg-zinc-950 hover:text-lime"
+          >
+            <Pencil size={12} strokeWidth={1.75} /> Edit listing
+          </button>
+        ) : (
+          <span className="text-[11.5px] text-zinc-500">{l.member.visibility === "private" ? "Only you see this" : "Off-market · contact the agent"}</span>
+        )
+      ) : href ? (
         <a
           href={href}
           target="_blank"
@@ -1176,10 +1244,35 @@ function PoolTag({ pool }: { pool: Pool | null }) {
 }
 
 /** "NEW" for listings found in the latest scrape, "PRICE ↓/↑" for prices that moved in it. */
+/** Add / edit listings by hand (provided by the Dashboard). */
+const MemberListingActions = createContext<{ add: () => void; edit: (id: string) => void; openListing: (ref: string) => void } | null>(null);
+
+function MemberTag({ l }: { l: Listing }) {
+  if (!l.member) return null;
+  const priv = l.member.visibility === "private";
+  return (
+    <>
+      <span
+        className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-semibold tracking-wide ${priv ? "bg-zinc-200 text-zinc-700" : "bg-lime text-zinc-950"}`}
+        title={VISIBILITY_HINT[l.member.visibility]}
+      >
+        {priv && <Lock size={8} strokeWidth={2.5} />}
+        {priv ? "ONLY ME" : "OFF-MARKET"}
+      </span>
+      {l.member.went_public && (
+        <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold tracking-wide text-amber-900" title={`Now also on a public site as ${l.member.went_public.listing_id}`}>
+          NOW PUBLIC
+        </span>
+      )}
+    </>
+  );
+}
+
 function ScrapeTags({ l }: { l: Listing }) {
   const moved = l.last_price_change && l.last_price_change.date === SCRAPE_RUNS[0].date ? l.last_price_change : null;
   return (
     <>
+      <MemberTag l={l} />
       {l.is_new && <span className="rounded bg-zinc-950 px-1.5 py-0.5 text-[9px] font-semibold tracking-wide text-lime">NEW</span>}
       {moved && (
         <span
@@ -1760,9 +1853,18 @@ function ListingDetails({ l }: { l: Listing }) {
         value={l.tenure === "Erfpacht" ? `Erfpacht · ${l.lease_years_left} yrs left` : "Eigendom (freehold)"}
         color={TENURE_COLOR[l.tenure]}
       />
-      <DetailItem label="First seen" value={fmtDate(l.first_seen)} />
-      <DetailItem label="Last scraped" value={fmtTimestamp(l.last_scraped)} />
-      <DetailItem label="Last found on source" value={fmtTimestamp(l.last_found_at)} />
+      {l.member ? (
+        <>
+          <DetailItem label="Added" value={fmtDate(l.first_seen)} />
+          <DetailItem label="Last updated" value={fmtTimestamp(l.last_scraped)} />
+        </>
+      ) : (
+        <>
+          <DetailItem label="First seen" value={fmtDate(l.first_seen)} />
+          <DetailItem label="Last scraped" value={fmtTimestamp(l.last_scraped)} />
+          <DetailItem label="Last found on source" value={fmtTimestamp(l.last_found_at)} />
+        </>
+      )}
     </>
   );
 
@@ -1862,7 +1964,7 @@ function ListingDetails({ l }: { l: Listing }) {
             <WatchButton l={l} />
           </div>
           <AINote l={l} />
-          <ConfidencePanel l={l} />
+          {l.member ? <MemberListingPanel l={l} /> : <ConfidencePanel l={l} />}
           <dl className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-3 xl:grid-cols-4">
             {facts}
             {shared}
@@ -1900,6 +2002,8 @@ function ActiveListings({
   const [status, setStatus] = useState<ListingStatus | "All">("All");
   const [pool, setPool] = useState<"Any" | "Has pool" | Pool>("Any");
   const [newToday, setNewToday] = useState(Boolean(initialNewToday));
+  const [offMarket, setOffMarket] = useState(false);
+  const actions = useContext(MemberListingActions);
   const [category, setCategory] = useState<Category>("All");
   const [subtypes, setSubtypes] = useState<string[]>([]);
   const [district, setDistrict] = useState(initialDistrict ?? "All");
@@ -1987,6 +2091,7 @@ function ActiveListings({
         (status === "All" || l.status === status) &&
         (pool === "Any" || (pool === "Has pool" ? l.pool === "Private pool" || l.pool === "Shared pool" : l.pool === pool)) &&
         (!newToday || l.is_new) &&
+        (!offMarket || Boolean(l.member)) &&
         (!priceMin || l.asking_price_usd >= priceMin) &&
         (!priceMax || l.asking_price_usd <= priceMax) &&
         (!bedsMin || (l.category === "Property" && l.bedrooms >= bedsMin)) &&
@@ -2007,7 +2112,7 @@ function ActiveListings({
       if (y === null) return -1;
       return (typeof x === "string" ? x.localeCompare(y as string) : x - (y as number)) * dir;
     });
-  }, [listings, deferredQuery, category, subtypes, district, signal, priceMin, priceMax, bedsMin, sizeMin, newOnly, dropsOnly, reliableOnly, sort, tenure, newToday, status, pool]);
+  }, [listings, deferredQuery, category, subtypes, district, signal, priceMin, priceMax, bedsMin, sizeMin, newOnly, dropsOnly, reliableOnly, sort, tenure, newToday, offMarket, status, pool]);
 
   // 25 per page; back to page 1 whenever filters or sort change the result set
   const [page, setPage] = useState(0);
@@ -2066,13 +2171,14 @@ function ActiveListings({
 
   const moreCount =
     [priceMin, priceMax, bedsMin, sizeMin].filter(Boolean).length + (newOnly ? 1 : 0) + (dropsOnly ? 1 : 0) + (reliableOnly ? 1 : 0) + (pool !== "Any" ? 1 : 0);
-  const filtersActive = Boolean(query) || tenure !== "All" || status !== "All" || newToday || category !== "All" || subtypes.length > 0 || district !== "All" || signal !== "ALL" || moreCount > 0;
+  const filtersActive = Boolean(query) || tenure !== "All" || status !== "All" || newToday || offMarket || category !== "All" || subtypes.length > 0 || district !== "All" || signal !== "ALL" || moreCount > 0;
   const clearAll = () => {
     setQuery("");
     setTenure("All");
     setStatus("All");
     setPool("Any");
     setNewToday(false);
+    setOffMarket(false);
     pickCategory("All");
     setDistrict("All");
     setSignal("ALL");
@@ -2119,15 +2225,27 @@ function ActiveListings({
             for full details in the list below.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => downloadCsv(rows)}
-          disabled={!rows.length}
-          className="shine inline-flex items-center gap-2 rounded-full bg-lime px-4 py-2 text-[12px] font-semibold tracking-wide text-zinc-950 transition-colors hover:bg-white disabled:opacity-40"
-        >
-          <Download size={13} strokeWidth={1.5} />
-          Export CSV
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {actions && (
+            <button
+              type="button"
+              onClick={actions.add}
+              className="shine inline-flex items-center gap-2 rounded-full bg-lime px-4 py-2 text-[12px] font-semibold tracking-wide text-zinc-950 transition-colors hover:bg-white"
+            >
+              <Plus size={13} strokeWidth={2} />
+              Add listing
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => downloadCsv(rows)}
+            disabled={!rows.length}
+            className="inline-flex items-center gap-2 rounded-full border border-white/25 px-4 py-2 text-[12px] font-semibold tracking-wide text-white transition-colors hover:border-white disabled:opacity-40"
+          >
+            <Download size={13} strokeWidth={1.5} />
+            Export CSV
+          </button>
+        </div>
       </div>
 
       {/* summary */}
@@ -2215,6 +2333,20 @@ function ActiveListings({
             {listings && (
               <span className={`${MONO} rounded-full px-1.5 text-[10px] ${newToday ? "bg-lime text-zinc-950" : "bg-zinc-950 text-lime"}`}>
                 {listings.filter((l) => l.is_new).length}
+              </span>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => setOffMarket((v) => !v)}
+            aria-pressed={offMarket}
+            className={toggleCls(offMarket)}
+            title="Listings agents added by hand, not on public sites"
+          >
+            Off-market
+            {listings && (
+              <span className={`${MONO} rounded-full px-1.5 text-[10px] ${offMarket ? "bg-lime text-zinc-950" : "bg-zinc-950 text-lime"}`}>
+                {listings.filter((l) => l.member).length}
               </span>
             )}
           </button>
@@ -2348,6 +2480,7 @@ function ActiveListings({
         onHover={setHoverId}
         onExit={closeFullMap}
         renderDetails={(l) => <ListingDetails l={l} />}
+        onAddListing={actions?.add}
       />
 
       {/* list */}
@@ -3232,9 +3365,19 @@ function Dashboard() {
   const { data, error } = useDashboardData(MARKET_ID);
   // Master Market view: flagged (archived) and zero-confidence listings are gone for everyone.
   const { flags } = useFlags();
-  const market = useMemo(() => data?.allListings.filter((l) => l.confidence_score > 0 && !flags[l.listing_id]), [data, flags]);
-  const watchCount = useWatchlist().entries.length;
   const me = useProfile();
+  // Listings agents added by hand: Off-market ones for every member, Only me ones for their agent.
+  const agentListings = useAgentListings(me.profile);
+  const memberListings = useMemo(
+    () => (data ? agentListings.rows.map((r) => agentRowToListing(r, data.allListings, agentListings.myId)) : []),
+    [data, agentListings.rows, agentListings.myId],
+  );
+  const market = useMemo(
+    () => (data ? [...memberListings, ...data.allListings.filter((l) => l.confidence_score > 0 && !flags[l.listing_id])] : undefined),
+    [data, flags, memberListings],
+  );
+  const [listingDialog, setListingDialog] = useState<{ open: boolean; id?: string }>({ open: false });
+  const watchCount = useWatchlist().entries.length;
   const setTab = useCallback((t: Tab) => {
     setTabState(t);
     window.history.replaceState(null, "", `?tab=${TAB_SLUG[t]}`);
@@ -3250,6 +3393,17 @@ function Dashboard() {
     setListingsView((v) => ({ key: v.key + 1, newToday: true }));
     window.history.replaceState(null, "", "?tab=listings");
   };
+  const listingActions = useMemo(
+    () => ({
+      add: () => setListingDialog({ open: true }),
+      edit: (id: string) => setListingDialog({ open: true, id }),
+      openListing: (ref: string) => {
+        setListingsView((v) => ({ key: v.key + 1, openId: ref }));
+        setTabState("Listings");
+      },
+    }),
+    [],
+  );
   const openUpdates = () => {
     setBoardOpen(true);
     setTabState("Listings");
@@ -3264,6 +3418,7 @@ function Dashboard() {
     );
 
   return (
+    <MemberListingActions.Provider value={listingActions}>
     <div className={`${inter.className} min-h-screen overflow-x-clip bg-white text-zinc-800 antialiased selection:bg-lime selection:text-zinc-950`}>
       <Header tab={tab} onTab={setTab} updates={updatesToday} onUpdates={openUpdates} watchCount={watchCount} onProfile={openProfile} />
 
@@ -3298,6 +3453,16 @@ function Dashboard() {
 
       <FlagToast listings={data?.allListings} />
 
+      <AddListingDialog
+        open={listingDialog.open}
+        onClose={() => setListingDialog({ open: false })}
+        editing={listingDialog.id ? agentListings.byId.get(listingDialog.id) : undefined}
+        listings={market ?? []}
+        onSave={agentListings.save}
+        onDelete={agentListings.remove}
+        onOpenListing={openListing}
+      />
+
       <footer className="border-t border-zinc-200">
         <div className={`${MONO} mx-auto flex max-w-[1400px] flex-wrap justify-between gap-2 px-6 py-5 text-[10px] tracking-wider text-zinc-500`}>
           <span>© 2026 TERMINAL · POWERED BY SEQUENCE DATA · PROPRIETARY & CONFIDENTIAL</span>
@@ -3305,6 +3470,7 @@ function Dashboard() {
         </div>
       </footer>
     </div>
+    </MemberListingActions.Provider>
   );
 }
 
