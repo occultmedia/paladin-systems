@@ -12,7 +12,7 @@
  */
 
 import { RunLine } from "@/components/run-line";
-import { Fragment, Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { Fragment, Suspense, useCallback, useDeferredValue, useEffect, useId, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
@@ -67,6 +67,8 @@ import {
   ArrowUp,
   Bell,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Flag,
   Info,
   Settings as SettingsIcon,
@@ -453,6 +455,55 @@ function Header({ tab, onTab, updates, onUpdates, watchCount, onProfile }: { tab
 function scrollToRow(key: string, block: ScrollLogicalPosition = "center") {
   const el = [...document.querySelectorAll<HTMLElement>(`[data-row="${key}"]`)].find((e) => e.offsetParent !== null);
   el?.scrollIntoView({ behavior: "smooth", block });
+}
+
+const PAGE_SIZE = 25;
+
+/** Page numbers to show: first, last, and a window around the current page. */
+function pageList(page: number, count: number): Array<number | "gap"> {
+  const out: Array<number | "gap"> = [];
+  for (let i = 0; i < count; i++) {
+    if (i === 0 || i === count - 1 || Math.abs(i - page) <= 1) out.push(i);
+    else if (out[out.length - 1] !== "gap") out.push("gap");
+  }
+  return out;
+}
+
+function Pager({ page, count, total, onPage }: { page: number; count: number; total: number; onPage: (p: number) => void }) {
+  if (count <= 1) return null;
+  const from = page * PAGE_SIZE + 1;
+  const to = Math.min(total, (page + 1) * PAGE_SIZE);
+  const btn = "grid h-9 min-w-9 place-items-center rounded-full px-2 text-[12.5px] font-semibold tabular-nums transition-[background-color,color,transform] duration-150 active:scale-[0.94]";
+  return (
+    <nav aria-label="Listing pages" className="mt-5 flex flex-wrap items-center justify-between gap-3">
+      <p className="text-[12px] tabular-nums text-zinc-500">
+        Showing <span className="font-semibold text-zinc-900">{from}–{to}</span> of {total.toLocaleString("en-US")}
+      </p>
+      <div className="glass inline-flex items-center gap-0.5 rounded-full p-1">
+        <button type="button" onClick={() => onPage(page - 1)} disabled={page === 0} aria-label="Previous page" className={`${btn} text-zinc-700 hover:bg-white/80 disabled:pointer-events-none disabled:opacity-35`}>
+          <ChevronLeft size={15} strokeWidth={2.2} />
+        </button>
+        {pageList(page, count).map((p, i) =>
+          p === "gap" ? (
+            <span key={`gap-${i}`} className="px-1 text-[12px] text-zinc-400">…</span>
+          ) : (
+            <button
+              key={p}
+              type="button"
+              onClick={() => onPage(p)}
+              aria-current={p === page ? "page" : undefined}
+              className={`${btn} ${p === page ? "bg-zinc-950 text-lime" : "text-zinc-700 hover:bg-white/80"}`}
+            >
+              {p + 1}
+            </button>
+          ),
+        )}
+        <button type="button" onClick={() => onPage(page + 1)} disabled={page >= count - 1} aria-label="Next page" className={`${btn} text-zinc-700 hover:bg-white/80 disabled:pointer-events-none disabled:opacity-35`}>
+          <ChevronRight size={15} strokeWidth={2.2} />
+        </button>
+      </div>
+    </nav>
+  );
 }
 
 function Skeleton({ className = "" }: { className?: string }) {
@@ -1888,7 +1939,9 @@ function ActiveListings({
     if (!el) return;
     const update = () => {
       setPaneW(el.clientWidth);
-      setEdge({ left: el.scrollLeft > 4, right: el.scrollLeft + el.clientWidth < el.scrollWidth - 4 });
+      const left = el.scrollLeft > 4;
+      const right = el.scrollLeft + el.clientWidth < el.scrollWidth - 4;
+      setEdge((e) => (e.left === left && e.right === right ? e : { left, right }));
     };
     update();
     const ro = new ResizeObserver(update);
@@ -1918,9 +1971,10 @@ function ActiveListings({
     [listings],
   );
 
+  const deferredQuery = useDeferredValue(query);
   const rows = useMemo(() => {
     if (!listings) return [];
-    const q = query.trim().toLowerCase();
+    const q = deferredQuery.trim().toLowerCase();
     const filtered = listings.filter((l) => {
       const size = l.category === "Land" ? l.lot_sqft : l.built_sqft;
       return (
@@ -1952,7 +2006,33 @@ function ActiveListings({
       if (y === null) return -1;
       return (typeof x === "string" ? x.localeCompare(y as string) : x - (y as number)) * dir;
     });
-  }, [listings, query, category, subtypes, district, signal, priceMin, priceMax, bedsMin, sizeMin, newOnly, dropsOnly, reliableOnly, sort, tenure, newToday, status, pool]);
+  }, [listings, deferredQuery, category, subtypes, district, signal, priceMin, priceMax, bedsMin, sizeMin, newOnly, dropsOnly, reliableOnly, sort, tenure, newToday, status, pool]);
+
+  // 25 per page; back to page 1 whenever filters or sort change the result set
+  const [page, setPage] = useState(0);
+  const [pagedRows, setPagedRows] = useState(rows);
+  const [deepLink, setDeepLink] = useState(initialOpenId ?? null);
+  if (pagedRows !== rows) {
+    setPagedRows(rows);
+    // a ?open= link lands on the page that holds that listing
+    const i = deepLink ? rows.findIndex((r) => r.listing_id === deepLink) : -1;
+    setPage(i >= 0 ? Math.floor(i / PAGE_SIZE) : 0);
+    if (i >= 0) setDeepLink(null);
+  }
+  const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const pageIdx = Math.min(page, pageCount - 1);
+  const pageRows = useMemo(() => rows.slice(pageIdx * PAGE_SIZE, (pageIdx + 1) * PAGE_SIZE), [rows, pageIdx]);
+  const listTopRef = useRef<HTMLDivElement>(null);
+  const goToPage = (p: number) => {
+    setPage(Math.max(0, Math.min(pageCount - 1, p)));
+    setOpenId(null);
+    listTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+  /** Flip to the page holding a listing, so it can be opened and scrolled to. */
+  const showListing = (id: string) => {
+    const i = rows.findIndex((r) => r.listing_id === id);
+    if (i >= 0) setPage(Math.floor(i / PAGE_SIZE));
+  };
 
   const stats = useMemo(() => {
     const props = rows.filter((r): r is ListingSignal => r.category === "Property");
@@ -2245,6 +2325,7 @@ function ActiveListings({
               onClose={() => setPopupId(null)}
               onDetails={() => {
                 setPopupId(null);
+                showListing(popupListing.listing_id);
                 setOpenId(popupListing.listing_id);
                 window.setTimeout(() => scrollToRow(`row-${popupListing.listing_id}`, "start"), 50);
               }}
@@ -2259,14 +2340,17 @@ function ActiveListings({
         allListings={listings ?? []}
         selectedId={openId}
         hoveredId={hoverId}
-        onSelect={(id) => setOpenId(id || null)}
+        onSelect={(id) => {
+          if (id) showListing(id);
+          setOpenId(id || null);
+        }}
         onHover={setHoverId}
         onExit={closeFullMap}
         renderDetails={(l) => <ListingDetails l={l} />}
       />
 
       {/* list */}
-      <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
+      <div ref={listTopRef} className="mt-8 flex scroll-mt-24 flex-wrap items-center justify-between gap-3">
         <p className="font-display text-[18px] font-bold text-zinc-950">
           {listings ? `${int.format(stats.count)} listing${stats.count === 1 ? "" : "s"}` : "Loading listings…"}
         </p>
@@ -2304,7 +2388,7 @@ function ActiveListings({
             </button>
           </li>
         )}
-        {rows.map((l) => {
+        {pageRows.map((l) => {
           const open = openId === l.listing_id;
           return (
             <li key={l.listing_id} data-row={`row-${l.listing_id}`} className={`relative scroll-mt-24 ${open ? "bg-mint-soft" : ""}`}>
@@ -2367,6 +2451,9 @@ function ActiveListings({
           );
         })}
       </ul>
+      <div className="md:hidden">
+        <Pager page={pageIdx} count={pageCount} total={rows.length} onPage={goToPage} />
+      </div>
 
       <div className="relative mt-3 hidden md:block">
       <div aria-hidden className={`pointer-events-none absolute inset-y-0 left-0 z-20 w-4 bg-gradient-to-r from-white to-transparent transition-opacity ${edge.left ? "opacity-100" : "opacity-0"}`} />
@@ -2426,7 +2513,7 @@ function ActiveListings({
                 </td>
               </tr>
             )}
-            {rows.map((l) => {
+            {pageRows.map((l) => {
               const open = openId === l.listing_id;
               const hot = hoverId === l.listing_id;
               const vsPct = l.category === "Property" ? l.price_vs_comps_pct : l.price_vs_district_pct;
@@ -2534,6 +2621,7 @@ function ActiveListings({
           </tbody>
         </table>
       </div>
+      <Pager page={pageIdx} count={pageCount} total={rows.length} onPage={goToPage} />
       </div>
       <div className="mt-4 space-y-1 text-[11px] leading-relaxed text-zinc-500">
         <p>
