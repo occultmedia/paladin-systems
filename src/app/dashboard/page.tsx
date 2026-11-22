@@ -2262,11 +2262,7 @@ function ActiveListings({
         onSelect={(id) => setOpenId(id || null)}
         onHover={setHoverId}
         onExit={closeFullMap}
-        onOpenDetails={(id) => {
-          setFullMap(false);
-          setOpenId(id);
-          window.setTimeout(() => scrollToRow(`row-${id}`, "start"), 350);
-        }}
+        renderDetails={(l) => <ListingDetails l={l} />}
       />
 
       {/* list */}

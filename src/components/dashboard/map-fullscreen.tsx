@@ -14,7 +14,7 @@ import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
-import { LayoutList, Map as MapIcon, Megaphone, Pin, Plus, Search } from "lucide-react";
+import { ArrowLeft, LayoutList, Map as MapIcon, Megaphone, Pin, Plus, Search, X } from "lucide-react";
 import { Wordmark } from "@/components/logo";
 import { GrainField } from "@/components/landing/grain-field";
 import { PostCard } from "@/components/feed/feed-view";
@@ -331,7 +331,7 @@ export function MapFullscreen({
   onSelect,
   onHover,
   onExit,
-  onOpenDetails,
+  renderDetails,
 }: {
   open: boolean;
   listings: Listing[];
@@ -342,14 +342,20 @@ export function MapFullscreen({
   onHover: (id: string | null) => void;
   /** Leave full screen, landing on the normal view of this tab. */
   onExit: (tab: FullPanel) => void;
-  onOpenDetails: (id: string) => void;
+  /** The full property details, shown in a glass window over the map. */
+  renderDetails: (l: Listing) => React.ReactNode;
 }) {
   const [panel, setPanel] = useState<FullPanel>("Listings");
   const [mobileView, setMobileView] = useState<"Map" | FullPanel>("Map");
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onExit(panel);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (detailsOpen) setDetailsOpen(false);
+      else onExit(panel);
+    };
     document.addEventListener("keydown", onKey);
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -357,11 +363,16 @@ export function MapFullscreen({
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = prev;
     };
-  }, [open, onExit, panel]);
+  }, [open, onExit, panel, detailsOpen]);
 
   // Portals only exist in the browser; wait until after hydration (the page can open in full screen).
   const mounted = useSyncExternalStore(noopSubscribe, () => true, () => false);
   const selected = allListings.find((l) => l.listing_id === selectedId) ?? null;
+  const showDetails = detailsOpen && selected !== null && panel !== "Deals";
+  const closeAll = () => {
+    setDetailsOpen(false);
+    onSelect("");
+  };
   const pick = (id: string) => {
     onSelect(id);
     setMobileView("Map");
@@ -455,8 +466,8 @@ export function MapFullscreen({
               </div>
             )}
 
-            {/* map */}
-            <div className="relative min-w-0 flex-1">
+            {/* map (isolated, so its pins never paint over the Deals board) */}
+            <div className={`relative isolate min-w-0 flex-1 ${panel === "Deals" ? "lg:invisible" : ""}`}>
               <ArubaMap
                 mode="listings"
                 listings={listings}
@@ -469,17 +480,55 @@ export function MapFullscreen({
 
               {/* the picked listing opens as a glass window on the map */}
               <AnimatePresence>
-                {selected && mobileView === "Map" && panel !== "Deals" && (
+                {selected && !showDetails && mobileView === "Map" && panel !== "Deals" && (
                   <ListingPopup
                     key={selected.listing_id}
                     l={selected}
-                    onClose={() => onSelect("")}
-                    onDetails={() => onOpenDetails(selected.listing_id)}
+                    onClose={closeAll}
+                    onDetails={() => setDetailsOpen(true)}
                     className="absolute inset-x-3 bottom-3 sm:inset-x-auto sm:right-4 sm:top-14 sm:bottom-auto sm:w-[360px]"
                   />
                 )}
               </AnimatePresence>
             </div>
+
+            {/* Full details: a large glass window over the map, beside the list */}
+            <AnimatePresence>
+              {showDetails && selected && (
+                <motion.div
+                  key="details"
+                  role="dialog"
+                  aria-label={`${selected.asset_name}, full details`}
+                  initial={{ opacity: 0, y: 16, scale: 0.985 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 12, scale: 0.99 }}
+                  transition={{ duration: 0.32, ease: EASE }}
+                  className="glass absolute inset-0 z-[6] flex flex-col overflow-hidden lg:inset-y-3 lg:left-[404px] lg:right-3 lg:rounded-2xl"
+                >
+                  <div className="flex shrink-0 items-center justify-between gap-3 border-b border-white/60 px-4 py-3">
+                    <button
+                      type="button"
+                      onClick={() => setDetailsOpen(false)}
+                      className="inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[12.5px] font-semibold text-zinc-600 transition-colors hover:bg-white/70 hover:text-zinc-950"
+                    >
+                      <ArrowLeft size={14} /> Back to map
+                    </button>
+                    <p className="min-w-0 truncate font-display text-[15px] text-zinc-950">{selected.asset_name}</p>
+                    <button
+                      type="button"
+                      onClick={closeAll}
+                      aria-label="Close"
+                      className="glass grid size-8 shrink-0 place-items-center rounded-full text-zinc-900 transition-transform hover:scale-105"
+                    >
+                      <X size={15} strokeWidth={2.2} />
+                    </button>
+                  </div>
+                  <div data-lenis-prevent className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 sm:p-4">
+                    {renderDetails(selected)}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* phones / tablets: a panel over the map */}
             <AnimatePresence>
