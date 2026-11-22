@@ -60,6 +60,9 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_member();
 
+-- Only the trigger runs this; nobody can call it through the API.
+revoke all on function public.handle_new_member() from public, anon, authenticated;
+
 -- Feed posts --------------------------------------------------------------
 create table if not exists public.feed_posts (
   id          uuid primary key default gen_random_uuid(),
