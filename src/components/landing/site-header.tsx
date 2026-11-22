@@ -12,6 +12,7 @@ const LINKS: Array<[string, string]> = [
   ["For agents", "#agents"],
   ["For investors", "#investors"],
   ["Pricing", "#pricing"],
+  ["FAQ", "#faq"],
 ];
 
 export function SiteHeader() {

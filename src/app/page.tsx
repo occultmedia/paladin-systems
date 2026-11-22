@@ -14,7 +14,8 @@ import { scoreConfidence } from "@/lib/confidence";
 import { MARKET_TOTAL, marketBrief, scanRows } from "@/lib/scan-data";
 import { ClientsPane, HistoryPane, TerminalPreview, type PreviewData } from "@/components/landing/terminal-preview";
 import { MotionRoot, Reveal, Stagger, StaggerItem } from "@/components/motion/reveal";
-import { CONTACT_EMAIL, PLANS, SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/site";
+import { CONTACT_EMAIL, PLANS, SITE_DESCRIPTION, SITE_NAME, SITE_URL, YEARLY_SAVINGS_USD } from "@/lib/site";
+import { Faq, type FaqItem } from "@/components/landing/faq";
 import {
   ALL_LISTINGS,
   SCRAPE_RUNS,
@@ -447,6 +448,57 @@ function ListingCard({ l }: { l: Listing }) {
   );
 }
 
+/* ── FAQ ─────────────────────────────────────────────────────────────── */
+
+const FAQ: FaqItem[] = [
+  {
+    q: "Where does Terminal get its listings?",
+    a: `Every morning Terminal reads the public listing pages of Aruba's real estate agencies, brokers and developers (${AGENCIES} websites today) and collects every home, condo, villa, plot of land and commercial property for sale. Each listing shows the agency's logo and links back to the original page on its website.`,
+  },
+  {
+    q: "How often is the data updated?",
+    a: "Once a day, early in the morning, Aruba time. Each run picks up new listings, price changes and properties that went under contract, sold or came off the market, and adds them to the daily feed and to the price history of every listing.",
+  },
+  {
+    q: "What do Undervalued, At market and Overpriced mean?",
+    a: "Homes and condos are compared on price per square foot with similar listings: the same kind of property in the same district, or island-wide when a district has fewer than 3. Land and commercial property are compared with the district average. 10% or more below is Undervalued, 10% or more above is Overpriced, anything in between is At market.",
+  },
+  {
+    q: "What is the Confidence Score?",
+    a: "A score from 0 to 100 for how sure Terminal is that a listing is really still for sale. Agency sites often leave listings up long after a deal closes. The score starts at 100 and drops when a listing disappears from its source website, stays on the market for more than 6 months (more again after a year), or keeps the same price for more than 4 months.",
+  },
+  {
+    q: "What if a listing has already been sold?",
+    a: "Flag it from the listing. A flagged listing is marked as gone, its Confidence Score drops to 0 and it is removed from the market view for every member, so nobody else wastes a call on it.",
+  },
+  {
+    q: "Does Terminal sell property or act as an agent?",
+    a: "No. Terminal is a market intelligence tool, not a broker or a listing portal. Every listing belongs to the agency that published it, and the call, WhatsApp and e-mail buttons go straight to that agency's listing agent.",
+  },
+  {
+    q: "Is the AI Signal financial advice?",
+    a: "No. AI Signal writes a daily market briefing and a plain-English note on each listing from the same data you see in the table: price history, comparable listings and time on the market. Treat it as a starting point and check the details with the listing agent before you make an offer.",
+  },
+  {
+    q: "Who can see my watchlist, clients and Deals posts?",
+    a: "Your watchlist and the interested clients you save on a listing are yours alone. Posts on the Deals board (off-market deals, buyer requests and rentals) are shared with every member, because that is what the board is for.",
+  },
+  {
+    q: "How much does it cost?",
+    a: `One plan with everything in it: $${PLANS.monthly.price} a month, or $${PLANS.yearly.price.toLocaleString("en-US")} a year, which saves $${YEARLY_SAVINGS_USD}. Teams that need several seats can contact us for team access.`,
+  },
+  {
+    q: "My agency's listings are missing or wrong. What do I do?",
+    a: `E-mail ${CONTACT_EMAIL} with your website address and we will add it to the daily run or fix the listing.`,
+  },
+];
+
+const faqJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: FAQ.map(({ q, a }) => ({ "@type": "Question", name: q, acceptedAnswer: { "@type": "Answer", text: a } })),
+};
+
 /* ── page ────────────────────────────────────────────────────────────── */
 
 export default function Home() {
@@ -457,6 +509,7 @@ export default function Home() {
     <div className="relative min-h-screen bg-white font-sans text-zinc-800 antialiased selection:bg-lime selection:text-zinc-950">
       <div aria-hidden className="pointer-events-none absolute inset-y-0 left-1/2 z-[5] hidden w-full max-w-[1240px] -translate-x-1/2 border-x border-zinc-200 md:block" />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
 
       <SiteHeader />
 
@@ -951,6 +1004,31 @@ export default function Home() {
               </StaggerItem>
             </Stagger>
             </div>
+          </div>
+        </section>
+
+        {/* FAQ */}
+        <section id="faq" className="relative scroll-mt-16 overflow-hidden bg-white">
+          <div aria-hidden className="pointer-events-none absolute -right-24 top-24 size-[380px] rounded-full bg-lime/25 blur-3xl" />
+          <div className="relative mx-auto grid max-w-[1240px] gap-10 px-5 py-16 sm:px-6 sm:py-24 lg:grid-cols-[0.8fr_1.2fr] lg:gap-16">
+            <div className="lg:sticky lg:top-28 lg:self-start">
+              <SectionHeading
+                eyebrow="FAQ"
+                title="How Terminal works."
+                body="Where the listings come from, how often they update and what the numbers mean."
+              />
+              <Reveal>
+                <p className="mt-6 text-[14px] text-zinc-500">
+                  Still have a question?{" "}
+                  <a href={`mailto:${CONTACT_EMAIL}`} className="font-medium text-zinc-950 underline decoration-lime decoration-2 underline-offset-4">
+                    E-mail us
+                  </a>
+                </p>
+              </Reveal>
+            </div>
+            <Reveal>
+              <Faq items={FAQ} />
+            </Reveal>
           </div>
         </section>
 
