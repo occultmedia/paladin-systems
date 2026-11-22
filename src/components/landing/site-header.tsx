@@ -8,9 +8,9 @@ import { NavAuth } from "@/components/auth/nav-auth";
 import { Wordmark } from "@/components/logo";
 
 const LINKS: Array<[string, string]> = [
-  ["AI", "#ai-signal"],
-  ["For agents", "#agents"],
-  ["For investors", "#investors"],
+  ["How it works", "#how"],
+  ["Who it's for", "#who"],
+  ["Features", "#features"],
   ["Pricing", "#pricing"],
   ["FAQ", "#faq"],
 ];

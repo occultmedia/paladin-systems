@@ -231,12 +231,12 @@ export function Hero({
         </motion.a>
 
         <motion.h1 {...fade(0.08)} className="mt-6 font-display text-[clamp(40px,6vw,72px)] leading-[1.02] tracking-[-0.035em] text-[#15171C]">
-          The market terminal <br className="hidden sm:block" />
-          for Aruba real estate.
+          Every property for sale in Aruba. <br className="hidden sm:block" />
+          One screen.
         </motion.h1>
 
         <motion.p {...fade(0.16)} className="mt-6 max-w-[34rem] text-[16.5px] leading-relaxed text-zinc-500 sm:text-[17.5px]">
-          Every morning Terminal scrapes every real estate website in Aruba, tracks what changed and lets AI analyze it: new listings, price cuts and what each property is worth against its comps. Built for agents, brokers and investors.
+          Terminal checks every agency website each morning and shows you what changed and what each listing is really worth. Built for agents, brokers and investors.
         </motion.p>
 
         <motion.div {...fade(0.24)} className="mt-8 flex items-center gap-2.5">
