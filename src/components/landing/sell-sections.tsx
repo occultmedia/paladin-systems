@@ -254,7 +254,7 @@ export function InvestorsSection({ ex }: { ex: InvestorExample }) {
                 <span className="inline-flex items-center gap-2 rounded-full bg-zinc-950 px-4 py-2 text-[12.5px] font-semibold text-lime">Contact {ex.post.name.split(" ")[0]}</span>
               </div>
             </div>
-            <div className="absolute -right-2 -top-4 hidden rounded-2xl border border-zinc-200 bg-white px-4 py-3 shadow-lg sm:block">
+            <div className="glass absolute -right-2 -top-4 z-30 hidden rounded-2xl px-4 py-3 sm:block">
               <p className="font-display text-[22px] font-bold leading-none text-zinc-950">{ex.undervalued}</p>
               <p className="mt-1 text-[11px] text-zinc-500">undervalued today</p>
             </div>

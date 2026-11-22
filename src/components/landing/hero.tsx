@@ -163,7 +163,7 @@ function TerminalWindow({
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 6 }}
                 transition={{ duration: 0.4, ease: EASE }}
-                className="pointer-events-none absolute bottom-4 left-4 right-4 max-w-[300px] rounded-xl bg-white p-3.5 shadow-[0_12px_32px_-8px_rgb(15_23_42/0.25)] ring-1 ring-black/5"
+                className="pointer-events-none absolute bottom-4 left-4 right-4 max-w-[300px] rounded-xl p-3.5 glass"
               >
                 <p className="flex items-center gap-1.5 text-[11.5px] font-medium text-zinc-500">
                   <span className="size-1.5 rounded-full" style={{ background: DOT[event.tone] }} />
@@ -223,7 +223,7 @@ export function Hero({
   return (
     <section ref={ref} className="relative w-full bg-white" aria-label="Terminal: Aruba real estate market intelligence">
       <div className="mx-auto flex max-w-[1240px] flex-col items-center px-5 pb-16 pt-32 text-center sm:pb-20 sm:pt-40">
-        <motion.a {...fade(0)} href="#ai-signal" className="group inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white py-1 pl-1 pr-3 text-[13px] text-zinc-600 transition-colors hover:border-zinc-300">
+        <motion.a {...fade(0)} href="#ai-signal" className="glass group inline-flex items-center gap-2 rounded-full py-1 pl-1 pr-3 text-[13px] text-zinc-600 transition-colors hover:border-zinc-300">
           <span className="rounded-full bg-lime px-2 py-0.5 text-[11.5px] font-medium text-zinc-950">New</span>
           <span className="sm:hidden">AI Signal prices every listing</span>
           <span className="hidden sm:inline">AI Signal now prices every listing against its comps</span>

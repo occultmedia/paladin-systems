@@ -30,7 +30,7 @@ export function SiteHeader() {
   return (
     <header
       className={`fixed inset-x-0 top-0 z-[1000] transition-[background-color,border-color,backdrop-filter] duration-300 ${
-        solid ? "border-b border-zinc-200 bg-white/85 backdrop-blur-md" : "border-b border-zinc-200 bg-white"
+        solid ? "border-b border-white/70 bg-white/60 shadow-[0_1px_0_rgb(10_10_10/0.06),0_10px_30px_-18px_rgb(10_10_10/0.25)] backdrop-blur-xl backdrop-saturate-150" : "border-b border-zinc-200 bg-white"
       }`}
     >
       <div className="mx-auto flex h-16 max-w-[1240px] items-center justify-between px-5 sm:px-6">

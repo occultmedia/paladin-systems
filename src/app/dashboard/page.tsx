@@ -17,7 +17,8 @@ import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
+import { ListingPopup, ViewToggle } from "@/components/dashboard/listing-popup";
 import { Wordmark } from "@/components/logo";
 import { FeedView } from "@/components/feed/feed-view";
 import { SettingsView } from "@/components/settings/settings-view";
@@ -69,7 +70,6 @@ import {
   Flag,
   Info,
   Settings as SettingsIcon,
-  Maximize2,
   ShieldCheck,
   Undo2,
   LayoutList,
@@ -1863,6 +1863,7 @@ function ActiveListings({
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "listed", dir: "asc" });
   const [openId, setOpenId] = useState<string | null>(initialOpenId ?? null);
   const [hoverId, setHoverId] = useState<string | null>(null);
+  const [popupId, setPopupId] = useState<string | null>(null);
   const [fullMap, setFullMap] = useState(Boolean(initialFullMap));
   const closeFullMap = useCallback((tab: FullPanel = "Listings") => {
     setFullMap(false);
@@ -2003,10 +2004,9 @@ function ActiveListings({
     setReliableOnly(false);
   };
 
-  const selectFromMap = (id: string) => {
-    setOpenId(id);
-    requestAnimationFrame(() => scrollToRow(`row-${id}`));
-  };
+  // a pin opens the glass window on the map; Full details jumps to the row
+  const selectFromMap = (id: string) => setPopupId(id || null);
+  const popupListing = popupId ? rows.find((l) => l.listing_id === popupId) ?? null : null;
 
   const selectCls = `${MONO} rounded-md border border-zinc-300 bg-white px-3 py-2 text-[12px] text-zinc-800 outline-none transition-colors hover:border-zinc-500 focus:border-zinc-950`;
   const segBtn = (on: boolean) =>
@@ -2230,19 +2230,28 @@ function ActiveListings({
         <ArubaMap
           mode="listings"
           listings={rows}
-          selectedId={openId}
+          selectedId={popupId ?? openId}
           hoveredId={hoverId}
           onSelect={selectFromMap}
           onHover={setHoverId}
           height={560}
         />
-        <button
-          type="button"
-          onClick={() => setFullMap(true)}
-          className="absolute bottom-3 right-3 z-[3] inline-flex items-center gap-2 rounded-full bg-zinc-950 px-3.5 py-2 text-[12px] font-semibold text-lime shadow-lg ring-1 ring-black/10 transition-transform hover:-translate-y-px active:scale-[0.98] max-sm:bottom-auto max-sm:top-3"
-        >
-          <Maximize2 size={13} strokeWidth={2.2} /> Full-screen map
-        </button>
+        <ViewToggle value="normal" onChange={() => setFullMap(true)} className="absolute bottom-3 right-3 z-[5] max-sm:bottom-auto max-sm:top-3" />
+        <AnimatePresence>
+          {popupListing && (
+            <ListingPopup
+              key={popupListing.listing_id}
+              l={popupListing}
+              onClose={() => setPopupId(null)}
+              onDetails={() => {
+                setPopupId(null);
+                setOpenId(popupListing.listing_id);
+                window.setTimeout(() => scrollToRow(`row-${popupListing.listing_id}`, "start"), 50);
+              }}
+              className="absolute inset-x-3 bottom-16 sm:inset-x-auto sm:right-4 sm:top-14 sm:bottom-auto sm:w-[360px]"
+            />
+          )}
+        </AnimatePresence>
       </div>
       <MapFullscreen
         open={fullMap}
@@ -2303,7 +2312,7 @@ function ActiveListings({
           const open = openId === l.listing_id;
           return (
             <li key={l.listing_id} data-row={`row-${l.listing_id}`} className={`relative scroll-mt-24 ${open ? "bg-mint-soft" : ""}`}>
-              <span className="absolute left-1 top-5 z-10 rounded-full bg-white/90 shadow-sm">
+              <span className="glass absolute left-1 top-5 z-10 rounded-full">
                 <WatchButton l={l} variant="icon" />
               </span>
               <button

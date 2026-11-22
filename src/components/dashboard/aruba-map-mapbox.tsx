@@ -154,7 +154,7 @@ export default function ArubaMapMapbox(props: ArubaMapProps) {
         }}
         onPitchEnd={(e) => setIs3d(e.target.getPitch() > 10)}
       >
-        {interactive && <NavigationControl position="top-left" visualizePitch />}
+        {interactive && <NavigationControl position={fill ? "bottom-right" : "top-left"} visualizePitch />}
 
         {props.mode === "listings" &&
           props.listings.map((l) => {

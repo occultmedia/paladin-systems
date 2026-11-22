@@ -14,7 +14,7 @@ import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
-import { ArrowUpRight, LayoutList, Map as MapIcon, Megaphone, Minimize2, Pin, X, Plus, Search } from "lucide-react";
+import { LayoutList, Map as MapIcon, Megaphone, Pin, Plus, Search } from "lucide-react";
 import { Wordmark } from "@/components/logo";
 import { GrainField } from "@/components/landing/grain-field";
 import { PostCard } from "@/components/feed/feed-view";
@@ -23,6 +23,7 @@ import type { Listing } from "@/lib/aruba-data";
 import { POST_KINDS, useFeed, type PostKind } from "@/lib/feed";
 import { useWatchlist } from "@/lib/watchlist";
 import { AgencyLogo, SIGNAL_COLOR, SIGNAL_LABEL } from "./map-shared";
+import { ListingPopup, ViewToggle, kindOf, usdShort } from "./listing-popup";
 
 const ArubaMap = dynamic(() => import("./aruba-map"), {
   ssr: false,
@@ -39,14 +40,6 @@ const PANELS: Array<{ id: FullPanel; icon: typeof Pin }> = [
 ];
 
 const EASE = [0.22, 1, 0.36, 1] as const;
-const usdShort = (n: number) =>
-  n >= 1e6 ? `$${(n / 1e6).toFixed(2)}M` : `$${Math.round(n / 1000)}k`;
-const kindOf = (l: Listing) =>
-  l.category === "Property"
-    ? `${l.property_type} · ${l.bedrooms} bd`
-    : l.category === "Land"
-      ? `Land · ${l.zoning}`
-      : `Commercial · ${l.commercial_use}`;
 
 /* ── rows ────────────────────────────────────────────────────────────── */
 
@@ -76,7 +69,7 @@ function Row({
       onClick={onPick}
       onMouseEnter={() => onHover(l.listing_id)}
       onMouseLeave={() => onHover(null)}
-      className={`flex w-full items-center gap-3 rounded-xl p-2.5 text-left transition-colors ${on ? "bg-zinc-950 text-white" : "hover:bg-zinc-100"}`}
+      className={`flex w-full items-center gap-3 rounded-xl p-2.5 text-left transition-colors ${on ? "bg-zinc-950 text-white" : "hover:bg-white/70"}`}
     >
       <span className="relative shrink-0">
         {l.photo_url ? (
@@ -353,7 +346,6 @@ export function MapFullscreen({
 }) {
   const [panel, setPanel] = useState<FullPanel>("Listings");
   const [mobileView, setMobileView] = useState<"Map" | FullPanel>("Map");
-  const { isPinned, toggle } = useWatchlist();
 
   useEffect(() => {
     if (!open) return;
@@ -432,131 +424,22 @@ export function MapFullscreen({
                   <span className="absolute inline-flex size-full animate-ping rounded-full bg-lime opacity-70 motion-reduce:animate-none" />
                   <span className="relative inline-flex size-2 rounded-full bg-lime" />
                 </span>
-                Full screen ·{" "}
+                Dashboard view ·{" "}
                 <span className="text-white">{listings.length}</span> on the map
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => onExit(panel)}
-              className="inline-flex shrink-0 items-center gap-2 rounded-full border border-white/20 px-3.5 py-1.5 text-[12.5px] font-semibold transition-colors hover:border-lime hover:text-lime"
-            >
-              <Minimize2 size={14} />
-              <span className="hidden sm:inline">Exit to normal view</span>
-              <span className="sm:hidden">Exit</span>
-              <kbd className="hidden rounded border border-white/20 px-1 font-mono text-[10px] text-zinc-400 sm:inline">
-                Esc
-              </kbd>
-            </button>
+            <div className="flex shrink-0 items-center gap-2">
+              <ViewToggle tone="dark" value="dashboard" onChange={() => onExit(panel)} />
+              <kbd className="hidden rounded border border-white/20 px-1 font-mono text-[10px] text-zinc-400 md:inline">Esc</kbd>
+            </div>
           </div>
 
           <div className="relative flex min-h-0 flex-1">
             {/* side panel (desktop) */}
-            <aside className={`hidden w-[390px] shrink-0 flex-col border-r border-zinc-200 ${panel === "Deals" ? "" : "lg:flex"}`}>
-              <div className="border-b border-zinc-200 p-3">
+            <aside className={`glass absolute bottom-3 left-3 top-3 z-[4] hidden w-[380px] flex-col overflow-hidden rounded-2xl ${panel === "Deals" ? "" : "lg:flex"}`}>
+              <div className="border-b border-white/60 p-3">
                 <PanelTabs value={panel} onChange={setPanel} />
               </div>
-              <AnimatePresence mode="wait">
-                {selected && panel !== "Deals" && (
-                  <motion.div
-                    key={selected.listing_id}
-                    initial={{ opacity: 0, y: -6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.25, ease: EASE }}
-                    className="border-b border-zinc-200 p-4"
-                  >
-                    {selected.photo_url && (
-                      <Image
-                        src={`${selected.photo_url}?auto=format&fit=crop&w=720&h=400&q=70`}
-                        alt={selected.asset_name}
-                        width={358}
-                        height={180}
-                        unoptimized
-                        className="aspect-[2/1] h-auto w-full rounded-xl object-cover"
-                      />
-                    )}
-                    <div className="mt-3 flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate font-display text-[16px] font-bold text-zinc-950">
-                          {selected.asset_name}
-                        </p>
-                        <p className="truncate text-[12px] text-zinc-500">
-                          {selected.district} · {kindOf(selected)} ·{" "}
-                          {selected.agency.name}
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => onSelect("")}
-                        aria-label="Clear selection"
-                        className="grid size-7 shrink-0 place-items-center rounded-full text-zinc-400 hover:bg-zinc-100 hover:text-zinc-950"
-                      >
-                        <X size={14} />
-                      </button>
-                    </div>
-                    <dl className="mt-3 grid grid-cols-3 gap-2 text-[11px]">
-                      <div className="rounded-lg bg-zinc-50 p-2">
-                        <dt className="text-zinc-500">Asking</dt>
-                        <dd className="mt-0.5 font-display text-[14px] font-bold tabular-nums text-zinc-950">
-                          {usdShort(selected.asking_price_usd)}
-                        </dd>
-                      </div>
-                      <div className="rounded-lg bg-zinc-50 p-2">
-                        <dt className="text-zinc-500">$ / ft²</dt>
-                        <dd className="mt-0.5 font-display text-[14px] font-bold tabular-nums text-zinc-950">
-                          ${selected.price_per_sqft_usd.toLocaleString("en-US")}
-                        </dd>
-                      </div>
-                      <div className="rounded-lg bg-zinc-50 p-2">
-                        <dt className="text-zinc-500">Confidence</dt>
-                        <dd
-                          className="mt-0.5 font-display text-[14px] font-bold tabular-nums"
-                          style={{
-                            color:
-                              BAND_COLOR[
-                                confidenceBand(selected.confidence_score)
-                              ],
-                          }}
-                        >
-                          {selected.confidence_score}%
-                        </dd>
-                      </div>
-                    </dl>
-                    <div className="mt-3 flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => onOpenDetails(selected.listing_id)}
-                        className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-zinc-950 py-2.5 text-[13px] font-semibold text-lime transition-colors hover:bg-zinc-800"
-                      >
-                        Full details <ArrowUpRight size={14} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          toggle(selected.listing_id, selected.asking_price_usd)
-                        }
-                        aria-pressed={isPinned(selected.listing_id)}
-                        className={`inline-flex items-center gap-1.5 rounded-full border px-4 text-[12.5px] font-semibold transition-colors ${
-                          isPinned(selected.listing_id)
-                            ? "border-zinc-950 bg-lime text-zinc-950"
-                            : "border-zinc-300 text-zinc-800 hover:border-zinc-950"
-                        }`}
-                      >
-                        <Pin
-                          size={13}
-                          fill={
-                            isPinned(selected.listing_id)
-                              ? "currentColor"
-                              : "none"
-                          }
-                        />
-                        {isPinned(selected.listing_id) ? "Pinned" : "Pin"}
-                      </button>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
               <div
                 data-lenis-prevent
                 className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain p-2"
@@ -584,50 +467,16 @@ export function MapFullscreen({
                 fill
               />
 
-              {/* phones / tablets: selected listing card */}
+              {/* the picked listing opens as a glass window on the map */}
               <AnimatePresence>
-                {selected && mobileView === "Map" && (
-                  <motion.div
+                {selected && mobileView === "Map" && panel !== "Deals" && (
+                  <ListingPopup
                     key={selected.listing_id}
-                    initial={{ opacity: 0, y: 24 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 24 }}
-                    transition={{ duration: 0.3, ease: EASE }}
-                    className="absolute inset-x-3 bottom-3 z-[3] rounded-2xl border border-zinc-200 bg-white p-2 shadow-2xl lg:hidden"
-                  >
-                    <Row
-                      l={selected}
-                      on={false}
-                      onPick={() => onOpenDetails(selected.listing_id)}
-                      onHover={() => {}}
-                    />
-                    <div className="mt-1 flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => onOpenDetails(selected.listing_id)}
-                        className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-zinc-950 py-2.5 text-[13px] font-semibold text-lime"
-                      >
-                        Full details <ArrowUpRight size={14} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          toggle(selected.listing_id, selected.asking_price_usd)
-                        }
-                        className={`inline-flex items-center gap-1.5 rounded-xl border px-4 text-[12.5px] font-semibold ${isPinned(selected.listing_id) ? "border-zinc-950 bg-lime text-zinc-950" : "border-zinc-300 text-zinc-800"}`}
-                      >
-                        <Pin
-                          size={13}
-                          fill={
-                            isPinned(selected.listing_id)
-                              ? "currentColor"
-                              : "none"
-                          }
-                        />
-                        {isPinned(selected.listing_id) ? "Pinned" : "Pin"}
-                      </button>
-                    </div>
-                  </motion.div>
+                    l={selected}
+                    onClose={() => onSelect("")}
+                    onDetails={() => onOpenDetails(selected.listing_id)}
+                    className="absolute inset-x-3 bottom-3 sm:inset-x-auto sm:right-4 sm:top-14 sm:bottom-auto sm:w-[360px]"
+                  />
                 )}
               </AnimatePresence>
             </div>
