@@ -25,7 +25,7 @@ export function AiCapabilities({ ex }: { ex: AiExamples }) {
         <p className="text-[12.5px] font-medium text-zinc-500">01 · A verdict on every listing</p>
         <div className="mt-4 flex-1 rounded-xl bg-zinc-950 p-4 text-white">
           <p className="flex items-center justify-between text-[12px] font-medium text-zinc-400">
-            AI Signal <span className="rounded bg-lime px-1.5 py-px font-semibold text-zinc-950">{ex.note.verdict}</span>
+            AI Signal <span className="rounded bg-lime px-1.5 py-px font-semibold text-zinc-950">🔥 {ex.note.verdict}</span>
           </p>
           <p className="mt-2.5 text-[13.5px] font-semibold leading-snug">{ex.note.headline}</p>
           <p className="mt-2 text-[11.5px] text-zinc-400">

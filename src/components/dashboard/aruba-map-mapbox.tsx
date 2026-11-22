@@ -11,7 +11,7 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Map, { Marker, NavigationControl, Popup, type MapRef } from "react-map-gl/mapbox";
 import type { Listing, Signal } from "@/lib/aruba-data";
-import { HoverCard, PLATFORM_COLOR, RentalHoverCard, SIGNAL_COLOR, SIGNAL_LABEL, pinPrice, type ArubaMapProps } from "./map-shared";
+import { HotFlame, HoverCard, PLATFORM_COLOR, RentalHoverCard, SIGNAL_COLOR, SIGNAL_LABEL, pinPrice, type ArubaMapProps } from "./map-shared";
 import { PLATFORM_LABEL, type RentalPlatform } from "@/lib/aruba-data";
 
 const TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
@@ -180,6 +180,7 @@ export default function ArubaMapMapbox(props: ArubaMapProps) {
                     className={`sd-pin sd-pin-${shapeOf(l)}${active ? " sd-pin-active" : ""}`}
                     style={{ background: SIGNAL_COLOR[l.signal] }}
                   />
+                  {l.signal === "UNDERVALUED" && <HotFlame size={11} className="pointer-events-none absolute -right-1.5 -top-2 drop-shadow-[0_1px_1px_rgb(0_0_0/0.35)]" />}
                 </span>
               </Marker>
             );
@@ -327,6 +328,7 @@ export default function ArubaMapMapbox(props: ArubaMapProps) {
                 <span key={s} className="flex items-center gap-1.5">
                   <span className="size-2.5 rounded-full" style={{ background: SIGNAL_COLOR[s] }} />
                   {SIGNAL_LABEL[s]}
+                  {s === "UNDERVALUED" && <HotFlame size={11} />}
                 </span>
               ))}
               <span className="text-zinc-300">|</span>

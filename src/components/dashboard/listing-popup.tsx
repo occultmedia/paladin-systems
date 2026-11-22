@@ -13,7 +13,7 @@ import { ArrowUpRight, Pin, X } from "lucide-react";
 import { BAND_COLOR, confidenceBand } from "@/lib/confidence";
 import type { Listing } from "@/lib/aruba-data";
 import { useWatchlist } from "@/lib/watchlist";
-import { AgencyLogo, SIGNAL_COLOR, SIGNAL_LABEL } from "./map-shared";
+import { AgencyLogo, HotFlame, SIGNAL_COLOR, SIGNAL_LABEL } from "./map-shared";
 
 export const usdShort = (n: number) => (n >= 1e6 ? `$${(n / 1e6).toFixed(2)}M` : `$${Math.round(n / 1000)}k`);
 export const kindOf = (l: Listing) =>
@@ -75,6 +75,7 @@ export function ListingPopup({
         <span className="glass absolute bottom-2 left-2 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11.5px] font-semibold" style={{ color: SIGNAL_COLOR[l.signal] }}>
           <span className="size-1.5 rounded-full" style={{ background: SIGNAL_COLOR[l.signal] }} />
           {SIGNAL_LABEL[l.signal]}
+          {l.signal === "UNDERVALUED" && <HotFlame size={13} />}
         </span>
       </div>
 

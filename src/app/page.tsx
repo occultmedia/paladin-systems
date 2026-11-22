@@ -220,7 +220,7 @@ function heroData() {
     events.push({ ...at(c.listing), id: `px-${c.listing.listing_id}-${i}`, kind: p < 0 ? "Price cut" : "Price raised", tone: p < 0 ? "down" : "up", title: c.listing.asset_name, detail: `${c.listing.district} · ${c.listing.agency.name}`, value: `${pct(p)} → ${usdM(c.change.price_usd)}` });
   });
   if (best)
-    events.push({ ...at(best), id: `ai-${best.listing_id}`, kind: "AI Signal", tone: "up", title: best.asset_name, detail: `${usd(best.price_per_sqft_usd)}/ft² vs ${usd(best.comps_psf_usd)} for ${best.comps_count} comps`, value: `${pct(best.price_vs_comps_pct)} vs comps · Undervalued` });
+    events.push({ ...at(best), id: `ai-${best.listing_id}`, kind: "AI Signal", tone: "up", title: best.asset_name, detail: `${usd(best.price_per_sqft_usd)}/ft² vs ${usd(best.comps_psf_usd)} for ${best.comps_count} comps`, value: `${pct(best.price_vs_comps_pct)} vs comps · Undervalued 🔥` });
   status.forEach((l) => events.push({ ...at(l), id: `st-${l.listing_id}`, kind: l.status, tone: "warn", title: l.asset_name, detail: `${l.district} · ${l.agency.name}`, value: `Was ${usdM(l.asking_price_usd)}` }));
   if (fresh[1]) events.push({ ...at(fresh[1]), id: `new-${fresh[1].listing_id}`, kind: "New listing", tone: "mint", title: fresh[1].asset_name, detail: `${fresh[1].district} · ${fresh[1].agency.name}`, value: usdM(fresh[1].asking_price_usd) });
   if (doubt && doubt.confidence_score < 80)

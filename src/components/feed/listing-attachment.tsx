@@ -10,7 +10,7 @@ import Image from "next/image";
 import { ArrowUpRight, Building2, Search, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { ALL_LISTINGS, type Listing } from "@/lib/aruba-data";
-import { SIGNAL_COLOR, SIGNAL_LABEL } from "@/components/dashboard/map-shared";
+import { HotFlame, SIGNAL_COLOR, SIGNAL_LABEL } from "@/components/dashboard/map-shared";
 
 const BY_ID = new Map(ALL_LISTINGS.map((l) => [l.listing_id, l]));
 export const listingById = (id: string | null | undefined) => (id ? (BY_ID.get(id) ?? null) : null);
@@ -52,6 +52,7 @@ export function AttachedListing({ id, onOpen, compact = false }: { id: string | 
             <span className="inline-flex items-center gap-1 font-semibold" style={{ color: SIGNAL_COLOR[l.signal] }}>
               <span className="size-1.5 rounded-full" style={{ background: SIGNAL_COLOR[l.signal] }} />
               {SIGNAL_LABEL[l.signal]}
+              {l.signal === "UNDERVALUED" && <HotFlame size={12} />}
             </span>
             <span className="tabular-nums text-zinc-500">
               {pct > 0 ? "+" : ""}

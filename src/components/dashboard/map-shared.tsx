@@ -15,6 +15,15 @@ export const SIGNAL_LABEL: Record<Signal, string> = {
   OVERPRICED: "Overpriced",
 };
 
+/** 🔥 next to Undervalued: the AI rates it a great deal. */
+export function HotFlame({ size = 12, className = "" }: { size?: number; className?: string }) {
+  return (
+    <span role="img" aria-label="Great deal" title="Great deal: priced 10%+ below its comps" className={`hot-flame inline-block leading-none ${className}`} style={{ fontSize: size }}>
+      🔥
+    </span>
+  );
+}
+
 /** Asking-price moves: up = green, down = red, no change = orange. */
 export const priceColor = (n: number) => (n > 0 ? "#2E9E5B" : n < 0 ? "#D64545" : "#E08A1E");
 
@@ -131,7 +140,9 @@ export function HoverCard({ l }: { l: Listing }) {
           )}
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8, paddingTop: 8, borderTop: "1px solid #F4F4F5" }}>
-          <span style={{ color, fontSize: 11, fontWeight: 600 }}>● {SIGNAL_LABEL[l.signal]}</span>
+          <span style={{ color, fontSize: 11, fontWeight: 600 }}>
+            ● {SIGNAL_LABEL[l.signal]} {l.signal === "UNDERVALUED" && <HotFlame size={11} />}
+          </span>
           <span style={{ color: "#A1A1AA", fontSize: 11 }}>
             {l.is_new ? "Found today" : `${l.days_on_market} days listed`}
             {" · "}

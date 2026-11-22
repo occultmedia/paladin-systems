@@ -22,7 +22,7 @@ import { BAND_COLOR, confidenceBand } from "@/lib/confidence";
 import type { Listing } from "@/lib/aruba-data";
 import { POST_KINDS, useFeed, type PostKind } from "@/lib/feed";
 import { useWatchlist } from "@/lib/watchlist";
-import { AgencyLogo, SIGNAL_COLOR, SIGNAL_LABEL } from "./map-shared";
+import { HotFlame, AgencyLogo, SIGNAL_COLOR, SIGNAL_LABEL } from "./map-shared";
 import { ListingPopup, ViewToggle, kindOf, usdShort } from "./listing-popup";
 
 const ArubaMap = dynamic(() => import("./aruba-map"), {
@@ -107,6 +107,7 @@ function Row({
               style={{ background: SIGNAL_COLOR[l.signal] }}
             />
             {SIGNAL_LABEL[l.signal]}
+            {l.signal === "UNDERVALUED" && <HotFlame size={12} />}
           </span>
           {extra ?? (
             <span

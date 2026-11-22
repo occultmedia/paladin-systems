@@ -58,7 +58,7 @@ import {
   type Tenure,
   type VacationRental,
 } from "@/lib/aruba-data";
-import { AgencyLogo } from "@/components/dashboard/map-shared";
+import { HotFlame, AgencyLogo } from "@/components/dashboard/map-shared";
 import { Inter } from "next/font/google";
 import {
   ArrowRight,
@@ -526,6 +526,7 @@ function SignalBadge({ signal }: { signal: Signal }) {
     <span className={`${MONO} inline-flex items-center gap-2 text-[11px] uppercase tracking-wider`} style={{ color: s.color }}>
       <span className="h-1.5 w-1.5" style={{ background: s.color }} />
       {s.label}
+      {signal === "UNDERVALUED" && <HotFlame size={13} className="-ml-0.5" />}
     </span>
   );
 }

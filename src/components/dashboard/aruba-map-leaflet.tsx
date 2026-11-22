@@ -14,7 +14,7 @@ import { useEffect, useMemo } from "react";
 import L, { type LatLngBoundsExpression, type LatLngExpression } from "leaflet";
 import { CircleMarker, MapContainer, Marker, TileLayer, Tooltip, useMap } from "react-leaflet";
 import type { Listing, Signal } from "@/lib/aruba-data";
-import { HoverCard, PLATFORM_COLOR, RentalHoverCard, SIGNAL_COLOR, SIGNAL_LABEL, pinPrice, type ArubaMapProps } from "./map-shared";
+import { HotFlame, HoverCard, PLATFORM_COLOR, RentalHoverCard, SIGNAL_COLOR, SIGNAL_LABEL, pinPrice, type ArubaMapProps } from "./map-shared";
 
 const ARUBA_CENTER: LatLngExpression = [12.53, -70.0];
 const ARUBA_BOUNDS: LatLngBoundsExpression = [
@@ -185,6 +185,7 @@ export default function ArubaMapLeaflet(props: ArubaMapProps) {
                 <span key={s} className="flex items-center gap-1.5">
                   <span className="size-2.5 rounded-full" style={{ background: SIGNAL_COLOR[s] }} />
                   {SIGNAL_LABEL[s]}
+                  {s === "UNDERVALUED" && <HotFlame size={11} />}
                 </span>
               ))}
               <span className="text-zinc-300">|</span>
