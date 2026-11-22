@@ -141,7 +141,7 @@ async function uploadIfNew(uid: string, kind: "photo" | "logo", value?: string):
   if (!value.startsWith("data:")) return value; // already a stored URL
   const blob = dataUrlToBlob(value);
   const path = `${uid}/${kind}-${Date.now()}.${blob.type === "image/jpeg" ? "jpg" : "png"}`;
-  const { error } = await sb.storage.from("profile-media").upload(path, blob, { contentType: blob.type, upsert: true });
+  const { error } = await sb.storage.from("profile-media").upload(path, blob, { contentType: blob.type, cacheControl: "31536000", upsert: false });
   if (error) throw new Error(`Upload failed: ${error.message}`);
   return sb.storage.from("profile-media").getPublicUrl(path).data.publicUrl;
 }
@@ -201,8 +201,9 @@ export function useProfile() {
           try {
             stored = await persist(user.id, mergeSignup(stored, signup));
             clearLocal();
-          } catch {
-            /* keep the local copy and try again next time */
+          } catch (err) {
+            // Keep the local copy and try again on the next visit.
+            console.warn("Terminal: could not save the sign-up photo/logo yet.", err);
           }
         } else if (sameAccount && stored) {
           clearLocal();
