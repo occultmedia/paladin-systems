@@ -12,16 +12,17 @@
 import { createClient, type SupabaseClient, type User } from "@supabase/supabase-js";
 import { useEffect, useState } from "react";
 import type { Billing } from "./site";
+import type { Database } from "./database.types";
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 export const authConfigured = Boolean(URL && KEY);
 
-let client: SupabaseClient | null = null;
-export function supabase(): SupabaseClient | null {
+let client: SupabaseClient<Database> | null = null;
+export function supabase(): SupabaseClient<Database> | null {
   if (!authConfigured) return null;
-  return (client ??= createClient(URL!, KEY!, { auth: { persistSession: true, autoRefreshToken: true } }));
+  return (client ??= createClient<Database>(URL!, KEY!, { auth: { persistSession: true, autoRefreshToken: true } }));
 }
 
 export type Role = "Agent" | "Investor" | "Brokerage";

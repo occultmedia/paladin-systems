@@ -775,14 +775,8 @@ const mockRepository: DashboardRepository = {
  *     if (error) throw error;
  *     return data;
  *   },
- *   async getActiveListings(marketId) {
- *     const { data, error } = await supabase
- *       .from("v_active_listing_signals").select("*")
- *       .eq("market_id", marketId)
- *       .order("last_scraped", { ascending: false });
- *     if (error) throw error;
- *     return data;
- *   },
+ *   // v_master_market rows -> Listing (see lib/master-market.ts)
+ *   getActiveListings: (marketId) => fetchMasterMarket(supabase, marketId),
  * };
  */
 
