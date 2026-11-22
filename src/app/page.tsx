@@ -894,14 +894,22 @@ export default function Home() {
         </section>
 
         {/* Pricing */}
-        <section id="pricing" className="scroll-mt-16 bg-mint-soft">
+        <section id="pricing" className="relative scroll-mt-16 overflow-hidden bg-mint-soft">
           <div className="mx-auto max-w-[1240px] px-5 py-16 sm:px-6 sm:py-24">
             <Reveal className="text-center">
               <Eyebrow>Pricing</Eyebrow>
               <h2 className="mt-4 font-display text-[30px] font-bold tracking-tight text-zinc-950 sm:text-[44px]">One plan. The whole market.</h2>
             </Reveal>
-            <Stagger className="mx-auto mt-10 grid max-w-[1000px] gap-5 sm:mt-12 lg:grid-cols-[1.35fr_1fr]" gap={0.12}>
-              <StaggerItem className="relative rounded-3xl border-2 border-zinc-950 bg-white p-7 shadow-xl shadow-zinc-900/5 sm:p-10">
+            <div className="relative mx-auto mt-10 max-w-[1000px] sm:mt-12">
+            {/* soft shapes behind the glass so the frost has something to blur */}
+            <div aria-hidden className="pointer-events-none absolute inset-0">
+              <div className="absolute -left-10 top-6 size-[340px] rounded-full bg-lime/70 blur-3xl sm:size-[420px]" />
+              <div className="absolute bottom-0 left-[38%] size-[220px] rounded-full bg-zinc-950/25 blur-3xl" />
+              <div className="absolute -right-6 -top-6 size-[260px] rounded-full bg-[#d8f7b8] blur-3xl" />
+              <div className="hero-grain absolute inset-0 opacity-[0.25] mix-blend-overlay" />
+            </div>
+            <Stagger className="relative grid gap-5 lg:grid-cols-[1.35fr_1fr]" gap={0.12}>
+              <StaggerItem className="relative rounded-3xl border border-white/80 bg-white/50 shadow-[inset_0_1px_0_rgb(255_255_255/0.95),inset_0_0_0_1px_rgb(255_255_255/0.35),0_24px_60px_-28px_rgb(10_10_10/0.35)] ring-1 ring-zinc-950/[0.06] backdrop-blur-2xl backdrop-saturate-150 p-7 sm:p-10">
                 <RunLine speed={9} width={2} />
                 <p className="font-display text-[18px] font-bold text-zinc-950">Aruba</p>
                 <div className="mt-5">
@@ -926,7 +934,7 @@ export default function Home() {
                   ))}
                 </ul>
               </StaggerItem>
-              <StaggerItem className="flex flex-col justify-between rounded-3xl border border-zinc-200 bg-white p-7 sm:p-10">
+              <StaggerItem className="flex flex-col justify-between rounded-3xl border border-white/80 bg-white/50 shadow-[inset_0_1px_0_rgb(255_255_255/0.95),inset_0_0_0_1px_rgb(255_255_255/0.35),0_24px_60px_-28px_rgb(10_10_10/0.35)] ring-1 ring-zinc-950/[0.06] backdrop-blur-2xl backdrop-saturate-150 p-7 sm:p-10">
                 <div>
                   <p className="font-display text-[18px] font-bold text-zinc-950">Teams &amp; data access</p>
                   <p className="mt-4 font-display text-[40px] font-bold leading-none text-zinc-950">Custom</p>
@@ -936,12 +944,13 @@ export default function Home() {
                 </div>
                 <a
                   href={`mailto:${CONTACT_EMAIL}?subject=Terminal%20Team%20Access`}
-                  className="mt-8 inline-flex items-center gap-2 self-start rounded-full border-2 border-zinc-950 px-5 py-3 font-display text-[14px] font-semibold text-zinc-950 transition-colors hover:bg-zinc-950 hover:text-white"
+                  className="mt-8 inline-flex items-center gap-2 self-start rounded-full border border-zinc-950/15 bg-white/60 px-5 py-3 font-display text-[14px] font-semibold text-zinc-950 transition-colors hover:bg-zinc-950 hover:text-white"
                 >
                   Contact us <ArrowUpRight size={15} strokeWidth={2} />
                 </a>
               </StaggerItem>
             </Stagger>
+            </div>
           </div>
         </section>
 
