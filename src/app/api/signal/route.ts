@@ -3,9 +3,12 @@
  *   { kind: "brief" }                -> AI Signal market brief for the latest scrape
  *   { kind: "listing", id: string }  -> AI note for one listing
  *
- * The server builds the facts itself from the scrape data (the client only
- * sends an id), asks Claude for the write-up as structured JSON, and caches
- * the answer per scrape so each note is generated once a day per instance.
+ * Members only: the request carries the member's Supabase access token, and
+ * the server reads the live market with it (`v_master_market` and the agent
+ * listings that member can see), so row-level security decides what goes in.
+ * The server builds the facts itself (the client only sends an id), asks
+ * Claude for the write-up as structured JSON, and caches the answer until the
+ * listing or the market changes.
  * Without ANTHROPIC_API_KEY, or if the call fails, it returns the computed
  * note from the same facts with `source: "computed"`.
  *
@@ -14,7 +17,11 @@
  */
 
 import Anthropic from "@anthropic-ai/sdk";
-import { ALL_LISTINGS, SCRAPE_RUNS, SCRAPED_AT } from "@/lib/aruba-data";
+import { createClient } from "@supabase/supabase-js";
+import { MARKET_ID, buildScrapeRuns, type Listing } from "@/lib/aruba-data";
+import { agentRowToListing } from "@/lib/agent-listing-map";
+import type { AgentListingViewRow, Database } from "@/lib/database.types";
+import { fetchMasterMarket } from "@/lib/master-market";
 import {
   LISTING_NOTE_SCHEMA,
   MARKET_BRIEF_SCHEMA,
@@ -71,10 +78,41 @@ async function askClaude<T>(task: string, facts: unknown, schema: Record<string,
   }
 }
 
-async function buildListing(id: string): Promise<Cached | null> {
-  const l = ALL_LISTINGS.find((x) => x.listing_id === id);
-  if (!l) return null;
-  const facts = listingFacts(l, ALL_LISTINGS);
+/** The live market as this member sees it, or null when the token is missing or invalid. */
+async function marketFor(req: Request): Promise<{ uid: string; visible: Listing[]; shared: Listing[] } | null> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const token = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
+  if (!url || !key || !token) return null;
+  const sb = createClient<Database>(url, key, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { data: auth } = await sb.auth.getUser(token);
+  if (!auth.user) return null;
+  const [scraped, members] = await Promise.all([
+    fetchMasterMarket(sb, MARKET_ID),
+    sb.from("v_agent_listings").select("*").eq("market_id", MARKET_ID).then(({ data, error }) => {
+      if (error) throw error;
+      return (data ?? []) as AgentListingViewRow[];
+    }),
+  ]);
+  const mine = members.map((r) => agentRowToListing(r, scraped, auth.user.id));
+  const visible = [...mine, ...scraped];
+  // Comps and the brief only use what every member can see, so shared cache entries never carry anyone's private listings.
+  const shared = [...mine.filter((l) => l.member?.visibility === "members"), ...scraped];
+  return { uid: auth.user.id, visible, shared };
+}
+
+/** Changes whenever a listing is added, removed, repriced or changes status. */
+function fingerprint(listings: Listing[]) {
+  let h = 0;
+  for (const l of listings) for (const c of `${l.listing_id}:${l.asking_price_usd}:${l.status};`) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return `${listings.length}-${h.toString(36)}`;
+}
+
+async function buildListing(l: Listing, comps: Listing[]): Promise<Cached | null> {
+  const facts = listingFacts(l, comps.some((x) => x.listing_id === l.listing_id) ? comps : [l, ...comps]);
   const ai = await askClaude<ListingNote>(
     "Write the analyst note for this listing: a verdict (Opportunity, Fair value, Overpriced or Watch), a one-line headline, a 2-3 sentence analysis, 2-4 supporting points, and one concrete next step for the agent.",
     facts,
@@ -85,14 +123,15 @@ async function buildListing(id: string): Promise<Cached | null> {
   return { ...note, source: ok ? "claude" : "computed", generated_at: new Date().toISOString() };
 }
 
-async function buildBrief(): Promise<Cached> {
-  const facts = briefFacts(SCRAPE_RUNS, ALL_LISTINGS);
+async function buildBrief(all: Listing[]): Promise<Cached> {
+  const latest = all.map((l) => l.last_scraped).sort().pop() ?? new Date().toISOString();
+  const facts = briefFacts(buildScrapeRuns(all, [], 7, latest), all);
   const ai = await askClaude<MarketBrief>(
     "Write today's AI Signal briefing from the latest scrapes: a headline, a 2-3 sentence summary of what changed and what it says about the market, 3-5 takeaways, and up to 3 listings (by listing_id from the facts) worth looking at today with a one-line reason each.",
     facts,
     MARKET_BRIEF_SCHEMA,
   );
-  const ids = new Set(ALL_LISTINGS.map((l) => l.listing_id));
+  const ids = new Set(all.map((l) => l.listing_id));
   const ok = ai && ai.headline && Array.isArray(ai.points);
   const brief = ok ? { ...ai, points: ai.points.slice(0, 5), watch: ai.watch.filter((w) => ids.has(w.listing_id)).slice(0, 3) } : computedBrief(facts);
   return { ...brief, source: ok ? "claude" : "computed", generated_at: new Date().toISOString() };
@@ -119,14 +158,28 @@ export async function POST(req: Request) {
     return Response.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  if (body.kind === "brief") {
-    const brief = await cached(`brief:${SCRAPED_AT}`, buildBrief);
+  const isBrief = body.kind === "brief";
+  const isListing = body.kind === "listing" && typeof body.id === "string" && body.id.length < 64;
+  if (!isBrief && !isListing) return Response.json({ error: "Expected { kind: 'brief' } or { kind: 'listing', id }" }, { status: 400 });
+
+  let market: Awaited<ReturnType<typeof marketFor>>;
+  try {
+    market = await marketFor(req);
+  } catch (err) {
+    console.error("[signal] could not read the market", err);
+    return Response.json({ error: "Market unavailable" }, { status: 503 });
+  }
+  if (!market) return Response.json({ error: "Sign in to use AI Signal" }, { status: 401 });
+
+  if (isBrief) {
+    if (!market.shared.length) return Response.json({ error: "No listings yet" }, { status: 404 });
+    const brief = await cached(`brief:${fingerprint(market.shared)}`, () => buildBrief(market.shared));
     return Response.json(brief);
   }
-  if (body.kind === "listing" && typeof body.id === "string" && body.id.length < 64) {
-    const id = body.id;
-    const note = await cached(`listing:${id}:${SCRAPED_AT}`, () => buildListing(id));
-    return note ? Response.json(note) : Response.json({ error: "Unknown listing" }, { status: 404 });
-  }
-  return Response.json({ error: "Expected { kind: 'brief' } or { kind: 'listing', id }" }, { status: 400 });
+  // Only listings this member can see; the cache is checked after that.
+  const l = market.visible.find((x) => x.listing_id === body.id);
+  if (!l) return Response.json({ error: "Unknown listing" }, { status: 404 });
+  const key = `listing:${l.listing_id}:${l.asking_price_usd}:${l.status}:${l.last_scraped}:${fingerprint(market.shared)}`;
+  const note = await cached(key, () => buildListing(l, market.shared));
+  return note ? Response.json(note) : Response.json({ error: "Unknown listing" }, { status: 404 });
 }

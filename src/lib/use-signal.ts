@@ -1,16 +1,27 @@
 "use client";
 
-/* Client side of AI Signal: fetch the brief / a listing note once per visit. */
+/*
+ * Client side of AI Signal: fetch the brief / a listing note once per visit.
+ * Sends the member's access token; the server reads the live market with it.
+ */
 
 import { useEffect, useState } from "react";
+import { supabase } from "./auth";
 import type { ListingNote, MarketBrief, WithSource } from "./signal-ai";
 
 const memo = new Map<string, Promise<unknown>>();
 
+async function authHeader(): Promise<Record<string, string>> {
+  const token = (await supabase()?.auth.getSession())?.data.session?.access_token;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 function load<T>(key: string, body: object): Promise<T> {
   let p = memo.get(key) as Promise<T> | undefined;
   if (!p) {
-    p = fetch("/api/signal", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then((r) => {
+    p = authHeader().then((auth) =>
+      fetch("/api/signal", { method: "POST", headers: { "Content-Type": "application/json", ...auth }, body: JSON.stringify(body) }),
+    ).then((r) => {
       if (!r.ok) throw new Error(`AI Signal ${r.status}`);
       return r.json() as Promise<T>;
     });
@@ -41,8 +52,10 @@ function useSignal<T>(key: string | null, body: object | null): State<T> & { loa
   return { ...current, loading: !!key && !current.data && !current.error };
 }
 
-export const useMarketBrief = (enabled = true) =>
-  useSignal<WithSource<MarketBrief>>(enabled ? "brief" : null, enabled ? { kind: "brief" } : null);
+/** `version` changes when the market does (null = no listings yet, nothing to brief). */
+export const useMarketBrief = (version: string | null) =>
+  useSignal<WithSource<MarketBrief>>(version ? `brief:${version}` : null, version ? { kind: "brief" } : null);
 
-export const useListingNote = (id: string | null) =>
-  useSignal<WithSource<ListingNote>>(id ? `listing:${id}` : null, id ? { kind: "listing", id } : null);
+/** `version` changes when the listing does (price, status, last scrape). */
+export const useListingNote = (id: string | null, version = "") =>
+  useSignal<WithSource<ListingNote>>(id ? `listing:${id}:${version}` : null, id ? { kind: "listing", id } : null);

@@ -38,28 +38,24 @@ import { PLANS } from "@/lib/site";
 import type { AISource, Verdict } from "@/lib/signal-ai";
 import {
   COMMERCIAL_USES,
-  ALL_LISTINGS,
-  MARKET_ID,
+  arubaToday,
+  buildScrapeRuns,
   RESIDENTIAL_TYPES,
   LISTING_STATUSES,
-  SCRAPE_RUNS,
   STATUS_HINT,
   TENURES,
   TENURE_HINT,
   ZONINGS,
-  repository,
   type Listing,
   type ListingSignal,
-  type MarketSnapshot,
-  type MonthlyPerformance,
   type ListingStatus,
   type Pool,
   type PriceEvent,
   type ScrapeRun,
   type Signal,
   type Tenure,
-  type VacationRental,
 } from "@/lib/aruba-data";
+import { publishMarket, useMasterMarket } from "@/lib/live-market";
 import { HotFlame, AgencyLogo } from "@/components/dashboard/map-shared";
 import { Inter } from "next/font/google";
 import {
@@ -136,41 +132,6 @@ const ArubaMap = dynamic(() => import("@/components/dashboard/aruba-map"), {
   loading: () => <div className="h-[520px] w-full animate-pulse bg-zinc-100" />,
 });
 
-
-interface DashboardData {
-  snapshot: MarketSnapshot;
-  monthly: MonthlyPerformance[];
-  listings: ListingSignal[];
-  allListings: Listing[];
-  rentals: VacationRental[];
-}
-
-function useDashboardData(marketId: string) {
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    Promise.all([
-      repository.getMarketSnapshot(marketId),
-      repository.getMonthlyPerformance(marketId, 12),
-      repository.getActiveListingSignals(marketId, 5),
-      repository.getActiveListings(marketId),
-      repository.getVacationRentals(marketId),
-    ])
-      .then(([snapshot, monthly, listings, allListings, rentals]) => {
-        if (!cancelled) setData({ snapshot, monthly, listings, allListings, rentals });
-      })
-      .catch((e: unknown) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Feed unavailable");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [marketId]);
-
-  return { data, error, loading: !data && !error };
-}
 
 /* ─────────────────────────────────────────────────────────────────────────
  * Formatters
@@ -387,7 +348,7 @@ function AccountMenu({ compact = false, onProfile }: { compact?: boolean; onProf
   );
 }
 
-function Header({ tab, onTab, updates, onUpdates, watchCount, onProfile }: { tab: Tab; onTab: (t: Tab) => void; updates: number; onUpdates: () => void; watchCount: number; onProfile: () => void }) {
+function Header({ tab, onTab, updates, onUpdates, watchCount, onProfile, updatedAt }: { tab: Tab; onTab: (t: Tab) => void; updates: number; onUpdates: () => void; watchCount: number; onProfile: () => void; /** Latest scrape (ISO), null before the first one. */ updatedAt: string | null }) {
   return (
     <header className="deck relative isolate z-40 border-b border-white/[0.08]">
       <GrainField variant="ink" className="-z-10" />
@@ -422,7 +383,7 @@ function Header({ tab, onTab, updates, onUpdates, watchCount, onProfile }: { tab
               <span className="relative inline-flex h-1.5 w-1.5 rounded-full" style={{ background: C.up }} />
             </span>
             <span className={`${MONO} whitespace-nowrap text-[11px] tracking-wider text-zinc-500`}>
-              UPDATED TODAY <span className="text-zinc-200">{fmtRunTime(SCRAPE_RUNS[0].run_at)} AST</span>
+              UPDATED TODAY <span className="text-zinc-200">{updatedAt ? `${fmtRunTime(updatedAt)} AST` : "—"}</span>
             </span>
           </div>
           <button
@@ -1269,7 +1230,7 @@ function MemberTag({ l }: { l: Listing }) {
 }
 
 function ScrapeTags({ l }: { l: Listing }) {
-  const moved = l.last_price_change && l.last_price_change.date === SCRAPE_RUNS[0].date ? l.last_price_change : null;
+  const moved = l.last_price_change && l.last_price_change.date === arubaToday() ? l.last_price_change : null;
   return (
     <>
       <MemberTag l={l} />
@@ -1287,7 +1248,7 @@ function ScrapeTags({ l }: { l: Listing }) {
 }
 
 const relDay = (iso: string) => {
-  const days = Math.round((Date.parse(`${SCRAPE_RUNS[0].date}T00:00:00Z`) - Date.parse(`${iso}T00:00:00Z`)) / 86_400_000);
+  const days = Math.round((Date.parse(`${arubaToday()}T00:00:00Z`) - Date.parse(`${iso}T00:00:00Z`)) / 86_400_000);
   return days === 0 ? "today" : days === 1 ? "yesterday" : `${days} days ago`;
 };
 
@@ -1310,7 +1271,7 @@ function estMarketValue(l: Listing) {
 
 /** Asking price (step line, from the day we found it) and estimated market value over time. */
 function valueSeries(l: Listing) {
-  const today = dayTs(SCRAPE_RUNS[0].date);
+  const today = dayTs(arubaToday());
   const listed = dayTs(l.price_history[0].date);
   const start = Math.min(listed - 45 * DAY_MS, today - 270 * DAY_MS);
   const fair = estMarketValue(l);
@@ -1791,7 +1752,7 @@ function AIShimmer({ lines = 3, dark = false }: { lines?: number; dark?: boolean
 }
 
 function AINote({ l }: { l: Listing }) {
-  const { data, loading, error } = useListingNote(l.listing_id);
+  const { data, loading, error } = useListingNote(l.listing_id, `${l.asking_price_usd}:${l.status}:${l.last_scraped}`);
   return (
     <section aria-label="AI analysis" className="ai-ring mb-6 rounded-xl p-4 text-white [--ai-bg:#0b0b0d] sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1972,6 +1933,28 @@ function ListingDetails({ l }: { l: Listing }) {
           <PriceHistory l={l}  />
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Shown before the first scrape and before anyone has added a listing. */
+function EmptyMarket({ onAdd }: { onAdd?: () => void }) {
+  return (
+    <div className="mx-auto max-w-[46ch]">
+      <p className="font-display text-[17px] font-bold text-zinc-950">No listings yet</p>
+      <p className="mt-1.5 text-[13px] leading-relaxed text-zinc-500">
+        Listings appear here as soon as the daily scrape of Aruba&rsquo;s agency sites starts. Have an off-market property? Add it now and every
+        member sees it.
+      </p>
+      {onAdd && (
+        <button
+          type="button"
+          onClick={onAdd}
+          className="mt-4 inline-flex items-center gap-2 rounded-full bg-zinc-950 px-4 py-2 text-[12.5px] font-semibold text-lime transition-opacity hover:opacity-90"
+        >
+          <Plus size={13} strokeWidth={2} /> Add listing
+        </button>
+      )}
     </div>
   );
 }
@@ -2514,7 +2497,12 @@ function ActiveListings({
               <Skeleton className="h-20 w-full" />
             </li>
           ))}
-        {listings && !rows.length && (
+        {listings && !listings.length && (
+          <li className="py-12 text-center">
+            <EmptyMarket onAdd={actions?.add} />
+          </li>
+        )}
+        {listings && listings.length > 0 && !rows.length && (
           <li className="py-12 text-center text-[13px] text-zinc-500">
             No listings match these filters.{" "}
             <button type="button" onClick={clearAll} className="underline underline-offset-4">
@@ -2637,7 +2625,14 @@ function ActiveListings({
                   </td>
                 </tr>
               ))}
-            {listings && !rows.length && (
+            {listings && !listings.length && (
+              <tr>
+                <td colSpan={colCount} className="py-16 text-center">
+                  <EmptyMarket onAdd={actions?.add} />
+                </td>
+              </tr>
+            )}
+            {listings && listings.length > 0 && !rows.length && (
               <tr>
                 <td colSpan={colCount} className="py-16 text-center text-[13px] text-zinc-500">
                   No listings match these filters.{" "}
@@ -2814,7 +2809,7 @@ function watchUpdates(ids: Set<string>, runs: ScrapeRun[]): WatchUpdate[] {
   return out;
 }
 
-function Watchlist({ listings, onOpenListing, onBrowse }: { listings?: Listing[]; onOpenListing: (id: string) => void; onBrowse: () => void }) {
+function Watchlist({ listings, runs, onOpenListing, onBrowse }: { listings?: Listing[]; runs: ScrapeRun[]; onOpenListing: (id: string) => void; onBrowse: () => void }) {
   const { entries, unpin, setNote, clear } = useWatchlist();
   const [sort, setSort] = useState<WatchSort>("pinned");
   const [openId, setOpenId] = useState<string | null>(null);
@@ -2835,8 +2830,8 @@ function Watchlist({ listings, onOpenListing, onBrowse }: { listings?: Listing[]
   }, [entries, byId, sort]);
 
   const ids = useMemo(() => new Set(rows.map((r) => r.l.listing_id)), [rows]);
-  const updates = useMemo(() => watchUpdates(ids, SCRAPE_RUNS), [ids]);
-  const today = SCRAPE_RUNS[0].date;
+  const updates = useMemo(() => watchUpdates(ids, runs), [ids, runs]);
+  const today = runs[0].date;
   const todayCount = updates.filter((u) => u.date === today).length;
   const total = rows.reduce((a, r) => a + r.l.asking_price_usd, 0);
   const drops = rows.filter((r) => r.l.price_change_pct < 0).length;
@@ -3114,7 +3109,9 @@ function TerminalUpdates({
   onShowNew: () => void;
 }) {
   const latest = runs[0];
-  const brief = useMarketBrief();
+  // Re-brief when the market changes; nothing to brief before the first listing.
+  const version = allListings.length ? `${allListings.length}:${latest.date}:${latest.new_listings.length}:${latest.price_changes.length}:${latest.status_changes.length}` : null;
+  const brief = useMarketBrief(version);
   const drops = latest.price_changes.filter((c) => c.change.event === "Price drop").length;
   const ups = latest.price_changes.length - drops;
   const boxRef = useRef<HTMLDivElement>(null);
@@ -3154,7 +3151,15 @@ function TerminalUpdates({
           AI Signal
         </span>
         <span className="min-w-0 flex-1 basis-[260px] truncate text-zinc-200">
-          {brief.data ? brief.data.headline : brief.loading ? <span className="text-zinc-500">Reading today&apos;s scrape…</span> : `Updated today ${fmtRunTime(latest.run_at)} AST`}
+          {!allListings.length ? (
+            <span className="text-zinc-400">No listings yet. AI Signal starts reading the market with the first scrape.</span>
+          ) : brief.data ? (
+            brief.data.headline
+          ) : brief.loading ? (
+            <span className="text-zinc-500">Reading today&apos;s scrape…</span>
+          ) : (
+            `Updated today ${fmtRunTime(latest.run_at)} AST`
+          )}
         </span>
         <span className="flex items-center gap-3 text-zinc-400">
           <span>
@@ -3190,9 +3195,15 @@ function TerminalUpdates({
             <div className="flex items-center justify-between gap-2">
               <AIMark dark />
               <span className="text-[11px] text-zinc-500">
-                {fmtRunDay(latest, 0)} · {fmtRunTime(latest.run_at)} AST
+                {allListings.length ? `${fmtRunDay(latest, 0)} · ${fmtRunTime(latest.run_at)} AST` : "Waiting for the first scrape"}
               </span>
             </div>
+            {!allListings.length && (
+              <p className="mt-3 text-[13px] leading-relaxed text-zinc-300">
+                No listings yet. Once the daily scrape of Aruba&rsquo;s agency sites starts, AI Signal briefs you here every morning: what&rsquo;s new,
+                price cuts, status changes and the listings worth a look.
+              </p>
+            )}
             {brief.loading && (
               <div className="mt-4">
                 <AIShimmer lines={4} dark />
@@ -3245,6 +3256,7 @@ function TerminalUpdates({
               </>
             )}
           </section>
+          {allListings.length > 0 && (
           <div role="log" aria-label="Scrape log">
             <p className="px-4 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-950 sm:px-5">Scrape log</p>
             {runs.map((run, i) => (
@@ -3309,6 +3321,7 @@ function TerminalUpdates({
               </div>
             ))}
           </div>
+          )}
           </div>
           {latest.new_listings.length > 0 && (
             <button
@@ -3361,21 +3374,29 @@ function Dashboard() {
   });
   const [boardOpen, setBoardOpen] = useState(false);
   const toggleBoard = useCallback(() => setBoardOpen((o) => !o), []);
-  const updatesToday = SCRAPE_RUNS[0].new_listings.length + SCRAPE_RUNS[0].price_changes.length + SCRAPE_RUNS[0].status_changes.length;
-  const { data, error } = useDashboardData(MARKET_ID);
+  // Live Master Market from Supabase (empty until the scraper runs).
+  const { listings: scraped, error } = useMasterMarket();
   // Master Market view: flagged (archived) and zero-confidence listings are gone for everyone.
   const { flags } = useFlags();
   const me = useProfile();
   // Listings agents added by hand: Off-market ones for every member, Only me ones for their agent.
   const agentListings = useAgentListings(me.profile);
   const memberListings = useMemo(
-    () => (data ? agentListings.rows.map((r) => agentRowToListing(r, data.allListings, agentListings.myId)) : []),
-    [data, agentListings.rows, agentListings.myId],
+    () => (scraped ? agentListings.rows.map((r) => agentRowToListing(r, scraped, agentListings.myId)) : []),
+    [scraped, agentListings.rows, agentListings.myId],
   );
   const market = useMemo(
-    () => (data ? [...memberListings, ...data.allListings.filter((l) => l.confidence_score > 0 && !flags[l.listing_id])] : undefined),
-    [data, flags, memberListings],
+    () => (scraped && !agentListings.loading ? [...memberListings, ...scraped.filter((l) => l.confidence_score > 0 && !flags[l.listing_id])] : undefined),
+    [scraped, agentListings.loading, flags, memberListings],
   );
+  useEffect(() => publishMarket(market ?? []), [market]);
+  // Daily summaries (new, price moves, status changes) for the last 7 days, from the live listings.
+  const updatedAt = useMemo(() => {
+    const times = (scraped ?? []).map((l) => l.last_scraped).filter(Boolean).sort();
+    return times.length ? times[times.length - 1] : null;
+  }, [scraped]);
+  const runs = useMemo(() => buildScrapeRuns(market ?? [], [], 7, updatedAt ?? new Date().toISOString()), [market, updatedAt]);
+  const updatesToday = runs[0].new_listings.length + runs[0].price_changes.length + runs[0].status_changes.length;
   const [listingDialog, setListingDialog] = useState<{ open: boolean; id?: string }>({ open: false });
   const watchCount = useWatchlist().entries.length;
   const setTab = useCallback((t: Tab) => {
@@ -3420,7 +3441,7 @@ function Dashboard() {
   return (
     <MemberListingActions.Provider value={listingActions}>
     <div className={`${inter.className} min-h-screen overflow-x-clip bg-white text-zinc-800 antialiased selection:bg-lime selection:text-zinc-950`}>
-      <Header tab={tab} onTab={setTab} updates={updatesToday} onUpdates={openUpdates} watchCount={watchCount} onProfile={openProfile} />
+      <Header tab={tab} onTab={setTab} updates={updatesToday} onUpdates={openUpdates} watchCount={watchCount} onProfile={openProfile} updatedAt={updatedAt} />
 
       <main className="mx-auto max-w-[1400px] px-4 pb-20 sm:px-6">
         {error ? (
@@ -3429,7 +3450,7 @@ function Dashboard() {
           </div>
         ) : tab === "Listings" ? (
           <>
-            <TerminalUpdates runs={SCRAPE_RUNS} allListings={ALL_LISTINGS} open={boardOpen} onToggle={toggleBoard} onOpenListing={openListing} onShowNew={showNewToday} />
+            <TerminalUpdates runs={runs} allListings={market ?? []} open={boardOpen} onToggle={toggleBoard} onOpenListing={openListing} onShowNew={showNewToday} />
             <ActiveListings
               key={listingsView.key}
               listings={market}
@@ -3447,11 +3468,11 @@ function Dashboard() {
         ) : tab === "Settings" ? (
           <SettingsView profile={{ draft: me.draft, loading: me.loading }} onSaveProfile={me.save} shared={me.shared} />
         ) : (
-          <Watchlist listings={market} onOpenListing={openListing} onBrowse={() => setTab("Listings")} />
+          <Watchlist listings={market} runs={runs} onOpenListing={openListing} onBrowse={() => setTab("Listings")} />
         )}
       </main>
 
-      <FlagToast listings={data?.allListings} />
+      <FlagToast listings={scraped} />
 
       <AddListingDialog
         open={listingDialog.open}

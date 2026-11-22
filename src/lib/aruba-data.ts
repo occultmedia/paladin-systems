@@ -7,8 +7,16 @@
 
 import { scoreConfidence } from "./confidence";
 
-/** True once `repository` reads the scraped `property_master` data from Supabase. */
-export const LIVE_DATA = false;
+/**
+ * The Terminal (dashboard, Watchlist, Deals) reads only live Supabase data:
+ * `v_master_market` (scraped) and `v_agent_listings` (added by agents).
+ * The mock data below is kept only to illustrate the landing, login and
+ * sign-up pages.
+ */
+export const LIVE_DATA = true;
+
+/** Today's date in Aruba (AST, UTC-4, no daylight saving) as 'YYYY-MM-DD'. */
+export const arubaToday = (now = Date.now()) => new Date(now - 4 * 3600_000).toISOString().slice(0, 10);
 
 /* ─────────────────────────────────────────────────────────────────────────
  * Types — mirror the Supabase Postgres tables (snake_case on the wire)
@@ -1113,10 +1121,12 @@ export interface ScrapeRun {
   status_changes: Listing[]; // went under contract or sold in this scrape
 }
 
-export function buildScrapeRuns(listings: Listing[], rentals: VacationRental[], days = 7): ScrapeRun[] {
+/** One summary per day, newest first. `anchor` = the latest run (the mock scrape time, or now for live data). */
+export function buildScrapeRuns(listings: Listing[], rentals: VacationRental[], days = 7, anchor = SCRAPED_AT): ScrapeRun[] {
+  const live = anchor !== SCRAPED_AT;
   return Array.from({ length: days }, (_, ago) => {
-    const runAt = new Date(Date.parse(SCRAPED_AT) - ago * DAY).toISOString();
-    const date = runAt.slice(0, 10);
+    const runAt = new Date(Date.parse(anchor) - ago * DAY).toISOString();
+    const date = live ? arubaToday(Date.parse(anchor) - ago * DAY) : runAt.slice(0, 10);
     const price_changes: ScrapePriceChange[] = [];
     for (const l of listings) {
       l.price_history.forEach((e, i) => {

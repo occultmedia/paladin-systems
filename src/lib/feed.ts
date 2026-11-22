@@ -11,7 +11,7 @@
  *  - Supabase `deal_desk_feed` / `deal_desk_posts` / `deal_desk_interest`
  *    (see supabase/migrations/20261122000000_delta_pipeline.sql) once
  *    accounts are live.
- *  - This browser until then, plus sample posts so Deals is not empty.
+ *  - This browser until accounts are configured.
  */
 
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
@@ -87,96 +87,6 @@ export interface Responder {
 export const TITLE_MAX = 90;
 export const BODY_MAX = 600;
 
-/* ── sample posts (fictional people and companies) ─────────────────────── */
-
-const ago = (h: number) => new Date(Date.now() - h * 36e5).toISOString();
-const sample = (p: Omit<FeedPost, "expires_at" | "side" | "sample">): FeedPost => ({
-  ...p,
-  side: sideOf(p.kind),
-  expires_at: new Date(Date.parse(p.created_at) + TTL_MS).toISOString(),
-  sample: true,
-});
-
-const SAMPLES: FeedPost[] = [
-  sample({
-    id: "sample-1",
-    created_at: ago(2),
-    kind: "Off-market",
-    asset_class: "Property",
-    title: "4-bed villa in Malmok, owner wants a quiet sale",
-    body: "Ocean-view villa on a 1,100 m² lot, private pool, renovated 2023. Not listed anywhere. Owner will consider serious offers with proof of funds. Happy to co-broke 50/50.",
-    budget_min: 1_950_000,
-    budget_max: 2_150_000,
-    district: "Malmok",
-    blind: true,
-    author: { name: "", role: "Agent", company: "" },
-  }),
-  sample({
-    id: "sample-2",
-    created_at: ago(5),
-    kind: "Buyer request",
-    asset_class: "Property",
-    title: "Client looking for a beachfront condo, Eagle Beach",
-    body: "2-bed condo, walking distance to the beach, rental program allowed. Cash buyer from Toronto, can close within 60 days.",
-    budget_min: 700_000,
-    budget_max: 900_000,
-    district: "Eagle Beach",
-    blind: false,
-    author: { name: "Marcus Hale", role: "Agent", company: "Northshore Property Group" },
-  }),
-  sample({
-    id: "sample-3",
-    created_at: ago(30),
-    kind: "Partnership",
-    asset_class: "Land",
-    title: "Investor wanted: 6-unit rental project in Noord",
-    body: "Land secured and permits submitted for six 1-bed vacation units. Looking for a capital partner for 40%. Projections and drawings available on request.",
-    budget_min: null,
-    budget_max: 650_000,
-    district: "Noord",
-    blind: false,
-    author: { name: "Elena Vos", role: "Investor", company: "Coastline Ventures" },
-  }),
-  sample({
-    id: "sample-4",
-    created_at: ago(76),
-    kind: "Buyer request",
-    asset_class: "Land",
-    title: "Tourism-zoned plot wanted for a boutique hotel",
-    body: "Fund client looking for 30,000+ ft² of tourism-zoned land within 10 minutes of Palm Beach. Eigendom preferred, erfpacht considered.",
-    budget_min: 1_500_000,
-    budget_max: 3_000_000,
-    district: "Palm Beach",
-    blind: true,
-    author: { name: "", role: "Investor", company: "" },
-  }),
-  sample({
-    id: "sample-5",
-    created_at: ago(140),
-    kind: "For sale",
-    asset_class: "Commercial",
-    title: "Commercial unit on main road, Oranjestad: co-broke welcome",
-    body: "Ground floor retail, 180 m², currently leased until 2027. Good yield for an investor client. 3% to the buyer's agent.",
-    budget_min: null,
-    budget_max: 780_000,
-    district: "Oranjestad",
-    blind: false,
-    author: { name: "Sofia Martens", role: "Agent", company: "Harbor Lane Real Estate" },
-  }),
-  sample({
-    id: "sample-6",
-    created_at: ago(210),
-    kind: "For rent",
-    asset_class: "Property",
-    title: "Furnished 3-bed house, long-term, Tierra del Sol",
-    body: "Available from January. Golf course view, 12-month minimum. Suits a relocating family or executive.",
-    budget_min: null,
-    budget_max: 4_200,
-    district: "Tierra del Sol",
-    blind: false,
-    author: { name: "Ricardo Lopes", role: "Brokerage", company: "Island Key Homes" },
-  }),
-];
 
 /* ── local (this browser) ─────────────────────────────────────────────── */
 
@@ -409,7 +319,7 @@ export function useFeed(author: Profile | null) {
       ? remote && remote.uid === user?.id
         ? remote.posts
         : []
-      : [...local.map((p) => (author ? { ...p, author } : p)), ...SAMPLES].map((p) => ({ ...p, interested: localInterest.includes(p.id) }));
+      : [...local.map((p) => (author ? { ...p, author } : p)) ].map((p) => ({ ...p, interested: localInterest.includes(p.id) }));
     return all.filter((p) => isLive(p, now)).sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
   }, [remoteMode, remote, user, local, localInterest, author, now]);
 

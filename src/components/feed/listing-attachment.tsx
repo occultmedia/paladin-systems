@@ -9,11 +9,10 @@
 import Image from "next/image";
 import { ArrowUpRight, Building2, Search, X } from "lucide-react";
 import { useMemo, useState } from "react";
-import { ALL_LISTINGS, type Listing } from "@/lib/aruba-data";
+import type { Listing } from "@/lib/aruba-data";
+import { useListingById, useMarketListings } from "@/lib/live-market";
 import { HotFlame, SIGNAL_COLOR, SIGNAL_LABEL } from "@/components/dashboard/map-shared";
 
-const BY_ID = new Map(ALL_LISTINGS.map((l) => [l.listing_id, l]));
-export const listingById = (id: string | null | undefined) => (id ? (BY_ID.get(id) ?? null) : null);
 
 const usdShort = (n: number) => (n >= 1e6 ? `$${(n / 1e6).toFixed(2)}M` : `$${Math.round(n / 1000)}k`);
 const kindOf = (l: Listing) =>
@@ -33,7 +32,7 @@ function Thumb({ l, size = "md" }: { l: Listing; size?: "sm" | "md" }) {
 
 /** The listing card on a post. */
 export function AttachedListing({ id, onOpen, compact = false }: { id: string | null | undefined; onOpen?: (id: string) => void; compact?: boolean }) {
-  const l = listingById(id);
+  const l = useListingById(id);
   if (!l) return null;
   const pct = vsComps(l);
   const body = (
@@ -86,12 +85,13 @@ export function AttachedListing({ id, onOpen, compact = false }: { id: string | 
 export function ListingPicker({ value, onChange }: { value: string | null; onChange: (l: Listing | null) => void }) {
   const [q, setQ] = useState("");
   const [focused, setFocused] = useState(false);
-  const picked = listingById(value);
+  const picked = useListingById(value);
+  const all = useMarketListings();
   const matches = useMemo(() => {
     const t = q.trim().toLowerCase();
-    if (!t) return ALL_LISTINGS.slice(0, 6);
-    return ALL_LISTINGS.filter((l) => `${l.asset_name} ${l.listing_id} ${l.district} ${l.agency.name}`.toLowerCase().includes(t)).slice(0, 6);
-  }, [q]);
+    if (!t) return all.slice(0, 6);
+    return all.filter((l) => `${l.asset_name} ${l.listing_id} ${l.district} ${l.agency.name}`.toLowerCase().includes(t)).slice(0, 6);
+  }, [q, all]);
 
   if (picked)
     return (
