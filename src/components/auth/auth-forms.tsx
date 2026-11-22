@@ -1,5 +1,6 @@
 "use client";
 
+import { RunLine } from "@/components/run-line";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
@@ -164,6 +165,7 @@ function SubmitButton({ busy, children }: { busy: boolean; children: React.React
       disabled={busy}
       className="shine group flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-zinc-950 font-display text-[15px] font-semibold text-lime transition-[background-color,transform] hover:bg-zinc-800 active:scale-[0.99] disabled:cursor-wait disabled:opacity-80"
     >
+      <RunLine speed={4} glow={4} />
       {busy ? (
         <span className="size-4 animate-spin rounded-full border-2 border-mint border-t-transparent" />
       ) : (

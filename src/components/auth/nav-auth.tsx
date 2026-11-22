@@ -1,5 +1,6 @@
 "use client";
 
+import { RunLine } from "@/components/run-line";
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import { useUser } from "@/lib/auth";
@@ -27,6 +28,7 @@ export function NavAuth({ tone = "light" }: { tone?: "light" | "dark" } = {}) {
         href="/signup"
         className={`shine group inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-4 py-2 font-display text-[13px] font-semibold transition-colors ${dark ? "bg-white text-zinc-950 hover:bg-zinc-100" : "bg-zinc-950 text-white hover:bg-zinc-800"}`}
       >
+        <RunLine speed={3.5} delay={-1.2} glow={4} />
         Sign up
         <ArrowUpRight size={14} strokeWidth={2} className="transition-transform group-hover:-translate-y-px group-hover:translate-x-px" />
       </Link>

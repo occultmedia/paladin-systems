@@ -8,6 +8,7 @@
  * Motion stops for prefers-reduced-motion and while the hero is off screen.
  */
 
+import { RunLine } from "@/components/run-line";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
@@ -61,7 +62,8 @@ function TerminalWindow({
   const active = events.length ? step % events.length : 0;
   const event = events[active];
   return (
-    <div className="flex h-full flex-col overflow-hidden rounded-t-xl bg-white shadow-[0_1px_0_rgb(255_255_255/0.6)_inset,0_30px_80px_-24px_rgb(15_23_42/0.45)] ring-1 ring-black/5">
+    <div className="relative flex h-full flex-col overflow-hidden rounded-t-xl bg-white shadow-[0_1px_0_rgb(255_255_255/0.6)_inset,0_30px_80px_-24px_rgb(15_23_42/0.45)] ring-1 ring-black/5">
+      <RunLine speed={8} delay={-3} />
       {/* browser chrome */}
       <div className="flex h-9 shrink-0 items-center gap-3 border-b border-zinc-200/80 bg-zinc-50 px-3.5">
         <span className="flex gap-1.5" aria-hidden>
@@ -241,7 +243,8 @@ export function Hero({
           <Link href="/login" className="inline-flex h-10 items-center rounded-full border border-zinc-200 bg-white px-4 text-[14px] font-medium text-zinc-950 shadow-sm transition-colors hover:bg-zinc-50">
             Log in
           </Link>
-          <Link href="/signup" className="inline-flex h-10 items-center rounded-full bg-zinc-950 px-4 text-[14px] font-medium text-white shadow-sm transition-colors hover:bg-zinc-800">
+          <Link href="/signup" className="relative inline-flex h-10 items-center rounded-full bg-zinc-950 px-4 text-[14px] font-medium text-white shadow-sm transition-colors hover:bg-zinc-800">
+            <RunLine speed={3.5} glow={4} />
             Get access
           </Link>
         </motion.div>
@@ -260,6 +263,7 @@ export function Hero({
         >
           {/* brand backdrop: grainy lime-to-black gradient with drifting particles */}
           <GrainField variant="rise" />
+          <RunLine speed={10} width={1.5} glow={8} />
           <div className="relative px-3 pt-10 sm:px-12 sm:pt-16 lg:px-20 lg:pt-20">
             <div className="h-[440px] sm:h-[560px] lg:h-[620px]">
               <TerminalWindow listings={listings} events={events} step={step} onStep={setStep} running={running} kpis={kpis} brief={brief} runTime={runTime} total={total} />

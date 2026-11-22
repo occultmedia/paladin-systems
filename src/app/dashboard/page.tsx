@@ -11,6 +11,7 @@
  * `repository` to it. Nothing in the UI layer needs to change.
  */
 
+import { RunLine } from "@/components/run-line";
 import { Fragment, Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -2224,7 +2225,8 @@ function ActiveListings({
       </div>
 
       {/* map */}
-      <div className="relative">
+      <div className="relative rounded-2xl">
+        <RunLine speed={10} />
         <ArubaMap
           mode="listings"
           listings={rows}
@@ -2957,6 +2959,7 @@ function TerminalUpdates({
           <div className="max-h-[min(72vh,620px)] overflow-y-auto overscroll-contain" data-lenis-prevent>
           <section aria-label="AI Signal briefing" className="deck relative isolate overflow-hidden border-b border-zinc-200 px-4 py-4 [background-attachment:scroll] sm:px-5">
             <GrainField variant="ink" className="-z-10" />
+            <RunLine speed={8} delay={-2} />
             <div className="flex items-center justify-between gap-2">
               <AIMark dark />
               <span className="text-[11px] text-zinc-500">

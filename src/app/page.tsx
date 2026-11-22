@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { RunLine } from "@/components/run-line";
 import Link from "next/link";
 import { ArrowRight, ArrowUpRight, MessageCircle, Phone, Pin, Users } from "lucide-react";
 import { SequenceLockup, Wordmark } from "@/components/logo";
@@ -351,10 +352,11 @@ function PrimaryCta({ href = DASHBOARD, children, light }: { href?: string; chil
   return (
     <Link
       href={href}
-      className={`group inline-flex h-11 items-center gap-2 rounded-full px-5 text-[14px] font-medium shadow-sm transition-colors ${
+      className={`group relative inline-flex h-11 items-center gap-2 rounded-full px-5 text-[14px] font-medium shadow-sm transition-colors ${
         light ? "bg-white text-zinc-950 hover:bg-zinc-100" : "bg-zinc-950 text-white hover:bg-zinc-800"
       }`}
     >
+      <RunLine speed={4} delay={-2} glow={4} />
       {children}
       <ArrowRight size={15} strokeWidth={2} className="transition-transform duration-300 group-hover:translate-x-0.5" />
     </Link>
@@ -899,7 +901,8 @@ export default function Home() {
               <h2 className="mt-4 font-display text-[30px] font-bold tracking-tight text-zinc-950 sm:text-[44px]">One plan. The whole market.</h2>
             </Reveal>
             <Stagger className="mx-auto mt-10 grid max-w-[1000px] gap-5 sm:mt-12 lg:grid-cols-[1.35fr_1fr]" gap={0.12}>
-              <StaggerItem className="rounded-3xl border-2 border-zinc-950 bg-white p-7 shadow-xl shadow-zinc-900/5 sm:p-10">
+              <StaggerItem className="relative rounded-3xl border-2 border-zinc-950 bg-white p-7 shadow-xl shadow-zinc-900/5 sm:p-10">
+                <RunLine speed={9} width={2} />
                 <p className="font-display text-[18px] font-bold text-zinc-950">Aruba</p>
                 <div className="mt-5">
                   <PlanPrice />

@@ -460,3 +460,61 @@ body {
   font-weight: 600;
   font-optical-sizing: auto;
 }
+
+/* ── Running outline: a lime light that travels around a frame ─────────── */
+/* Rendered by <RunLine /> inside any `relative` element; it inherits the
+   element's corner radius. The line is a conic gradient masked to a thin
+   ring; a blurred copy behind it gives the glow. */
+@property --run-a {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: true;
+}
+@keyframes run-a {
+  to { --run-a: 360deg; }
+}
+.run-line {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  border-radius: inherit;
+  pointer-events: none;
+  animation: run-a var(--run-s, 7s) linear infinite;
+  animation-delay: var(--run-d, 0s);
+}
+.run-line i,
+.run-line b {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+.run-line i {
+  padding: var(--run-w, 1.75px);
+  background: conic-gradient(
+    from var(--run-a),
+    transparent 0turn,
+    transparent 0.58turn,
+    rgb(150 232 84 / 0.6) 0.86turn,
+    #9ee95c 0.95turn,
+    #acfa68 0.985turn,
+    #e9ffd2 0.997turn,
+    transparent 1turn
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+/* glow: the blur sits on the wrapper so it is applied after the mask */
+.run-line b {
+  filter: blur(var(--run-glow, 6px));
+  opacity: 0.9;
+}
+.run-line b i {
+  padding: calc(var(--run-w, 1.5px) + 1.5px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .run-line {
+    animation: none;
+    --run-a: 300deg;
+  }
+}

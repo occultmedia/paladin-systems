@@ -7,6 +7,7 @@
  * layer as the dashboard, prepared on the server and passed in as props.
  */
 
+import { RunLine } from "@/components/run-line";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowDown, ArrowUp, Bell, MessageCircle, Minus, Pin, Sparkles, Users } from "lucide-react";
 import { TypeText } from "@/components/ai/ai-visuals";
@@ -467,7 +468,8 @@ export function TerminalPreview({ data }: { data: PreviewData }) {
 
   return (
     <div onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)} onFocus={() => setPaused(true)} onBlur={() => setPaused(false)}>
-      <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-2xl shadow-zinc-900/10 sm:rounded-3xl">
+      <div className="relative overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-2xl shadow-zinc-900/10 sm:rounded-3xl">
+        <RunLine speed={11} delay={-5} />
         {/* window chrome */}
         <div className="flex items-center gap-3 border-b border-mint-deep bg-mint px-3 py-2.5 sm:px-4">
           <span className="flex gap-1.5" aria-hidden>

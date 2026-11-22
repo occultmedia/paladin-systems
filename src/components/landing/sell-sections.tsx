@@ -4,6 +4,7 @@
  * Every example is built from today's data by the page.
  */
 
+import { RunLine } from "@/components/run-line";
 import Link from "next/link";
 import { Reveal, Stagger, StaggerItem } from "@/components/motion/reveal";
 import { FloorPlan } from "./floor-plan";
@@ -155,6 +156,7 @@ export function AgentsSection({ m }: { m: AgentMorning }) {
         {/* an agent's morning, from today's data */}
         <Reveal delay={0.1} y={24}>
           <div className="relative rounded-3xl border border-zinc-200 bg-zinc-50 p-4 sm:p-6">
+            <RunLine speed={9} delay={-4} />
             <p className="px-1 text-[12px] font-medium text-zinc-500">Your morning in Terminal · {m.time}</p>
             <div className="mt-3 space-y-3">
               <div className="rounded-2xl bg-zinc-950 p-5 text-white">
@@ -222,7 +224,8 @@ export function InvestorsSection({ ex }: { ex: InvestorExample }) {
         {/* the network: a partnership post on members-only Deals */}
         <Reveal y={24} className="order-2 lg:order-1">
           <div className="relative">
-            <div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-[0_30px_70px_-35px_rgb(10_10_10/0.35)] sm:p-6">
+            <div className="relative rounded-3xl border border-zinc-200 bg-white p-5 shadow-[0_30px_70px_-35px_rgb(10_10_10/0.35)] sm:p-6">
+              <RunLine speed={9} delay={-6} />
               <div className="flex items-center justify-between">
                 <p className="text-[12px] font-medium text-zinc-500">Deals · Partnership</p>
                 <span className="rounded-full bg-zinc-950 px-2.5 py-0.5 text-[12px] font-medium text-lime">Members only</span>
