@@ -37,7 +37,7 @@ export function ListingPopup({
   const conf = BAND_COLOR[confidenceBand(l.confidence_score)];
   const stats: Array<[string, string, string | undefined]> = [
     ["Asking", usdShort(l.asking_price_usd), undefined],
-    ["$ / ft²", `$${l.price_per_sqft_usd.toLocaleString("en-US")}`, undefined],
+    ["$ / ft²", l.price_per_sqft_usd ? `$${l.price_per_sqft_usd.toLocaleString("en-US")}` : "—", undefined],
     ["Confidence", `${l.confidence_score}%`, conf],
   ];
   return (

@@ -91,15 +91,15 @@ export function HoverCard({ l }: { l: Listing }) {
   const color = SIGNAL_COLOR[l.signal];
   const facts =
     l.category === "Property"
-      ? `${l.bedrooms} beds · ${l.bathrooms} baths · ${num(l.built_sqft)} sq ft built${l.lot_sqft ? ` · ${num(l.lot_sqft)} lot` : ""}`
+      ? `${l.bedrooms} beds · ${l.bathrooms} baths${l.built_sqft ? ` · ${num(l.built_sqft)} sq ft built` : ""}${l.lot_sqft ? ` · ${num(l.lot_sqft)} lot` : ""}`
       : l.category === "Land"
         ? `${num(l.lot_sqft)} sq ft lot · ${l.zoning} zoning`
-        : `${l.commercial_use} · ${num(l.built_sqft)} sq ft built${l.lot_sqft ? ` · ${num(l.lot_sqft)} lot` : ""}`;
+        : `${l.commercial_use}${l.built_sqft ? ` · ${num(l.built_sqft)} sq ft built` : ""}${l.lot_sqft ? ` · ${num(l.lot_sqft)} lot` : ""}`;
   const status = STATUS_PILL[l.status];
   const metric =
     l.category === "Property"
-      ? { value: `$${num(l.price_per_sqft_usd)}/sq ft`, label: `${pct(l.price_vs_comps_pct)} vs comps` }
-      : { value: `$${num(l.price_per_sqft_usd)}/sq ft`, label: `${pct(l.price_vs_district_pct)} vs district` };
+      ? { value: l.price_per_sqft_usd ? `$${num(l.price_per_sqft_usd)}/sq ft` : "Size not stated", label: l.price_per_sqft_usd ? `${pct(l.price_vs_comps_pct)} vs comps` : "no $/sq ft" }
+      : { value: l.price_per_sqft_usd ? `$${num(l.price_per_sqft_usd)}/sq ft` : "Size not stated", label: l.price_per_sqft_usd ? `${pct(l.price_vs_district_pct)} vs district` : "no $/sq ft" };
   return (
     <div style={{ width: 250 }}>
       {l.photo_url && (

@@ -570,7 +570,9 @@ const median = (xs: number[]) => {
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 };
 
-const fmtSqft = (n: number) => `${int.format(n)} sq ft`;
+/** Sizes and $/sq ft of 0 mean "not stated on the source page". */
+const fmtSqft = (n: number) => (n > 0 ? `${int.format(n)} sq ft` : "Not stated");
+const fmtPsf = (n: number) => (n > 0 ? fmtUsd(n) : "—");
 const fmtDate = (iso: string) =>
   new Date(iso.length === 10 ? `${iso}T00:00:00Z` : iso).toLocaleDateString("en-US", {
     month: "short",
@@ -1290,7 +1292,7 @@ function valueSeries(l: Listing) {
       return {
         t,
         asking: ask ? ask.price_usd : null,
-        market: Math.round((fair / Math.pow(1 + g, monthsBack)) * (t === today ? 1 : wiggle)),
+        market: fair > 0 ? Math.round((fair / Math.pow(1 + g, monthsBack)) * (t === today ? 1 : wiggle)) : null,
       };
     });
 }
@@ -1323,7 +1325,8 @@ function PriceHistory({ l }: { l: Listing }) {
   const history = l.price_history;
   const series = valueSeries(l);
   const fair = estMarketValue(l);
-  const gap = ((l.asking_price_usd - fair) / fair) * 100;
+  const hasFair = fair > 0; // no estimate without a size and comparables
+  const gap = hasFair ? ((l.asking_price_usd - fair) / fair) * 100 : 0;
   const changed = history.length > 1;
   return (
     <div className="mt-8 border-t border-zinc-300/70 pt-5">
@@ -1384,16 +1387,25 @@ function PriceHistory({ l }: { l: Listing }) {
             </ResponsiveContainer>
           </div>
           <p className="px-2 pb-1 pt-2 text-[12px] text-zinc-600">
-            Asking <b className={`${MONO} text-zinc-950`}>{fmtUsdCompact(l.asking_price_usd)}</b> vs est. market value{" "}
-            <b className={MONO} style={{ color: MARKET_LINE }}>
-              {fmtUsdCompact(fair)}
-            </b>
-            {" · "}
-            <span className="font-semibold" style={{ color: SIGNAL_STYLE[l.signal].color }}>
-              {l.signal === "AT_MARKET"
-                ? `priced about right (${gap < 0 ? "−" : "+"}${Math.abs(gap).toFixed(0)}%)`
-                : `${Math.abs(gap).toFixed(0)}% ${gap < 0 ? "below" : "above"} market`}
-            </span>
+            Asking <b className={`${MONO} text-zinc-950`}>{fmtUsdCompact(l.asking_price_usd)}</b>
+            {hasFair ? (
+              <>
+                {" "}vs est. market value{" "}
+                <b className={MONO} style={{ color: MARKET_LINE }}>
+                  {fmtUsdCompact(fair)}
+                </b>
+                {" · "}
+                <span className="font-semibold" style={{ color: SIGNAL_STYLE[l.signal].color }}>
+                  {l.signal === "AT_MARKET"
+                    ? `priced about right (${gap < 0 ? "−" : "+"}${Math.abs(gap).toFixed(0)}%)`
+                    : `${Math.abs(gap).toFixed(0)}% ${gap < 0 ? "below" : "above"} market`}
+                </span>
+              </>
+            ) : (
+              <span className="text-zinc-500">
+                {" "}· no market value estimate: the agency does not state the {l.category === "Land" ? "lot" : "built"} size
+              </span>
+            )}
           </p>
         </div>
         <div>
@@ -1837,7 +1849,7 @@ function ListingDetails({ l }: { l: Listing }) {
         <DetailItem label="Zoning" value={l.zoning} />
         <DetailItem label="Lot size (land)" value={fmtSqft(l.lot_sqft)} />
         <DetailItem label="Built-up size" value="None (vacant land)" />
-        <DetailItem label="Price / sq ft" value={fmtUsd(l.price_per_sqft_usd)} />
+        <DetailItem label="Price / sq ft" value={fmtPsf(l.price_per_sqft_usd)} />
         <DetailItem label="District land avg" value={`${fmtUsd(l.district_land_psf_usd)} / sq ft`} />
         <DetailItem
           label="Vs. district avg"
@@ -1853,7 +1865,7 @@ function ListingDetails({ l }: { l: Listing }) {
         <DetailItem label="Built-up size (total)" value={fmtSqft(l.built_sqft)} />
         <DetailItem label="Lot size (land)" value={l.lot_sqft ? fmtSqft(l.lot_sqft) : "No land (unit in building)"} />
         <DetailItem label="Pool" value={l.pool ?? "—"} />
-        <DetailItem label="Price / sq ft" value={fmtUsd(l.price_per_sqft_usd)} />
+        <DetailItem label="Price / sq ft" value={fmtPsf(l.price_per_sqft_usd)} />
         <DetailItem label="District commercial avg" value={`${fmtUsd(l.district_commercial_psf_usd)} / sq ft`} />
         <DetailItem
           label="Vs. district avg"
@@ -1879,7 +1891,7 @@ function ListingDetails({ l }: { l: Listing }) {
             </span>
           }
         />
-        <DetailItem label="Price / sq ft" value={fmtUsd(l.price_per_sqft_usd)} />
+        <DetailItem label="Price / sq ft" value={fmtPsf(l.price_per_sqft_usd)} />
         <DetailItem label="Comparable $ / sq ft" value={`${fmtUsd(l.comps_psf_usd)} (${l.comps_count} listings)`} />
         <DetailItem
           label="Vs. comps"
@@ -2703,7 +2715,7 @@ function ActiveListings({
                         )}
                       </td>
                     )}
-                    {!landOnly && <td className={num}>{l.category === "Land" ? DASH : int.format(l.built_sqft)}</td>}
+                    {!landOnly && <td className={num}>{l.category === "Land" || !l.built_sqft ? DASH : int.format(l.built_sqft)}</td>}
                     <td className={num}>{l.lot_sqft ? int.format(l.lot_sqft) : DASH}</td>
                     <td className={`${num} text-zinc-950`}>
                       {fmtUsdCompact(l.asking_price_usd)}
@@ -2711,7 +2723,7 @@ function ActiveListings({
                         <PriceMove pct={l.price_change_pct} size={11} />
                       </p>
                     </td>
-                    <td className={num}>{fmtUsd(l.price_per_sqft_usd)}</td>
+                    <td className={num}>{l.price_per_sqft_usd > 0 ? fmtUsd(l.price_per_sqft_usd) : DASH}</td>
                     <td className={`${td} ${MONO} text-right`}>
                       <p className="text-[13px]" style={{ color: deltaColor(-vsPct) }}>
                         {fmtDelta(vsPct)}

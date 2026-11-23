@@ -74,6 +74,7 @@ async def main() -> int:
     ap.add_argument("--refresh-days", type=int, default=7, help="re-open unchanged listing pages after N days (default 7)")
     ap.add_argument("--out", help="dry run: save the records to this JSON file")
     ap.add_argument("--headed", action="store_true", help="show the browser window")
+    ap.add_argument("--no-normalise", action="store_true", help="only fill raw_listings; skip the normaliser")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args()
 
@@ -129,6 +130,16 @@ async def main() -> int:
             "rows_unchanged": totals.rows_unchanged,
             "error": "; ".join(errors)[:2000] or None,
         }).eq("id", run_id).execute()
+
+    # Level 2: move what changed tonight into property_master (the dashboard).
+    if db and not args.no_normalise:
+        from .normalise import Normaliser
+
+        try:
+            Normaliser(db).run()
+        except Exception as exc:  # noqa: BLE001
+            errors.append(f"normaliser: {exc}")
+            log.exception("normaliser failed")
 
     if args.dry_run:
         if args.out:

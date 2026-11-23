@@ -1,0 +1,574 @@
+"""
+Level 2: the normaliser. raw_listings -> property_master (what the dashboard reads).
+
+    python -m terminal_spider.normalise              # process every waiting raw row
+    python -m terminal_spider.normalise --dry-run    # show what it would write, write nothing
+    python -m terminal_spider.normalise --limit 5
+
+It runs automatically at the end of a spider run (python -m terminal_spider),
+and can be run on its own.
+
+For each raw row that is new or changed (the `raw_listing_deltas` queue):
+
+  1. Read the raw text into Terminal's fields: category and property type,
+     district, USD price, beds, baths, sizes in sq ft, pool, tenure, status,
+     map pin (district centre when the page has none), agent, main photo.
+  2. Find its golden record:
+       - the one it was merged into before (raw.property_id), else
+       - the same property already listed by ANOTHER agency (same match score
+         as the duplicate watch in the app: 70+ = same property), else
+       - a new property_master row with a fresh public ref (AW-XXXXX).
+  3. Write it. Only the agency that first listed a property (its primary
+     source) updates the details; other agencies' copies just keep it
+     "found" (the database trigger bumps last_scraped_at).
+  4. mark_raw_processed(): the raw row leaves the queue, or keeps the error.
+
+Then the comps pass recomputes the value signal for every active listing:
+  homes      median $/sq ft of similar homes (villas and estates vs condos,
+             apartments and townhouses), same district when it has 3+, else
+             island-wide;
+  land, commercial
+             average $/sq ft of the same class, same district when it has 3+,
+             else island-wide.
+  10%+ below = Below market (stored as UNDERVALUED), 10%+ above = Overpriced,
+  else At market. At least 2 comparables are needed; otherwise At market.
+
+The database does the rest itself: listing_events (Listed, Price drop,
+Status change) and price history come from triggers on property_master.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import logging
+import math
+import re
+import statistics
+import sys
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from typing import Any
+
+from .parsing import clean, parse_number
+
+log = logging.getLogger("terminal_spider.normalise")
+
+MARKET_ID = "aw-lux"
+SQM_TO_SQFT = 10.7639
+AWG_PER_USD = 1.79  # the florin is pegged to the dollar
+
+# Map centres used when a listing page has no pin (same as src/lib/aruba-data.ts DISTRICT_CENTERS).
+DISTRICT_CENTERS: dict[str, tuple[float, float]] = {
+    "Arashi": (12.6105, -70.048),
+    "Tierra del Sol": (12.6051, -70.0401),
+    "Malmok": (12.6017, -70.0453),
+    "Boca Catalina": (12.5979, -70.0441),
+    "Gold Coast": (12.6005, -70.0395),
+    "Palm Beach": (12.5735, -70.041),
+    "Noord": (12.58, -70.031),
+    "Eagle Beach": (12.5545, -70.051),
+    "Oranjestad": (12.521, -70.0335),
+    "Pos Chiquito": (12.476, -69.97),
+    "Savaneta": (12.4545, -69.945),
+    "Santa Cruz": (12.506, -69.984),
+    "Paradera": (12.533, -70.005),
+    "San Nicolas": (12.4335, -69.9065),
+}
+# Neighbourhood names agencies use, folded into Terminal's districts.
+DISTRICT_ALIASES = {
+    "bubali": "Noord", "salina cerca": "Noord", "alto vista": "Noord", "moko": "Noord", "tanki leendert": "Noord",
+    "tanki flip": "Noord", "palm beach area": "Palm Beach", "eagle": "Eagle Beach", "punta brabo": "Eagle Beach",
+    "sabana liber": "Noord", "westpunt": "Arashi", "sero colorado": "San Nicolas", "seroe colorado": "San Nicolas",
+    "san nicolaas": "San Nicolas", "pos chikito": "Pos Chiquito", "brasil": "Pos Chiquito",
+    "spaans lagoen": "Pos Chiquito", "balashi": "Pos Chiquito", "piedra plat": "Paradera", "ayo": "Paradera",
+    "jamanota": "Santa Cruz", "cunucu abao": "Oranjestad", "dakota": "Oranjestad", "madiki": "Oranjestad",
+    "wayaca": "Oranjestad", "bushiri": "Oranjestad", "barcadera": "Pos Chiquito",
+}
+ISLAND_CENTER = (12.52, -70.0)
+ARUBA_BOUNDS = ((12.3, 12.7), (-70.2, -69.8))
+
+STATUS_MAP = {
+    "for sale": "For sale",
+    "under contract": "Under contract",
+    "sale in progress": "Under contract",
+    "on hold": "Under contract",
+    "under offer": "Under contract",
+    "sold": "Sold",
+}
+UNIT_TYPES = {"Condo", "Apartment", "Townhouse"}
+DUP_LIKELY = 70
+
+
+# ── raw text -> fields ────────────────────────────────────────────────────
+
+
+def to_sqft(text: str | None) -> int | None:
+    """'1078 m² (11.604 Sq Ft)' -> 11603; '2,400 sq ft' -> 2400; ' m² (0 Sq Ft)' -> None."""
+    if not text:
+        return None
+    if m := re.search(r"([\d.,]+)\s*(m²|m2|sqm|square met)", text, re.I):
+        value = parse_number(m.group(1))
+        sqft = value * SQM_TO_SQFT if value else None
+    elif m := re.search(r"([\d.,]+)\s*(sq\.?\s*ft|ft²|square f)", text, re.I):
+        sqft = parse_number(m.group(1))
+    else:
+        sqft = None
+    return round(sqft) if sqft and sqft > 0 else None
+
+
+def district_of(raw: str | None, lat: float | None, lng: float | None) -> str:
+    """Terminal district for an agency's location text; nearest centre when the text is unknown but a pin exists."""
+    text = (clean(raw) or "").strip()
+    low = text.lower()
+    for name in DISTRICT_CENTERS:
+        if name.lower() == low:
+            return name
+    for alias, name in DISTRICT_ALIASES.items():
+        if alias in low:
+            return name
+    for name in DISTRICT_CENTERS:
+        if name.lower() in low:
+            return name
+    if lat is not None and lng is not None and not text:
+        return min(DISTRICT_CENTERS, key=lambda n: (DISTRICT_CENTERS[n][0] - lat) ** 2 + (DISTRICT_CENTERS[n][1] - lng) ** 2)
+    return text.title()[:60] if text else "Aruba"
+
+
+def approx_pin(district: str, key: str) -> tuple[float, float]:
+    """No pin on the page: a stable spot near the district centre."""
+    lat, lng = DISTRICT_CENTERS.get(district, ISLAND_CENTER)
+    h = int(hashlib.sha1(key.encode()).hexdigest()[:8], 16)
+    a = (h % 1000) / 1000 * math.tau
+    r = 0.002 + ((h >> 10) % 100) / 100 * 0.003
+    return lat + math.sin(a) * r, lng + math.cos(a) * r * 0.6
+
+
+def in_aruba(lat: Any, lng: Any) -> bool:
+    try:
+        return ARUBA_BOUNDS[0][0] <= float(lat) <= ARUBA_BOUNDS[0][1] and ARUBA_BOUNDS[1][0] <= float(lng) <= ARUBA_BOUNDS[1][1]
+    except (TypeError, ValueError):
+        return False
+
+
+def classify(raw_type: str | None, title: str, desc: str) -> tuple[str, str, str | None]:
+    """(asset_class, property_type, commercial_use) from the agency's type and the listing text."""
+    t = (raw_type or "").lower()
+    name = title.lower()
+    text = f"{name} {desc[:600].lower()}"
+    if "land" in t or (not t and re.search(r"\b(lot|plot|land)\b", name)):
+        return "Land", "Land", None
+    if "commercial" in t or "business" in t:
+        use = (
+            "Office" if re.search(r"\boffice", text)
+            else "Retail" if re.search(r"\b(retail|shop|store|showroom)", text)
+            else "Hospitality" if re.search(r"\b(hotel|resort|guest ?house|restaurant|hospitality|bar\b)", text)
+            else "Warehouse" if re.search(r"\b(warehouse|storage|industrial)", text)
+            else "Mixed-use" if re.search(r"mixed", text)
+            else None
+        )
+        return "Commercial", "Commercial", use
+    # Homes. Decide by the title first (the most specific words), then the description.
+    for words, kind in (
+        (r"penthouse", "Penthouse"),
+        (r"beach ?house", "Beach House"),
+        (r"town ?house|duplex", "Townhouse"),
+        (r"apartment|studio|\bapt\b", "Apartment"),
+        (r"condo", "Condo"),
+        (r"estate\b", "Estate"),
+        (r"villa|house|home|residence|bungalow|cunucu", "Villa"),
+    ):
+        if re.search(words, name):
+            return "Property", kind, None
+    if "condo" in t or "townhouse" in t:
+        if re.search(r"town ?house|duplex", text):
+            return "Property", "Townhouse", None
+        return "Property", "Apartment" if re.search(r"apartment|studio", text) else "Condo", None
+    if re.search(r"condo", text):
+        return "Property", "Condo", None
+    return "Property", "Villa", None
+
+
+def tenure_of(features: dict[str, str], desc: str) -> tuple[str, int | None]:
+    """('Erfpacht' | 'Eigendom', lease years left). Eigendom is the default when nothing is said."""
+    text = " ".join([*(f"{k} {v}" for k, v in features.items()), desc]).lower()
+    lease = re.search(r"erfpacht|long[- ]?lease|lease ?land|leasehold|government lease", text)
+    owned = re.search(r"eigendom|freehold|owned land|private land|fee simple|ownership land", text)
+    if lease and not (owned and owned.start() < lease.start()):
+        years = re.search(r"(\d{2})\s*(?:years?|yrs?)\s*(?:left|remaining)", text)
+        left = int(years.group(1)) if years and int(years.group(1)) <= 99 else None
+        return "Erfpacht", left
+    return "Eigendom", None
+
+
+def pool_of(features: dict[str, str]) -> str | None:
+    kind = (features.get("pool type") or "").lower()
+    has = (features.get("pool") or "").lower()
+    if "shared" in kind or "communal" in kind or "community" in kind:
+        return "Shared pool"
+    if "private" in kind or has in ("yes", "private"):
+        return "Private pool"
+    if has in ("no", "none"):
+        return "No pool"
+    return None
+
+
+def slug(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")[:60] or "agent"
+
+
+def public_ref(source_url: str, length: int = 5) -> str:
+    """Stable public ref from the source URL: AW- + base36."""
+    n = int(hashlib.sha1(source_url.encode()).hexdigest(), 16)
+    chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    out = ""
+    while len(out) < length:
+        n, r = divmod(n, 36)
+        out += chars[r]
+    return f"AW-{out}"
+
+
+@dataclass
+class Fields:
+    """One raw row read into property_master columns (without ids and lifecycle)."""
+    row: dict[str, Any]
+    agent: dict[str, Any] | None
+
+
+def read_raw(raw: dict[str, Any]) -> Fields:
+    """Turn a raw_listings row into property_master fields. Raises ValueError when it can't be listed."""
+    payload = raw.get("raw_payload") or {}
+    features = {k.lower(): (v or "") for k, v in (payload.get("features") or {}).items()}
+    title = clean(raw.get("raw_title")) or clean(raw.get("raw_address")) or ""
+    desc = raw.get("raw_description") or ""
+    if not title:
+        raise ValueError("no title or address")
+
+    price = parse_number(raw.get("raw_price"))
+    currency = (raw.get("raw_currency") or "USD").upper()
+    if not price or price <= 0:
+        raise ValueError(f"no price ({payload.get('price_text') or raw.get('raw_price')!r})")
+    if currency == "AWG":
+        price = price / AWG_PER_USD
+    elif currency != "USD":
+        raise ValueError(f"price in {currency}, not converted")
+
+    asset_class, ptype, use = classify(raw.get("raw_property_type"), title, desc)
+    beds = parse_number(raw.get("raw_beds"))
+    baths = parse_number(raw.get("raw_baths"))
+    # Sizes below these are typos on the source page ("3 m²"): treat them as unknown.
+    built = to_sqft(raw.get("raw_built_area"))
+    built = built if built and built >= 150 else None
+    lot = to_sqft(raw.get("raw_lot_area"))
+    lot = lot if lot and lot >= 300 else None
+    if asset_class == "Property" and beds is None:
+        raise ValueError("home without a bedroom count")
+    if asset_class == "Land" and not lot:
+        raise ValueError("land without a lot size")
+
+    lat, lng = raw.get("raw_lat"), raw.get("raw_lng")
+    district = district_of(raw.get("raw_district"), lat, lng)
+    if not in_aruba(lat, lng):
+        lat, lng = approx_pin(district, raw["source_url"])
+
+    tenure, lease_left = tenure_of(features, desc)
+    status = STATUS_MAP.get((raw.get("raw_status") or "for sale").strip().lower(), "For sale")
+    photos = [p for p in (raw.get("raw_photos") or []) if p][:1]
+
+    agent = None
+    a = raw.get("raw_agent") or None
+    if a and clean(a.get("name")):
+        agent = {
+            "id": f"{raw['agency_id']}-{slug(a['name'])}",
+            "agency_id": raw["agency_id"],
+            "name": clean(a["name"])[:120],
+            "title": (clean(a.get("title")) or None) and clean(a.get("title"))[:120],
+            "phone": (clean(a.get("phone")) or None) and clean(a.get("phone"))[:40],
+            "whatsapp": False,
+            "email": (clean(a.get("email")) or None) and clean(a.get("email"))[:160],
+            "photo_url": a.get("photo") or None,
+        }
+
+    row = {
+        "asset_class": asset_class,
+        "property_type": ptype,
+        "commercial_use": use,
+        "zoning": None,
+        "asset_name": title[:160],
+        "bedrooms": None if asset_class == "Land" or beds is None else min(60, int(beds)),
+        "bathrooms": None if asset_class == "Land" or baths is None else min(60.0, round(baths, 1)),
+        "built_sqft": None if asset_class == "Land" else built,
+        "lot_sqft": lot,
+        "pool": None if asset_class == "Land" else pool_of(features),
+        "tenure": tenure,
+        "lease_years_left": lease_left,
+        "district": district,
+        "address": clean(raw.get("raw_address")),
+        "lat": float(lat),
+        "lng": float(lng),
+        "asking_price_usd": round(price, 2),
+        "agency_id": raw["agency_id"],
+        "agent_id": agent["id"] if agent else None,
+        "source_url": raw["source_url"],
+        "photo_url": photos[0] if photos else None,
+        "photos": photos,
+        "listing_status": status,
+        "last_scraped_at": raw.get("last_scraped_at"),
+        "last_run_id": raw.get("last_run_id"),
+    }
+    return Fields(row, agent)
+
+
+# ── duplicate match (same scoring as src/lib/duplicates.ts and SQL listing_match_score) ──
+
+
+def _trigrams(s: str) -> set[str]:
+    out: set[str] = set()
+    for w in [w for w in re.split(r"[^a-z0-9]+", s.lower()) if w]:
+        p = f"  {w} "
+        out.update(p[i : i + 3] for i in range(len(p) - 2))
+    return out
+
+
+def similarity(a: str, b: str) -> float:
+    x, y = _trigrams(a), _trigrams(b)
+    if not x or not y:
+        return 0.0
+    both = len(x & y)
+    return both / (len(x) + len(y) - both)
+
+
+def distance_m(a_lat: float, a_lng: float, b_lat: float, b_lng: float) -> float:
+    dy = (b_lat - a_lat) * 111_320
+    dx = (b_lng - a_lng) * 111_320 * math.cos(math.radians((a_lat + b_lat) / 2))
+    return math.hypot(dx, dy)
+
+
+def match_score(a: dict[str, Any], b: dict[str, Any]) -> int:
+    if a["asset_class"] != b["asset_class"]:
+        return 0
+    s = 0
+    if None not in (a["lat"], a["lng"], b["lat"], b["lng"]):
+        d = distance_m(a["lat"], a["lng"], b["lat"], b["lng"])
+        if d > 1000:
+            return 0
+        s += 40 if d <= 40 else 28 if d <= 120 else 12 if d <= 300 else 0
+    elif a["district"].strip().lower() == b["district"].strip().lower():
+        s += 25
+    else:
+        return 0
+    diff = None
+    if a.get("built_sqft") and b.get("built_sqft"):
+        diff = abs(a["built_sqft"] - b["built_sqft"]) / max(a["built_sqft"], b["built_sqft"])
+    elif a.get("lot_sqft") and b.get("lot_sqft"):
+        diff = abs(a["lot_sqft"] - b["lot_sqft"]) / max(a["lot_sqft"], b["lot_sqft"])
+    if diff is not None:
+        s += 30 if diff <= 0.02 else 20 if diff <= 0.06 else 8 if diff <= 0.12 else -20 if diff > 0.25 else 0
+    if a.get("bedrooms") is not None and b.get("bedrooms") is not None:
+        s += 10 if a["bedrooms"] == b["bedrooms"] else -15
+    pa, pb = float(a["asking_price_usd"] or 0), float(b["asking_price_usd"] or 0)
+    if pa > 0 and pb > 0:
+        p = abs(pa - pb) / max(pa, pb)
+        s += 12 if p <= 0.03 else 7 if p <= 0.1 else 0
+    sim = similarity(a.get("address") or a["asset_name"], b.get("address") or b["asset_name"])
+    s += 15 if sim >= 0.55 else 7 if sim >= 0.35 else 0
+    return max(0, min(100, s))
+
+
+# ── database work ─────────────────────────────────────────────────────────
+
+MATCH_COLS = "id,listing_id,agency_id,asset_class,lat,lng,district,bedrooms,built_sqft,lot_sqft,asking_price_usd,asset_name,address"
+RAW_COLS = (
+    "id,agency_id,source_url,raw_title,raw_price,raw_currency,raw_beds,raw_baths,raw_built_area,raw_lot_area,"
+    "raw_property_type,raw_status,raw_address,raw_district,raw_description,raw_agent,raw_photos,raw_lat,raw_lng,"
+    "raw_payload,last_scraped_at,last_run_id,property_id"
+)
+
+
+def _all(query_fn, page: int = 1000) -> list[dict[str, Any]]:
+    """Read every row of a query, 1000 at a time."""
+    out: list[dict[str, Any]] = []
+    start = 0
+    while True:
+        data = query_fn().range(start, start + page - 1).execute().data or []
+        out.extend(data)
+        if len(data) < page:
+            return out
+        start += page
+
+
+def _same(a: Any, b: Any) -> bool:
+    """Equal, treating numbers from the database (int, float or numeric string) by value."""
+    if a is None or b is None:
+        return a is None and b is None
+    if isinstance(b, (int, float)):
+        try:
+            return abs(float(a) - float(b)) < 0.005
+        except (TypeError, ValueError):
+            return False
+    return a == b
+
+
+class Normaliser:
+    def __init__(self, db: Any, *, dry_run: bool = False, limit: int | None = None) -> None:
+        self.db = db
+        self.dry_run = dry_run
+        self.limit = limit
+        self.stats = {"read": 0, "inserted": 0, "updated": 0, "merged": 0, "failed": 0, "signals": 0}
+        self.failures: list[str] = []
+        self.planned: list[dict[str, Any]] = []
+
+    def _new_ref(self, url: str, taken: set[str]) -> str:
+        for length in (5, 6, 7, 8):
+            ref = public_ref(url, length)
+            if ref not in taken:
+                return ref
+        raise ValueError("could not pick a free public ref")
+
+    def _upsert_agent(self, agent: dict[str, Any] | None) -> None:
+        if agent and not self.dry_run:
+            self.db.table("listing_agents").upsert(agent, on_conflict="id").execute()
+
+    def _mark(self, raw_id: int, property_id: str | None, error: str | None = None) -> None:
+        if not self.dry_run:
+            self.db.rpc("mark_raw_processed", {"p_raw_id": raw_id, "p_property_id": property_id, "p_error": error}).execute()
+
+    def process_queue(self) -> None:
+        q = lambda: self.db.table("raw_listing_deltas").select(RAW_COLS).order("id")  # noqa: E731
+        raws = _all(q)
+        if self.limit:
+            raws = raws[: self.limit]
+        masters = _all(lambda: self.db.table("property_master").select(MATCH_COLS).eq("status", "active"))
+        by_id = {m["id"]: m for m in masters}
+        taken = {r["listing_id"] for r in _all(lambda: self.db.table("property_master").select("listing_id"))}
+        log.info("normalising %s raw rows (%s listings on the market)", len(raws), len(masters))
+
+        for raw in raws:
+            self.stats["read"] += 1
+            try:
+                f = read_raw(raw)
+            except Exception as exc:  # noqa: BLE001 - keep the error on the raw row, carry on
+                self.stats["failed"] += 1
+                self.failures.append(f"{raw['source_url']}: {exc}")
+                log.warning("skip %s: %s", raw["source_url"], exc)
+                self._mark(raw["id"], None, str(exc)[:500])
+                continue
+
+            try:
+                pid = raw.get("property_id")
+                master = by_id.get(pid) if pid else None
+                if master is None and not pid:
+                    # Same property already listed by another agency?
+                    cand = {**f.row, "id": None}
+                    best = max(
+                        ((match_score(cand, m), m) for m in masters if m["agency_id"] != raw["agency_id"]),
+                        key=lambda x: x[0],
+                        default=(0, None),
+                    )
+                    if best[0] >= DUP_LIKELY:
+                        master = best[1]
+                        self.stats["merged"] += 1
+                        log.info("merge %s into %s (score %s)", raw["source_url"], master["listing_id"], best[0])
+                        self.planned.append({"action": "merge", "into": master["listing_id"], **f.row})
+                        self._mark(raw["id"], master["id"])
+                        continue
+
+                self._upsert_agent(f.agent)
+                if master or pid:
+                    pid = pid or master["id"]
+                    primary = (master or {}).get("agency_id", raw["agency_id"]) == raw["agency_id"]
+                    if primary:
+                        self.planned.append({"action": "update", **f.row})
+                        if not self.dry_run:
+                            self.db.table("property_master").update(f.row).eq("id", pid).execute()
+                        self.stats["updated"] += 1
+                    self._mark(raw["id"], pid)
+                else:
+                    ref = self._new_ref(raw["source_url"], taken)
+                    taken.add(ref)
+                    row = {**f.row, "listing_id": ref, "market_id": MARKET_ID, "first_price_usd": f.row["asking_price_usd"]}
+                    self.planned.append({"action": "insert", **row})
+                    if self.dry_run:
+                        new_id = f"dry-{ref}"
+                    else:
+                        new_id = self.db.table("property_master").insert(row).execute().data[0]["id"]
+                    self.stats["inserted"] += 1
+                    m = {k: row.get(k) for k in MATCH_COLS.split(",")} | {"id": new_id}
+                    masters.append(m)
+                    by_id[new_id] = m
+                    self._mark(raw["id"], None if self.dry_run else new_id)
+                log.info("%s  %s | %s %s | %s | USD %s", ref if not (master or pid) else "update", f.row["asset_name"], f.row["asset_class"], f.row["property_type"], f.row["district"], f"{f.row['asking_price_usd']:,.0f}")
+            except Exception as exc:  # noqa: BLE001
+                self.stats["failed"] += 1
+                self.failures.append(f"{raw['source_url']}: {exc}")
+                log.exception("failed %s", raw["source_url"])
+                self._mark(raw["id"], None, str(exc)[:500])
+
+    def comps_pass(self) -> None:
+        """Recompute signals for every active listing (see module docstring)."""
+        rows = _all(lambda: self.db.table("property_master").select(
+            "id,listing_id,asset_class,property_type,district,listing_status,price_per_sqft_usd,signal,comps_psf_usd,"
+            "comps_count,price_vs_comps_pct,district_psf_usd,price_vs_district_pct"
+        ).eq("status", "active"))
+        live = [r for r in rows if r["listing_status"] not in ("Sold", "De-listed") and r["price_per_sqft_usd"]]
+        now = datetime.now(timezone.utc).isoformat()
+
+        def pool_for(r: dict[str, Any]) -> list[float]:
+            same = [x for x in live if x["id"] != r["id"] and x["asset_class"] == r["asset_class"]]
+            if r["asset_class"] == "Property":
+                unit = r["property_type"] in UNIT_TYPES
+                same = [x for x in same if (x["property_type"] in UNIT_TYPES) == unit]
+            local = [x for x in same if x["district"] == r["district"]]
+            return [float(x["price_per_sqft_usd"]) for x in (local if len(local) >= 3 else same)]
+
+        for r in rows:
+            psf = float(r["price_per_sqft_usd"]) if r["price_per_sqft_usd"] else None
+            comps = pool_for(r)
+            ref = None
+            if comps:
+                ref = statistics.median(comps) if r["asset_class"] == "Property" else statistics.fmean(comps)
+            vs = round((psf - ref) / ref * 100, 2) if psf and ref else None
+            signal = "AT_MARKET" if vs is None or len(comps) < 2 else "UNDERVALUED" if vs <= -10 else "OVERPRICED" if vs >= 10 else "AT_MARKET"
+            if r["asset_class"] == "Property":
+                upd = {"comps_psf_usd": round(ref, 2) if ref else None, "comps_count": len(comps), "price_vs_comps_pct": vs,
+                       "district_psf_usd": None, "price_vs_district_pct": None}
+            else:
+                upd = {"comps_psf_usd": None, "comps_count": len(comps), "price_vs_comps_pct": None,
+                       "district_psf_usd": round(ref, 2) if ref else None, "price_vs_district_pct": vs}
+            upd["signal"] = signal
+            changed = any(not _same(r.get(k), v) for k, v in upd.items())
+            if changed:
+                self.stats["signals"] += 1
+                if not self.dry_run:
+                    self.db.table("property_master").update({**upd, "signal_updated_at": now}).eq("id", r["id"]).execute()
+
+    def run(self) -> dict[str, int]:
+        self.process_queue()
+        self.comps_pass()
+        log.info("normaliser: %s", ", ".join(f"{k} {v}" for k, v in self.stats.items()))
+        return self.stats
+
+
+def main() -> int:
+    from .__main__ import make_client
+
+    ap = argparse.ArgumentParser(prog="terminal_spider.normalise", description="raw_listings -> property_master")
+    ap.add_argument("--dry-run", action="store_true", help="read and print, write nothing")
+    ap.add_argument("--limit", type=int, help="process at most N raw rows")
+    ap.add_argument("-v", "--verbose", action="store_true")
+    args = ap.parse_args()
+    logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO, format="%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S")
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    n = Normaliser(make_client(), dry_run=args.dry_run, limit=args.limit)
+    n.run()
+    if args.dry_run:
+        for p in n.planned:
+            print({k: p.get(k) for k in ("action", "listing_id", "asset_name", "asset_class", "property_type", "district", "bedrooms",
+                                        "bathrooms", "built_sqft", "lot_sqft", "pool", "tenure", "asking_price_usd", "listing_status", "lat", "lng")})
+    for f in n.failures:
+        print("FAILED", f)
+    return 1 if n.failures and not n.stats["inserted"] + n.stats["updated"] + n.stats["merged"] else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
