@@ -161,14 +161,14 @@ export type InvestorExample = {
   offMarket: number;
 };
 
-/** A partnership post on members-only Deals (fictional member). */
+/** A partnership post on the members-only Market feed (fictional member). */
 export function InvestorPostCard({ ex }: { ex: InvestorExample }) {
   return (
     <div className="relative">
       <div className="relative rounded-3xl border border-zinc-200 bg-white p-5 shadow-[0_30px_70px_-35px_rgb(10_10_10/0.35)] sm:p-6">
         <RunLine speed={9} delay={-6} />
         <div className="flex items-center justify-between">
-          <p className="text-[12px] font-medium text-zinc-500">Deals · Partnership</p>
+          <p className="text-[12px] font-medium text-zinc-500">Market feed · Partnership</p>
           <span className="rounded-full bg-zinc-950 px-2.5 py-0.5 text-[12px] font-medium text-lime">Members only</span>
         </div>
         <div className="mt-4 flex items-center gap-3">

@@ -32,7 +32,7 @@ const DOT: Record<HeroEvent["tone"], string> = { up: "#4CA30D", down: "#E5484D",
 const TABS = [
   { label: "Listings", icon: LayoutList },
   { label: "Watchlist", icon: Pin },
-  { label: "Deals", icon: Megaphone },
+  { label: "Market feed", icon: Megaphone },
   { label: "Settings", icon: Settings },
 ];
 

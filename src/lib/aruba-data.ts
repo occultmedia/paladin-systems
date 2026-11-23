@@ -8,7 +8,7 @@
 import { scoreConfidence } from "./confidence";
 
 /**
- * The Terminal (dashboard, Watchlist, Deals) reads only live Supabase data:
+ * The Terminal (dashboard, Watchlist, Market feed) reads only live Supabase data:
  * `v_master_market` (indexed) and `v_agent_listings` (added by agents).
  * The mock data below is kept only to illustrate the landing, login and
  * sign-up pages.

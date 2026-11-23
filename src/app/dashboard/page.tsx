@@ -178,16 +178,16 @@ function Logo() {
   );
 }
 
-const TABS = ["Listings", "Watchlist", "Deals", "Settings"] as const;
+const TABS = ["Listings", "Watchlist", "Market feed", "Settings"] as const;
 type Tab = (typeof TABS)[number];
 const TAB_SLUG: Record<Tab, string> = {
   Listings: "listings",
   Watchlist: "watchlist",
-  Deals: "deals",
+  "Market feed": "market-feed",
   Settings: "settings",
 };
 
-const TAB_ICON: Record<Tab, typeof Pin> = { Listings: LayoutList, Watchlist: Pin, Deals: Megaphone, Settings: SettingsIcon };
+const TAB_ICON: Record<Tab, typeof Pin> = { Listings: LayoutList, Watchlist: Pin, "Market feed": Megaphone, Settings: SettingsIcon };
 
 /** Pill switch between the dashboard tabs. */
 function TabSwitch({ tab, onTab, watchCount, full = false }: { tab: Tab; onTab: (t: Tab) => void; watchCount: number; full?: boolean }) {
@@ -1975,7 +1975,7 @@ function ActiveListings({
   initialOpenId?: string;
   initialNewToday?: boolean;
   initialFullMap?: boolean;
-  /** Leaving full-screen mode from the Watchlist or Deals panel opens that tab. */
+  /** Leaving full-screen mode from the Watchlist or Market feed panel opens that tab. */
   onExitTo?: (tab: FullPanel) => void;
   /** Full-screen mode was left; do not open it again on the next visit to this tab. */
   onFullClosed?: () => void;
@@ -3345,7 +3345,8 @@ function TerminalUpdates({
 
 const SLUG_TAB = {
   ...(Object.fromEntries(Object.entries(TAB_SLUG).map(([t, s]) => [s, t])) as Record<string, Tab>),
-  feed: "Deals", // the tab was called Feed; keep old links working
+  feed: "Market feed", // the tab was called Feed, then Deals; keep old links working
+  deals: "Market feed",
 } as Record<string, Tab>;
 
 function Dashboard() {
@@ -3463,7 +3464,7 @@ function Dashboard() {
               onExitTo={(t) => setTab(t)}
             />
           </>
-        ) : tab === "Deals" ? (
+        ) : tab === "Market feed" ? (
           <FeedView profile={me.profile} profileLoading={me.loading} shared={me.shared} onEditProfile={openProfile} onOpenListing={openListing} />
         ) : tab === "Settings" ? (
           <SettingsView profile={{ draft: me.draft, loading: me.loading }} onSaveProfile={me.save} shared={me.shared} />

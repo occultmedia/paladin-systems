@@ -337,7 +337,7 @@ const AUDIENCES: Audience[] = [
     points: [
       "AI flags listings priced 10% or more below their comps every morning.",
       "Full price history and a Confidence Score on every listing for quick diligence.",
-      "Off-market deals and co-investment posts on members-only Deals.",
+      "Off-market deals and co-investment posts on the members-only Market feed.",
     ],
     cta: { label: "Join as an investor", href: "/signup" },
     visual: <InvestorPostCard ex={INVESTOR} />,
@@ -359,7 +359,7 @@ const FEATURES: Array<[typeof Rss, string, string]> = [
   [Pin, "Watchlist", "Pin properties and see every move since you pinned."],
   [Users, "Interested clients", "Buyers on each listing with phone and notes."],
   [MessageCircle, "Agent contact", "Call, WhatsApp or e-mail the listing agent in one tap."],
-  [Handshake, "Deals board", "Members-only off-market deals, buyer requests and rentals."],
+  [Handshake, "Market feed", "The one page every member sees: off-market deals, buyer requests and rentals."],
   [MapIcon, "3D map", "Every listing on a map of the island, with filters."],
   [FileSpreadsheet, "CSV export", "Take any filtered list into your own spreadsheet."],
   [Flag, "Flag sold listings", "Mark a listing as gone and it disappears for every member."],
@@ -453,8 +453,8 @@ const FAQ: FaqItem[] = [
     a: "No. AI Signal writes a daily market briefing and a plain-English note on each listing from the same data you see in the table: price history, comparable listings and time on the market. Treat it as a starting point and check the details with the listing agent before you make an offer.",
   },
   {
-    q: "Who can see my watchlist, clients and Deals posts?",
-    a: "Your watchlist and the interested clients you save on a listing are yours alone. Posts on the Deals board (off-market deals, buyer requests and rentals) are shared with every member for 14 days. Post blind and members only see your role: they tap “I’m interested”, and you decide who to contact.",
+    q: "Who can see my watchlist, clients and Market feed posts?",
+    a: "Your watchlist and the interested clients you save on a listing are yours alone. Posts on the Market feed (off-market deals, buyer requests and rentals) are shared with every member for 14 days. Post blind and members only see your role: they tap “I’m interested”, and you decide who to contact.",
   },
   {
     q: "How much does it cost?",
@@ -617,7 +617,7 @@ export default function Home() {
                     "Value signal, price history and Confidence Score",
                     "AI morning briefing and a note on every listing",
                     "Watchlist and interested clients",
-                    "Members-only Deals board",
+                    "Members-only Market feed",
                     "3D map, agent contact and CSV export",
                   ].map((f) => (
                     <li key={f} className="flex gap-3 text-[14px] text-zinc-700">

@@ -1,7 +1,7 @@
 "use client";
 
 /*
- * A Terminal listing attached to a Deals post: the picker in the New post form
+ * A Terminal listing attached to a Market feed post: the picker in the New post form
  * and the card shown on the post. The card carries the listing's own data
  * (photo, price, AI Signal, price vs comps) and opens it in the Terminal.
  */

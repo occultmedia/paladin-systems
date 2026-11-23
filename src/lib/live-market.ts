@@ -4,7 +4,7 @@
  * The live Master Market: every active indexed listing from Supabase
  * (`v_master_market`, see lib/master-market.ts). Starts empty and fills as
  * the Index runs. The dashboard publishes the combined market (indexed +
- * agent listings) here so other parts (the Deals listing picker and the
+ * agent listings) here so other parts (the Market feed listing picker and the
  * listing cards on posts) can look listings up without loading them again.
  */
 

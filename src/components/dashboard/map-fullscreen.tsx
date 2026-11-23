@@ -2,10 +2,10 @@
 
 /*
  * Full-screen mode of the Terminal: the map fills the screen, with a panel
- * for Listings (your current filters), your Watchlist and Deals. Members land
+ * for Listings (your current filters), your Watchlist and the Market feed. Members land
  * here after logging in. Hovering a listing highlights its pin; clicking a
  * listing or pin flies the map in (3D) and shows its card. "Exit" returns to
- * the normal view on the matching tab (Listings, Watchlist or Deals). Esc
+ * the normal view on the matching tab (Listings, Watchlist or Market feed). Esc
  * exits too. On phones a bottom bar switches between Map and the panels.
  */
 
@@ -17,7 +17,7 @@ import { createPortal } from "react-dom";
 import { ArrowLeft, LayoutList, Map as MapIcon, Megaphone, Pin, Plus, Search, X } from "lucide-react";
 import { Wordmark } from "@/components/logo";
 import { GrainField } from "@/components/landing/grain-field";
-import { PostCard } from "@/components/feed/feed-view";
+import { PostCard, SharedNotice } from "@/components/feed/feed-view";
 import { BAND_COLOR, confidenceBand } from "@/lib/confidence";
 import type { Listing } from "@/lib/aruba-data";
 import { DEAL_TTL_DAYS, POST_KINDS, useFeed, type PostKind } from "@/lib/feed";
@@ -32,11 +32,11 @@ const ArubaMap = dynamic(() => import("./aruba-map"), {
 
 const noopSubscribe = () => () => {};
 
-export type FullPanel = "Listings" | "Watchlist" | "Deals";
+export type FullPanel = "Listings" | "Watchlist" | "Market feed";
 const PANELS: Array<{ id: FullPanel; icon: typeof Pin }> = [
   { id: "Listings", icon: LayoutList },
   { id: "Watchlist", icon: Pin },
-  { id: "Deals", icon: Megaphone },
+  { id: "Market feed", icon: Megaphone },
 ];
 
 const EASE = [0.22, 1, 0.36, 1] as const;
@@ -202,8 +202,8 @@ function WatchPanel({
   );
 }
 
-/** Deals in full-screen mode: no map, just the deal and offer cards. */
-function DealsBoard({ onPick, onNewPost, tabs }: { onPick: (id: string) => void; onNewPost: () => void; tabs?: React.ReactNode }) {
+/** Market feed in full-screen mode: no map, just the post cards. */
+function FeedBoard({ onPick, onNewPost, tabs }: { onPick: (id: string) => void; onNewPost: () => void; tabs?: React.ReactNode }) {
   const { posts, remove, setInterest, responders, loading } = useFeed(null);
   const [kind, setKind] = useState<PostKind | "All">("All");
   const [q, setQ] = useState("");
@@ -223,11 +223,11 @@ function DealsBoard({ onPick, onNewPost, tabs }: { onPick: (id: string) => void;
           {tabs && <div className="w-[360px] max-w-full">{tabs}</div>}
           <label className="relative min-w-[200px] flex-1">
             <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
-            <span className="sr-only">Search deals</span>
+            <span className="sr-only">Search the Market feed</span>
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Search deals, areas, members or a listing ID"
+              placeholder="Search posts, areas, members or a listing ID"
               className="w-full rounded-full border border-zinc-300 bg-white py-2 pl-9 pr-4 text-[13px] outline-none placeholder:text-zinc-400 focus:border-zinc-950"
             />
           </label>
@@ -262,6 +262,9 @@ function DealsBoard({ onPick, onNewPost, tabs }: { onPick: (id: string) => void;
       </div>
 
       <div data-lenis-prevent className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6">
+        <div className="mx-auto mb-4 max-w-[1600px]">
+          <SharedNotice light />
+        </div>
         {loading ? (
           <div className="grid gap-4 md:grid-cols-2">
             {[0, 1, 2, 3].map((i) => (
@@ -275,7 +278,7 @@ function DealsBoard({ onPick, onNewPost, tabs }: { onPick: (id: string) => void;
             ))}
           </div>
         ) : (
-          <Empty title={posts.length ? "No deals match" : `No deals in the last ${DEAL_TTL_DAYS} days`} text={posts.length ? "Try another type or search." : "Be the first to post one."} />
+          <Empty title={posts.length ? "No posts match" : `Nothing posted in the last ${DEAL_TTL_DAYS} days`} text={posts.length ? "Try another type or search." : "Be the first to post one."} />
         )}
       </div>
     </div>
@@ -376,7 +379,7 @@ export function MapFullscreen({
   // Portals only exist in the browser; wait until after hydration (the page can open in full screen).
   const mounted = useSyncExternalStore(noopSubscribe, () => true, () => false);
   const selected = allListings.find((l) => l.listing_id === selectedId) ?? null;
-  const showDetails = detailsOpen && selected !== null && panel !== "Deals";
+  const showDetails = detailsOpen && selected !== null && panel !== "Market feed";
   const closeAll = () => {
     setDetailsOpen(false);
     onSelect("");
@@ -434,7 +437,7 @@ export function MapFullscreen({
         onHover={onHover}
       />
     ) : (
-      <DealsBoard onPick={openFromDeal} onNewPost={() => onExit("Deals")} />
+      <FeedBoard onPick={openFromDeal} onNewPost={() => onExit("Market feed")} />
     );
 
   return createPortal(
@@ -472,7 +475,7 @@ export function MapFullscreen({
 
           <div className="relative flex min-h-0 flex-1">
             {/* side panel (desktop) */}
-            <aside className={`glass absolute bottom-3 left-3 top-3 z-[4] hidden w-[380px] flex-col overflow-hidden rounded-2xl ${panel === "Deals" ? "" : "lg:flex"}`}>
+            <aside className={`glass absolute bottom-3 left-3 top-3 z-[4] hidden w-[380px] flex-col overflow-hidden rounded-2xl ${panel === "Market feed" ? "" : "lg:flex"}`}>
               <div className="border-b border-white/60 p-3">
                 <PanelTabs value={panel} onChange={setPanel} />
               </div>
@@ -480,19 +483,19 @@ export function MapFullscreen({
                 data-lenis-prevent
                 className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain p-2"
               >
-                {panel !== "Deals" && list(panel)}
+                {panel !== "Market feed" && list(panel)}
               </div>
             </aside>
 
-            {/* Deals (desktop): the board takes the whole screen, no map */}
-            {panel === "Deals" && mobileView === "Map" && (
+            {/* Market feed (desktop): the board takes the whole screen, no map */}
+            {panel === "Market feed" && mobileView === "Map" && (
               <div className="absolute inset-0 z-[5] hidden lg:block">
-                <DealsBoard onPick={openFromDeal} onNewPost={() => onExit("Deals")} tabs={<PanelTabs value={panel} onChange={setPanel} />} />
+                <FeedBoard onPick={openFromDeal} onNewPost={() => onExit("Market feed")} tabs={<PanelTabs value={panel} onChange={setPanel} />} />
               </div>
             )}
 
-            {/* map (isolated, so its pins never paint over the Deals board) */}
-            <div className={`relative isolate min-w-0 flex-1 ${panel === "Deals" ? "lg:invisible" : ""}`}>
+            {/* map (isolated, so its pins never paint over the Market feed) */}
+            <div className={`relative isolate min-w-0 flex-1 ${panel === "Market feed" ? "lg:invisible" : ""}`}>
               <ArubaMap
                 mode="listings"
                 listings={listings}
@@ -505,7 +508,7 @@ export function MapFullscreen({
 
               {/* the picked listing opens as a glass window on the map */}
               <AnimatePresence>
-                {selected && !showDetails && mobileView === "Map" && panel !== "Deals" && (
+                {selected && !showDetails && mobileView === "Map" && panel !== "Market feed" && (
                   <ListingPopup
                     key={selected.listing_id}
                     l={selected}

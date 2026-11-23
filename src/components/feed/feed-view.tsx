@@ -1,7 +1,7 @@
 "use client";
 
 /*
- * Deals tab (the Deal Desk): a blind bid/ask board. Sellers post asks,
+ * Market feed tab (the Deal Desk): a blind bid/ask board. Sellers post asks,
  * buyers post bids with a budget range. Named posts show the poster and
  * their contact buttons; blind posts show only the poster's role, members tap
  * "I'm interested" and the poster sees who responded and reaches out. No chat
@@ -9,7 +9,7 @@
  */
 
 import { AnimatePresence, motion } from "framer-motion";
-import { Building2, Check, Clock, EyeOff, Loader2, Mail, MapPin, Megaphone, MessageCircle, Phone, Plus, Search, ShieldCheck, Trash2, Users } from "lucide-react";
+import { Building2, Check, Clock, EyeOff, Globe2, Loader2, Lock, Mail, MapPin, Megaphone, MessageCircle, Phone, Plus, Search, ShieldCheck, Trash2, Users } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -82,7 +82,7 @@ const digits = (s: string) => s.replace(/[^\d]/g, "");
 
 function ContactRow({ post }: { post: Pick<FeedPost, "title" | "author"> }) {
   const a = post.author;
-  const msg = `Hi ${a.name.split(" ")[0]}, about "${post.title}" on Terminal Deals.`;
+  const msg = `Hi ${a.name.split(" ")[0]}, about "${post.title}" on the Terminal Market feed.`;
   const links = [
     a.whatsapp && { href: `https://wa.me/${digits(a.whatsapp)}?text=${encodeURIComponent(msg)}`, label: "WhatsApp", icon: MessageCircle, primary: true },
     a.phone && { href: `tel:${a.phone.replace(/[^\d+]/g, "")}`, label: "Call", icon: Phone },
@@ -502,18 +502,38 @@ function Composer({ open, onClose, onPost, author }: { open: boolean; onClose: (
         {error && <p className="rounded-lg bg-[#FBE9E9] px-3 py-2 text-[12.5px] text-[#B23A3A]">{error}</p>}
 
         <div className="flex flex-col-reverse gap-3 border-t border-zinc-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-[11.5px] text-zinc-500">Your post deletes itself after {DEAL_TTL_DAYS} days.</p>
+          <p className="text-[11.5px] text-zinc-500">
+            <b className="font-semibold text-zinc-800">Every Terminal member can see this post.</b> It deletes itself after {DEAL_TTL_DAYS} days.
+          </p>
           <button
             type="submit"
             disabled={busy}
             className="shine inline-flex items-center justify-center gap-2 rounded-full bg-zinc-950 px-6 py-2.5 font-display text-[13.5px] font-semibold text-lime transition-colors hover:bg-zinc-800 disabled:opacity-60"
           >
             {busy && <Loader2 size={14} className="animate-spin" />}
-            Post to Deals
+            Post to Market feed
           </button>
         </div>
       </form>
     </Dialog>
+  );
+}
+
+/** The Market feed is the one page every member sees. Said plainly wherever you post. */
+export function SharedNotice({ light = false }: { light?: boolean }) {
+  return (
+    <div
+      className={`flex items-start gap-3 rounded-xl px-4 py-3 text-[12.5px] leading-relaxed ${
+        light ? "border border-zinc-200 bg-white text-zinc-600" : "bg-white/[0.06] text-zinc-300 ring-1 ring-lime/40"
+      }`}
+    >
+      <Globe2 size={16} strokeWidth={1.75} className={`mt-0.5 shrink-0 ${light ? "text-zinc-950" : "text-lime"}`} />
+      <p>
+        <b className={light ? "font-semibold text-zinc-950" : "font-semibold text-white"}>This is the only page visible to all users.</b> Every Terminal member
+        sees what is posted here. Your Watchlist, clients and Settings stay private{" "}
+        <Lock size={11} strokeWidth={2} className="-mt-0.5 inline" aria-hidden /> to you.
+      </p>
+    </div>
   );
 }
 
@@ -571,7 +591,7 @@ export function FeedView({
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
               <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500">Members only · Blind bid/ask · Posts last {DEAL_TTL_DAYS} days</p>
-              <h1 className="mt-2 font-display text-[28px] font-bold tracking-tight text-white sm:text-[34px]">Deals</h1>
+              <h1 className="mt-2 font-display text-[28px] font-bold tracking-tight text-white sm:text-[34px]">Market feed</h1>
               <p className="mt-1 max-w-xl text-[13px] text-zinc-400">
                 Bids and asks from agents, brokers and investors: off-market deals, buyer requests, rentals and partnerships. Post blind, and only reveal yourself to the members you choose.
               </p>
@@ -586,7 +606,11 @@ export function FeedView({
             </button>
           </div>
 
-          <div className="no-scrollbar -mx-4 mt-6 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0">
+          <div className="mt-5 max-w-3xl">
+            <SharedNotice />
+          </div>
+
+          <div className="no-scrollbar -mx-4 mt-5 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0">
             {(["All", ...POST_KINDS] as const).map((k) => {
               const on = kind === k;
               return (
@@ -612,16 +636,16 @@ export function FeedView({
         <section aria-label="Posts" className="min-w-0">
           <label className="relative mb-4 block">
             <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
-            <span className="sr-only">Search deals</span>
+            <span className="sr-only">Search the Market feed</span>
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Search deals, areas or a listing ID"
+              placeholder="Search posts, areas or a listing ID"
               className="w-full rounded-full border border-zinc-300 bg-white py-2.5 pl-9 pr-4 text-[13.5px] outline-none transition-colors placeholder:text-zinc-400 hover:border-zinc-400 focus:border-zinc-950"
             />
           </label>
 
-          {error && <p className="mb-4 rounded-lg bg-[#FBE9E9] px-3 py-2 text-[12.5px] text-[#B23A3A]">Deals could not load: {error}</p>}
+          {error && <p className="mb-4 rounded-lg bg-[#FBE9E9] px-3 py-2 text-[12.5px] text-[#B23A3A]">The Market feed could not load: {error}</p>}
 
           {loading ? (
             <div className="space-y-3">
@@ -657,7 +681,7 @@ export function FeedView({
           <div className="deck relative isolate overflow-hidden rounded-2xl p-5 [background-attachment:scroll]">
             <GrainField variant="ink" className="-z-10" />
             <p className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-400">
-              <ShieldCheck size={13} className="text-lime" /> How Deals works
+              <ShieldCheck size={13} className="text-lime" /> How the Market feed works
             </p>
             <ul className="mt-3 space-y-2.5 text-[12.5px] leading-relaxed text-zinc-300">
               <li>Post an ask (something to sell, rent or fund) or a bid (what a client wants, with a budget).</li>
@@ -665,7 +689,7 @@ export function FeedView({
               <li>Named posts show your contact buttons, so members can reach you directly.</li>
               <li className="flex gap-2">
                 <Clock size={13} className="mt-[3px] shrink-0 text-lime" />
-                <span>Posts delete themselves {DEAL_TTL_DAYS} days after they go up, so Deals is always fresh.</span>
+                <span>Posts delete themselves {DEAL_TTL_DAYS} days after they go up, so the feed is always fresh.</span>
               </li>
             </ul>
             {!profileLoading && !profile && (

@@ -1,7 +1,7 @@
 "use client";
 
 /*
- * Deals (the Deal Desk): a blind bid/ask board for members. Sellers post
+ * Market feed (the Deal Desk): a blind bid/ask board for members. Sellers post
  * asks (off-market, for sale, for rent, partnerships), buyers post bids
  * (buyer requests) with a budget range. Blind posts hide who posted: other
  * members tap "I'm interested", and only the poster sees who responded and

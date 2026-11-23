@@ -99,7 +99,7 @@ function ProfileForm({ initial, onSave, shared }: { initial: Profile; onSave: (p
 
   return (
     <form onSubmit={submit} className="space-y-6">
-      <Card id="profile" title="Profile" text="How you appear on Deals and to the members you contact.">
+      <Card id="profile" title="Profile" text="How you appear on the Market feed and to the members you contact.">
         <div className="grid gap-5 sm:grid-cols-2">
           <ImagePick label="Profile photo" hint="A clear headshot. Square works best." value={p.photo} round onChange={(v) => set("photo", v)} onError={setError} />
           <ImagePick label="Company logo" hint="PNG with a transparent background looks best." value={p.logo} round={false} onChange={(v) => set("logo", v)} onError={setError} />
@@ -326,7 +326,7 @@ function AccountCard() {
         </>
       ) : (
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="max-w-[46ch] text-[13px] text-zinc-600">You are using a preview. Your settings are saved on this device. Create an account to keep them and appear on Deals.</p>
+          <p className="max-w-[46ch] text-[13px] text-zinc-600">You are using a preview. Your settings are saved on this device. Create an account to keep them and appear on the Market feed.</p>
           <Link href="/signup" className="rounded-full bg-zinc-950 px-5 py-2 font-display text-[13px] font-semibold text-lime hover:bg-zinc-800">
             Create an account
           </Link>
