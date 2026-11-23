@@ -529,6 +529,8 @@ class Normaliser:
                 ref = statistics.median(comps) if r["asset_class"] == "Property" else statistics.fmean(comps)
             vs = round((psf - ref) / ref * 100, 2) if psf and ref else None
             signal = "AT_MARKET" if vs is None or len(comps) < 2 else "UNDERVALUED" if vs <= -10 else "OVERPRICED" if vs >= 10 else "AT_MARKET"
+            if r["listing_status"] in ("Sold", "De-listed"):
+                signal = "AT_MARKET"  # no longer buyable: keep the numbers, never flag it Below market or Overpriced
             if r["asset_class"] == "Property":
                 upd = {"comps_psf_usd": round(ref, 2) if ref else None, "comps_count": len(comps), "price_vs_comps_pct": vs,
                        "district_psf_usd": None, "price_vs_district_pct": None}
