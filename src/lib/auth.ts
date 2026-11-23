@@ -76,7 +76,15 @@ export async function logIn(email: string, password: string): Promise<AuthResult
 export async function sendReset(email: string): Promise<AuthResult> {
   const sb = supabase();
   if (!sb) return NOT_READY;
-  const { error } = await sb.auth.resetPasswordForEmail(email.trim(), { redirectTo: `${window.location.origin}/login` });
+  const { error } = await sb.auth.resetPasswordForEmail(email.trim(), { redirectTo: `${window.location.origin}/reset-password` });
+  return error ? { ok: false, error: error.message } : { ok: true };
+}
+
+/** Sets a new password for the account signed in by the reset link. */
+export async function updatePassword(password: string): Promise<AuthResult> {
+  const sb = supabase();
+  if (!sb) return NOT_READY;
+  const { error } = await sb.auth.updateUser({ password });
   return error ? { ok: false, error: error.message } : { ok: true };
 }
 

@@ -1,6 +1,6 @@
 # Sequence Data
 
-Aruba Real Estate Market Intelligence. Sequence Data scrapes every
+Aruba Real Estate Market Intelligence. Sequence Data indexes every
 high-value property and land listing in Aruba daily, plus vacation-rental
 data, and shows what is for sale, what it would earn, and whether the
 price is right. For real estate agents and investors ($150/month).
@@ -10,7 +10,7 @@ price is right. For real estate agents and investors ($150/month).
 - Data layer and mock data: `src/lib/aruba-data.ts` (swap `repository` for Supabase)
 
 Built with Next.js (App Router), TypeScript, Tailwind CSS v4, Recharts and
-Leaflet. Listing photos are Unsplash placeholders until the scraper stores real ones.
+Leaflet. Listing photos are Unsplash placeholders until the Index stores real ones.
 
 ## Commands
 

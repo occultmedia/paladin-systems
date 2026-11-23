@@ -1,7 +1,7 @@
 /**
  * Sequence Data — Aruba data layer.
  * Types mirror the Supabase Postgres tables; everything below "Mock data"
- * is placeholder until the scraper feed is live. Swap `repository` for the
+ * is placeholder until the Index feed is live. Swap `repository` for the
  * Supabase implementation (sketch below) and the UI keeps working.
  */
 
@@ -9,7 +9,7 @@ import { scoreConfidence } from "./confidence";
 
 /**
  * The Terminal (dashboard, Watchlist, Deals) reads only live Supabase data:
- * `v_master_market` (scraped) and `v_agent_listings` (added by agents).
+ * `v_master_market` (indexed) and `v_agent_listings` (added by agents).
  * The mock data below is kept only to illustrate the landing, login and
  * sign-up pages.
  */
@@ -67,10 +67,10 @@ export const TENURE_HINT: Record<Tenure, string> = {
   Erfpacht: "Leasehold: land leased from the government, building owned",
 };
 
-/** Where the listing is in the sale process, read from the listing site on every scrape. */
+/** Where the listing is in the sale process, read from the listing site on every Index run. */
 export type ListingStatus = "For sale" | "Under contract" | "Sold" | "De-listed";
 export const LISTING_STATUSES: ListingStatus[] = ["For sale", "Under contract", "Sold", "De-listed"];
-/** How the scraper decides each status (shown as help text in the UI). */
+/** How the Index decides each status (shown as help text in the UI). */
 export const STATUS_HINT: Record<ListingStatus, string> = {
   "For sale": "Listed and active on the agency's website.",
   "Under contract": "The agency marks it under contract, under offer or sale pending.",
@@ -78,18 +78,18 @@ export const STATUS_HINT: Record<ListingStatus, string> = {
   "De-listed": "Taken off the agency's website without being marked sold. It may be withdrawn, expired or sold privately.",
 };
 
-/** The real-estate company whose site the listing was scraped from. */
+/** The real-estate company whose site the listing was indexed from. */
 export interface Agency {
   id: string;
   name: string;
   website: string | null;
-  logo_url: string | null; // scraped from the agency site; null = show a monogram
+  logo_url: string | null; // indexed from the agency site; null = show a monogram
   color: string; // monogram background until the real logo is stored
 }
 
 /*
  * Placeholder agencies for the mock data (fictional names, no websites).
- * The scraper fills this table (table: agencies) with each real site's name,
+ * The Index fills this table (table: agencies) with each real site's name,
  * logo and URL, and stores every listing's own page in source_url.
  */
 export const AGENCIES: Record<string, Agency> = {
@@ -111,7 +111,7 @@ function agencyFor(channel: string, category: "Property" | "Land" | "Commercial"
   return pool[h % pool.length];
 }
 
-/** The agent at the agency who handles the listing (scraped from the listing page). */
+/** The agent at the agency who handles the listing (indexed from the listing page). */
 export interface ListingAgent {
   id: string;
   name: string;
@@ -125,7 +125,7 @@ export interface ListingAgent {
 
 /*
  * Placeholder agents (fictional people, reserved .example e-mail domain and
- * 555 test numbers). The scraper replaces these with the agent named on each
+ * 555 test numbers). The Index replaces these with the agent named on each
  * listing page.
  */
 const mkAgent = (agency: string, slug: string, name: string, title: string, n: number): ListingAgent => ({
@@ -174,23 +174,23 @@ function agentFor(agency: Agency, id: string): ListingAgent | null {
 export type Pool = "Private pool" | "Shared pool" | "No pool";
 export const POOLS: Pool[] = ["Private pool", "Shared pool", "No pool"];
 
-/** One change seen between two scrapes (table: listing_price_history). */
+/** One change seen between two Index runs (table: listing_price_history). */
 export interface PriceEvent {
-  date: string; // ISO date of the scrape that saw it
+  date: string; // ISO date of the Index run that saw it
   event: "Listed" | "Price drop" | "Price increase";
   price_usd: number;
   change_pct: number | null; // vs the previous price, null for "Listed"
 }
 
-/** Columns shared by every scraped listing. */
+/** Columns shared by every indexed listing. */
 export interface ListingBase {
   tenure: Tenure;
   lease_years_left: number | null; // erfpacht only
-  is_new: boolean; // first found in the latest scrape
+  is_new: boolean; // first found in the latest Index run
   price_history: PriceEvent[]; // oldest first; last entry = current price
   last_price_change: PriceEvent | null;
   status: ListingStatus;
-  status_changed: string | null; // ISO date the scrape saw the current status (null = for sale since listed)
+  status_changed: string | null; // ISO date the Index run saw the current status (null = for sale since listed)
   pool: Pool | null; // null for land
   listing_id: string;
   market_id: string;
@@ -198,11 +198,11 @@ export interface ListingBase {
   district: string;
   asking_price_usd: number;
   price_per_sqft_usd: number; // built area for properties, lot for land
-  price_change_pct: number; // since first scraped
+  price_change_pct: number; // since first indexed
   days_on_market: number;
   first_seen: string; // ISO date
   last_scraped: string; // ISO timestamp
-  last_found_at: string; // ISO timestamp the scraper last found it on its source site (property_master.last_scraped_at)
+  last_found_at: string; // ISO timestamp the Index last found it on its source site (property_master.last_scraped_at)
   confidence_score: number; // 0-100, see lib/confidence.ts; 0 = flagged delisted (hidden)
   source: string; // listing agency name (= agency.name)
   source_url: string | null; // the listing's own page on the agency's site
@@ -211,8 +211,8 @@ export interface ListingBase {
   signal: Signal;
   lat: number;
   lng: number;
-  photo_url: string | null; // main listing photo (scraped)
-  /** Set on listings an agent added by hand (table: agent_listings); absent on scraped ones. */
+  photo_url: string | null; // main listing photo (indexed)
+  /** Set on listings an agent added by hand (table: agent_listings); absent on indexed ones. */
   member?: MemberListingMeta;
 }
 
@@ -226,7 +226,7 @@ export interface MemberListingMeta {
   address: string | null;
   notes: string | null;
   raw_status: "For sale" | "Under contract" | "Sold" | "Withdrawn";
-  /** The scraper later found it on a public site (Master Market listing ref). */
+  /** The Index later found it on a public site (Master Market listing ref). */
   went_public: { listing_id: string; at: string } | null;
   /** Best duplicate match when it was saved (score >= 50). */
   match: { kind: "market" | "member"; ref: string; name: string; score: number } | null;
@@ -273,7 +273,7 @@ export interface CommercialListing extends ListingBase {
  */
 export type Listing = ListingSignal | LandListing | CommercialListing;
 
-/** table: vacation_rentals — scraped from Airbnb, Vrbo and direct-booking sites. */
+/** table: vacation_rentals — indexed from Airbnb, Vrbo and direct-booking sites. */
 export type RentalPlatform = "Airbnb" | "Vrbo" | "Direct";
 export const RENTAL_PLATFORMS: RentalPlatform[] = ["Airbnb", "Vrbo", "Direct"];
 export const PLATFORM_LABEL: Record<RentalPlatform, string> = {
@@ -314,7 +314,7 @@ export interface DashboardRepository {
   getMonthlyPerformance(marketId: string, months: number): Promise<MonthlyPerformance[]>;
   /** Featured property rows for the Yield Radar on the Rental Market tab. */
   getActiveListingSignals(marketId: string, limit: number): Promise<ListingSignal[]>;
-  /** Every active scraped listing (properties and land), for the Active Listings tab. */
+  /** Every active indexed listing (properties and land), for the Active Listings tab. */
   getActiveListings(marketId: string): Promise<Listing[]>;
   /** Every tracked vacation rental (Airbnb, Vrbo, direct sites), for the rentals map. */
   getVacationRentals(marketId: string): Promise<VacationRental[]>;
@@ -361,7 +361,7 @@ export const MOCK_MONTHLY: MonthlyPerformance[] = (
   revpar_usd: Math.round((adr_usd * occupancy_pct) / 100),
 }));
 
-export const SCRAPED_AT = "2026-11-15T06:00:00Z";
+export const INDEXED_AT = "2026-11-15T06:00:00Z";
 
 /* id, name, type, district, beds, baths, built sqft, lot sqft, asking, ADR, occ %, days listed, price change %, source */
 type RawRow = readonly [string, string, PropertyType, string, number, number, number, number | null, number, number, number, number, number, string];
@@ -404,7 +404,7 @@ export const RAW_LISTINGS: readonly RawRow[] = [
 
 /** Mirrors the SQL in v_active_listing_signals so mock and prod agree. */
 /*
- * Placeholder photos (Unsplash, free to use) until the scraper stores each
+ * Placeholder photos (Unsplash, free to use) until the Index stores each
  * listing's own photo. Not photos of the actual listings.
  */
 const U = (id: string) => `https://images.unsplash.com/photo-${id}`;
@@ -467,7 +467,7 @@ function locate(district: string, id: string): { lat: number; lng: number } {
 }
 
 const DAY = 86_400_000;
-const isoDaysAgo = (days: number) => new Date(Date.parse(SCRAPED_AT) - days * DAY).toISOString().slice(0, 10);
+const isoDaysAgo = (days: number) => new Date(Date.parse(INDEXED_AT) - days * DAY).toISOString().slice(0, 10);
 const hashId = (id: string) => {
   let h = 7;
   for (const c of id) h = (h * 131 + c.charCodeAt(0)) >>> 0;
@@ -475,10 +475,10 @@ const hashId = (id: string) => {
 };
 const roundPrice = (n: number) => Math.round(n / (n >= 1_000_000 ? 5_000 : 1_000)) * (n >= 1_000_000 ? 5_000 : 1_000);
 
-/** Price changes the latest scrape picked up (mock; prod reads listing_price_history). */
-const CHANGED_IN_LATEST_SCRAPE = new Set(["AW-0388", "AW-0291", "AW-C712", "AW-0372"]);
+/** Price changes the latest Index run picked up (mock; prod reads listing_price_history). */
+const CHANGED_IN_LATEST_INDEX = new Set(["AW-0388", "AW-0291", "AW-C712", "AW-0372"]);
 
-/** Listings no longer simply available: status and how many days ago the scrape saw it (mock). */
+/** Listings no longer simply available: status and how many days ago the Index run saw it (mock). */
 const STATUS_CHANGES: Record<string, [ListingStatus, number]> = {
   "AW-0637": ["Under contract", 0],
   "AW-L611": ["Under contract", 0],
@@ -509,10 +509,10 @@ function poolFor(kind: string, h: number): Pool | null {
 const ERFPACHT_SHARE = { Property: 0.35, Land: 0.6, Commercial: 0.5 } as const;
 
 /**
- * Columns that come from comparing scrapes: tenure, the "new" flag and the
+ * Columns that come from comparing indexes: tenure, the "new" flag and the
  * price history rebuilt from the current price and the change since first seen.
  */
-function scrapeMeta(
+function indexMeta(
   id: string,
   category: keyof typeof ERFPACHT_SHARE,
   price: number,
@@ -530,7 +530,7 @@ function scrapeMeta(
   const original = changePct ? roundPrice(price / (1 + changePct / 100)) : price;
   history.push({ date: isoDaysAgo(dom), event: "Listed", price_usd: original, change_pct: null });
   if (changePct) {
-    const lastAgo = CHANGED_IN_LATEST_SCRAPE.has(id) ? 0 : 1 + (h % Math.max(1, Math.min(dom - 1, 21)));
+    const lastAgo = CHANGED_IN_LATEST_INDEX.has(id) ? 0 : 1 + (h % Math.max(1, Math.min(dom - 1, 21)));
     const steps: Array<[number, number]> = [];
     if (Math.abs(changePct) >= 5 && dom >= 60) steps.push([Math.round(dom * 0.55), roundPrice(original * (1 + changePct / 200))]);
     steps.push([lastAgo, price]);
@@ -546,11 +546,11 @@ function scrapeMeta(
   }
   // Mock: some long-running listings have dropped off their source site for a few weeks.
   const weeksMissing = dom >= 14 && (h >>> 4) % 3 === 0 ? 1 + ((h >>> 7) % 10) : 0;
-  const lastFoundAt = new Date(Date.parse(SCRAPED_AT) - weeksMissing * 7 * DAY).toISOString();
+  const lastFoundAt = new Date(Date.parse(INDEXED_AT) - weeksMissing * 7 * DAY).toISOString();
   const lastMove = history[history.length - 1].date;
   return {
     last_found_at: lastFoundAt,
-    confidence_score: scoreConfidence({ lastFoundAt, daysOnMarket: dom, lastPriceChangeAt: `${lastMove}T00:00:00Z`, asOf: SCRAPED_AT }).score,
+    confidence_score: scoreConfidence({ lastFoundAt, daysOnMarket: dom, lastPriceChangeAt: `${lastMove}T00:00:00Z`, asOf: INDEXED_AT }).score,
     tenure,
     lease_years_left: tenure === "Erfpacht" ? 22 + (h % 37) : null,
     is_new: dom === 0,
@@ -587,10 +587,10 @@ export function deriveSignal(r: RawRow): ListingSignal {
   const comps = propertyComps(type, district);
   const vsComps = Math.round(((price / built - comps.psf) / comps.psf) * 1000) / 10;
   const signal: Signal = vsComps <= -10 ? "UNDERVALUED" : vsComps >= 10 ? "OVERPRICED" : "AT_MARKET";
-  const firstSeen = new Date(Date.parse(SCRAPED_AT) - dom * 86_400_000).toISOString().slice(0, 10);
+  const firstSeen = new Date(Date.parse(INDEXED_AT) - dom * 86_400_000).toISOString().slice(0, 10);
   return {
     category: "Property",
-    ...scrapeMeta(id, "Property", price, chg, dom, type),
+    ...indexMeta(id, "Property", price, chg, dom, type),
     listing_id: id,
     market_id: MARKET_ID,
     asset_name: name,
@@ -605,7 +605,7 @@ export function deriveSignal(r: RawRow): ListingSignal {
     price_change_pct: chg,
     days_on_market: dom,
     first_seen: firstSeen,
-    last_scraped: SCRAPED_AT,
+    last_scraped: INDEXED_AT,
     source: agencyFor(source, "Property", id).name,
     source_url: null,
     agency: agencyFor(source, "Property", id),
@@ -647,7 +647,7 @@ export const DISTRICT_LAND_PSF: Record<string, number> = {
   "Santa Cruz": 11,
 };
 
-/** Land signal: ≥10% below district average = Undervalued, ≥10% above = Overpriced. */
+/** Land signal: ≥10% below district average = Below market, ≥10% above = Overpriced. */
 export function deriveLand(r: RawLandRow): LandListing {
   const [id, name, district, lot, price, zoning, dom, chg, source] = r;
   const psf = Math.round(price / lot);
@@ -656,7 +656,7 @@ export function deriveLand(r: RawLandRow): LandListing {
   const signal: Signal = diff <= -10 ? "UNDERVALUED" : diff >= 10 ? "OVERPRICED" : "AT_MARKET";
   return {
     category: "Land",
-    ...scrapeMeta(id, "Land", price, chg, dom, "Land"),
+    ...indexMeta(id, "Land", price, chg, dom, "Land"),
     listing_id: id,
     market_id: MARKET_ID,
     asset_name: name,
@@ -670,8 +670,8 @@ export function deriveLand(r: RawLandRow): LandListing {
     price_vs_district_pct: diff,
     price_change_pct: chg,
     days_on_market: dom,
-    first_seen: new Date(Date.parse(SCRAPED_AT) - dom * 86_400_000).toISOString().slice(0, 10),
-    last_scraped: SCRAPED_AT,
+    first_seen: new Date(Date.parse(INDEXED_AT) - dom * 86_400_000).toISOString().slice(0, 10),
+    last_scraped: INDEXED_AT,
     source: agencyFor(source, "Land", id).name,
     source_url: null,
     agency: agencyFor(source, "Land", id),
@@ -704,7 +704,7 @@ export const DISTRICT_COMMERCIAL_PSF: Record<string, number> = {
   Malmok: 690,
 };
 
-/** Commercial signal: ≥10% below district average = Undervalued, ≥10% above = Overpriced. */
+/** Commercial signal: ≥10% below district average = Below market, ≥10% above = Overpriced. */
 export function deriveCommercial(r: RawCommercialRow): CommercialListing {
   const [id, name, district, use, built, lot, price, dom, chg, source] = r;
   const bench = DISTRICT_COMMERCIAL_PSF[district];
@@ -713,7 +713,7 @@ export function deriveCommercial(r: RawCommercialRow): CommercialListing {
   const photos = COMMERCIAL_PHOTOS[use];
   return {
     category: "Commercial",
-    ...scrapeMeta(id, "Commercial", price, chg, dom, use),
+    ...indexMeta(id, "Commercial", price, chg, dom, use),
     listing_id: id,
     market_id: MARKET_ID,
     asset_name: name,
@@ -728,8 +728,8 @@ export function deriveCommercial(r: RawCommercialRow): CommercialListing {
     price_vs_district_pct: diff,
     price_change_pct: chg,
     days_on_market: dom,
-    first_seen: new Date(Date.parse(SCRAPED_AT) - dom * 86_400_000).toISOString().slice(0, 10),
-    last_scraped: SCRAPED_AT,
+    first_seen: new Date(Date.parse(INDEXED_AT) - dom * 86_400_000).toISOString().slice(0, 10),
+    last_scraped: INDEXED_AT,
     source: agencyFor(source, "Commercial", id).name,
     source_url: null,
     agency: agencyFor(source, "Commercial", id),
@@ -992,8 +992,8 @@ function buildRentals(): VacationRental[] {
         annual_revenue_usd: Math.round(nightly * 365 * (occupancy / 100)),
         rating: reviews ? Math.round((4.55 + rand() * 0.45) * 100) / 100 : null,
         reviews,
-        first_seen: new Date(Date.parse(SCRAPED_AT) - Math.floor(10 + rand() * 900) * 86_400_000).toISOString().slice(0, 10),
-        last_scraped: SCRAPED_AT,
+        first_seen: new Date(Date.parse(INDEXED_AT) - Math.floor(10 + rand() * 900) * 86_400_000).toISOString().slice(0, 10),
+        last_scraped: INDEXED_AT,
         source_url: null,
         ...locate(district, id),
         photo_url: COMPACT_TYPES.includes(type)
@@ -1101,33 +1101,33 @@ export function estimateRevenue(input: EstimateInput): Estimate {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
- * Terminal updates (table: scrape_runs) — one entry per daily scrape:
+ * Terminal updates (table: scrape_runs) — one entry per daily index:
  * what was checked, what is new, which prices moved.
  * ──────────────────────────────────────────────────────────────────────── */
 
-export interface ScrapePriceChange {
+export interface IndexPriceChange {
   listing: Listing;
   change: PriceEvent;
   previous_price_usd: number;
 }
 
-export interface ScrapeRun {
+export interface IndexRun {
   run_at: string; // ISO timestamp
   date: string; // ISO date
   listings_checked: number;
   rentals_checked: number;
   new_listings: Listing[];
-  price_changes: ScrapePriceChange[];
-  status_changes: Listing[]; // went under contract or sold in this scrape
+  price_changes: IndexPriceChange[];
+  status_changes: Listing[]; // went under contract or sold in this Index run
 }
 
-/** One summary per day, newest first. `anchor` = the latest run (the mock scrape time, or now for live data). */
-export function buildScrapeRuns(listings: Listing[], rentals: VacationRental[], days = 7, anchor = SCRAPED_AT): ScrapeRun[] {
-  const live = anchor !== SCRAPED_AT;
+/** One summary per day, newest first. `anchor` = the latest run (the mock Index run time, or now for live data). */
+export function buildIndexRuns(listings: Listing[], rentals: VacationRental[], days = 7, anchor = INDEXED_AT): IndexRun[] {
+  const live = anchor !== INDEXED_AT;
   return Array.from({ length: days }, (_, ago) => {
     const runAt = new Date(Date.parse(anchor) - ago * DAY).toISOString();
     const date = live ? arubaToday(Date.parse(anchor) - ago * DAY) : runAt.slice(0, 10);
-    const price_changes: ScrapePriceChange[] = [];
+    const price_changes: IndexPriceChange[] = [];
     for (const l of listings) {
       l.price_history.forEach((e, i) => {
         if (i > 0 && e.date === date) price_changes.push({ listing: l, change: e, previous_price_usd: l.price_history[i - 1].price_usd });
@@ -1146,4 +1146,4 @@ export function buildScrapeRuns(listings: Listing[], rentals: VacationRental[], 
 }
 
 /** Newest first. */
-export const SCRAPE_RUNS: ScrapeRun[] = buildScrapeRuns(ALL_LISTINGS, VACATION_RENTALS);
+export const INDEX_RUNS: IndexRun[] = buildIndexRuns(ALL_LISTINGS, VACATION_RENTALS);

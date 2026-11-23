@@ -2,7 +2,7 @@
 
 /*
  * The Kill Switch: members flag a listing as delisted (sold, withdrawn, a
- * ghost). Scrapers cannot know a deal closed in cash yesterday; agents can.
+ * ghost). The Index cannot know a deal closed in cash yesterday; agents can.
  *
  * Live (LIVE_DATA and signed in): calls the Supabase RPC `flag_delisted`,
  * which in one transaction logs the member's user id in `property_flags`,

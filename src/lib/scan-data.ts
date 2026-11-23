@@ -1,10 +1,10 @@
 /*
  * Data for the "AI reads the market" visuals on the landing and auth pages.
- * Built from the same scrape data and comps the dashboard uses.
+ * Built from the same Index data and comps the dashboard uses.
  */
 
 import type { ScanRow } from "@/components/ai/ai-visuals";
-import { ALL_LISTINGS, SCRAPE_RUNS, type Listing } from "./aruba-data";
+import { ALL_LISTINGS, INDEX_RUNS, type Listing } from "./aruba-data";
 import { briefFacts, computedBrief, listingFacts, type MarketBrief } from "./signal-ai";
 
 const usdShort = (n: number) => (n >= 1e6 ? `$${(n / 1e6).toFixed(2)}M` : `$${Math.round(n / 1000)}k`);
@@ -39,7 +39,7 @@ export function scanRows(count = 12): ScanRow[] {
 }
 
 export function marketBrief(): MarketBrief {
-  return computedBrief(briefFacts(SCRAPE_RUNS, ALL_LISTINGS));
+  return computedBrief(briefFacts(INDEX_RUNS, ALL_LISTINGS));
 }
 
-export const MARKET_TOTAL = SCRAPE_RUNS[0].listings_checked;
+export const MARKET_TOTAL = INDEX_RUNS[0].listings_checked;

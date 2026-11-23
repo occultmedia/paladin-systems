@@ -3,7 +3,7 @@
 /*
  * AI Signal visuals: the market "being read" (a scan through real listings),
  * typed briefing text, and a cursor spotlight for dark panels. All content is
- * passed in from the scrape data; nothing here invents numbers. Motion is
+ * passed in from the Index data; nothing here invents numbers. Motion is
  * skipped for people who prefer reduced motion.
  */
 

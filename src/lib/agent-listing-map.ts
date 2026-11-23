@@ -24,7 +24,7 @@ const median = (xs: number[]) => {
 };
 const UNIT_TYPES = ["Condo", "Apartment", "Townhouse"];
 
-/** Same idea as the scraped listings: compare $/sq ft with similar listings, same district when there are 3+. */
+/** Same idea as the indexed listings: compare $/sq ft with similar listings, same district when there are 3+. */
 function compsFor(row: AgentListingViewRow, market: Listing[]) {
   const live = market.filter((l) => l.category === row.asset_class && !l.member && l.status !== "Sold" && l.status !== "De-listed");
   const kind =

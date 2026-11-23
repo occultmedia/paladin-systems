@@ -7,7 +7,7 @@
  *   npx supabase gen types typescript --project-id <ref> > src/lib/database.types.ts
  *
  * raw_listings / raw_listing_deltas / scrape_runs writes are here for the
- * service-role scraper only; RLS denies them to the browser client.
+ * service-role Index job only; RLS denies them to the browser client.
  */
 
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
@@ -27,7 +27,7 @@ export type DealSide = "bid" | "ask";
 export type DealKind = "Off-market" | "For sale" | "Buyer request" | "For rent" | "Partnership";
 export type MemberRole = "Agent" | "Investor" | "Brokerage";
 export type FeedKind = "Update" | DealKind;
-export type ScrapeRunStatus = "running" | "succeeded" | "failed";
+export type IndexRunStatus = "running" | "succeeded" | "failed";
 export type AgentListingVisibility = "members" | "private";
 export type AgentListingStatus = "For sale" | "Under contract" | "Sold" | "Withdrawn";
 
@@ -150,7 +150,7 @@ export type Database = {
           id: number;
           started_at: string;
           finished_at: string | null;
-          status: ScrapeRunStatus;
+          status: IndexRunStatus;
           sources_checked: number;
           listings_checked: number;
           rows_new: number;
@@ -162,7 +162,7 @@ export type Database = {
           id?: never;
           started_at?: string;
           finished_at?: string | null;
-          status?: ScrapeRunStatus;
+          status?: IndexRunStatus;
           sources_checked?: number;
           listings_checked?: number;
           rows_new?: number;

@@ -5,11 +5,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, ArrowRight, Check, Eye, EyeOff, Mail } from "lucide-react";
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { AIBadge, AIMarketScan, Spotlight, type ScanRow } from "@/components/ai/ai-visuals";
 import { ImagePick } from "@/components/feed/profile-dialog";
 import { Wordmark } from "@/components/logo";
-import { ROLES, logIn, sendReset, signUp, type AuthResult, type Role } from "@/lib/auth";
+import { ROLES, logIn, sendReset, signUp, supabase, updatePassword, type AuthResult, type Role } from "@/lib/auth";
 import { saveSignupProfile } from "@/lib/profile";
 import { CONTACT_EMAIL, PLANS, YEARLY_SAVINGS_USD, type Billing } from "@/lib/site";
 
@@ -227,22 +227,78 @@ function Done({ title, body }: { title: string; body: React.ReactNode }) {
 
 export function LoginForm() {
   const router = useRouter();
-  const [mode, setMode] = useState<"login" | "reset" | "sent">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<AuthResult | null>(null);
 
-  if (mode === "sent")
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setResult(null);
+    const r = await logIn(email, password);
+    setBusy(false);
+    if (r.ok) return router.push("/dashboard?tab=listings&map=full");
+    setResult(r);
+  };
+
+  return (
+    <>
+      <h1 className="font-display text-[32px] font-bold tracking-tight text-zinc-950">Welcome back</h1>
+      <p className="mt-2 text-[15px] text-zinc-500">Log in to see today&apos;s market briefing.</p>
+      <form onSubmit={submit} className="mt-8 space-y-5">
+        <Field label="Email">
+          {(id) => <input id={id} type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} className={inputCls} placeholder="you@agency.aw" />}
+        </Field>
+        <Field
+          label="Password"
+          hint={
+            <Link href="/forgot-password" className="text-[12.5px] font-medium text-zinc-500 transition-colors hover:text-zinc-950">
+              Forgot password?
+            </Link>
+          }
+        >
+          {(id) => <PasswordInput id={id} value={password} onChange={setPassword} autoComplete="current-password" />}
+        </Field>
+        <SubmitButton busy={busy}>Log in</SubmitButton>
+        <Notice result={result} />
+      </form>
+      <p className="mt-8 text-center text-[14px] text-zinc-500">
+        New to Terminal?{" "}
+        <Link href="/signup" className="font-semibold text-zinc-950 underline-offset-4 hover:underline">
+          Create an account
+        </Link>
+      </p>
+    </>
+  );
+}
+
+/* ── forgot password ────────────────────────────────────────────────────── */
+
+const BackToLogin = () => (
+  <Link href="/login" className="font-semibold text-zinc-950 underline-offset-4 hover:underline">
+    Back to log in
+  </Link>
+);
+
+export function ForgotPasswordForm() {
+  const [email, setEmail] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [result, setResult] = useState<AuthResult | null>(null);
+
+  if (sent)
     return (
       <Done
         title="Check your inbox"
         body={
           <>
-            If an account exists for <b className="text-zinc-950">{email}</b>, a reset link is on its way.{" "}
-            <button type="button" className="font-semibold text-zinc-950 underline underline-offset-2" onClick={() => setMode("login")}>
-              Back to log in
+            If an account exists for <b className="text-zinc-950">{email}</b>, a link to choose a new password is on its way. It works once and
+            expires after an hour. Nothing there? Check your spam folder, or{" "}
+            <button type="button" className="font-semibold text-zinc-950 underline underline-offset-2" onClick={() => setSent(false)}>
+              send it again
             </button>
+            .
           </>
         }
       />
@@ -252,50 +308,150 @@ export function LoginForm() {
     e.preventDefault();
     setBusy(true);
     setResult(null);
-    const r = mode === "login" ? await logIn(email, password) : await sendReset(email);
+    const r = await sendReset(email);
     setBusy(false);
-    if (r.ok) return mode === "login" ? router.push("/dashboard?tab=listings&map=full") : setMode("sent");
+    if (r.ok) return setSent(true);
     setResult(r);
   };
 
   return (
     <>
-      <h1 className="font-display text-[32px] font-bold tracking-tight text-zinc-950">{mode === "login" ? "Welcome back" : "Reset your password"}</h1>
-      <p className="mt-2 text-[15px] text-zinc-500">
-        {mode === "login" ? "Log in to see today's market briefing." : "Enter your email and we will send you a reset link."}
-      </p>
+      <h1 className="font-display text-[32px] font-bold tracking-tight text-zinc-950">Forgot your password?</h1>
+      <p className="mt-2 text-[15px] text-zinc-500">Enter the email you signed up with and we will send you a link to choose a new one.</p>
       <form onSubmit={submit} className="mt-8 space-y-5">
         <Field label="Email">
           {(id) => <input id={id} type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} className={inputCls} placeholder="you@agency.aw" />}
         </Field>
-        {mode === "login" && (
-          <Field
-            label="Password"
-            hint={
-              <button type="button" onClick={() => setMode("reset")} className="text-[12.5px] font-medium text-zinc-500 transition-colors hover:text-zinc-950">
-                Forgot password?
-              </button>
-            }
-          >
-            {(id) => <PasswordInput id={id} value={password} onChange={setPassword} autoComplete="current-password" />}
-          </Field>
-        )}
-        <SubmitButton busy={busy}>{mode === "login" ? "Log in" : "Send reset link"}</SubmitButton>
+        <SubmitButton busy={busy}>Send reset link</SubmitButton>
         <Notice result={result} />
       </form>
       <p className="mt-8 text-center text-[14px] text-zinc-500">
-        {mode === "login" ? (
-          <>
-            New to Terminal?{" "}
-            <Link href="/signup" className="font-semibold text-zinc-950 underline-offset-4 hover:underline">
-              Create an account
-            </Link>
-          </>
-        ) : (
-          <button type="button" onClick={() => setMode("login")} className="font-semibold text-zinc-950 underline-offset-4 hover:underline">
-            Back to log in
-          </button>
-        )}
+        Remembered it? <BackToLogin />
+      </p>
+    </>
+  );
+}
+
+/* ── choose a new password (opened from the reset email) ───────────────── */
+
+type ResetState = "checking" | "ready" | "invalid" | "done";
+
+/** Error Supabase put in the link (expired or already used), if any. */
+function linkError(): string | null {
+  const params = new URLSearchParams(window.location.hash.slice(1) || window.location.search.slice(1));
+  const code = params.get("error_code") ?? params.get("error");
+  if (!code) return null;
+  return code === "otp_expired" ? "This reset link has expired or was already used." : (params.get("error_description")?.replace(/\+/g, " ") ?? "This reset link is not valid.");
+}
+
+export function ResetPasswordForm() {
+  const router = useRouter();
+  const [state, setState] = useState<ResetState>("checking");
+  const [why, setWhy] = useState<string | null>(null);
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<AuthResult | null>(null);
+
+  useEffect(() => {
+    const sb = supabase();
+    const err = sb ? linkError() : "Accounts are not set up yet.";
+    if (!sb || err) {
+      const t = window.setTimeout(() => {
+        setWhy(err);
+        setState("invalid");
+      }, 0);
+      return () => window.clearTimeout(t);
+    }
+    let live = true;
+    // The reset link signs the member in (PASSWORD_RECOVERY); supabase-js reads the token from the URL.
+    const { data: sub } = sb.auth.onAuthStateChange((event, session) => {
+      if (!live) return;
+      if (event === "PASSWORD_RECOVERY" || (session && event === "SIGNED_IN")) setState((s) => (s === "done" ? s : "ready"));
+    });
+    // Give the URL token a moment to be exchanged, then decide.
+    const t = window.setTimeout(async () => {
+      const { data } = await sb.auth.getSession();
+      if (live) setState((s) => (s !== "checking" ? s : data.session ? "ready" : "invalid"));
+    }, 1200);
+    return () => {
+      live = false;
+      window.clearTimeout(t);
+      sub.subscription.unsubscribe();
+    };
+  }, []);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (password !== confirm) return setResult({ ok: false, error: "The two passwords do not match." });
+    if (strength(password) < 2) return setResult({ ok: false, error: "Choose a stronger password: at least 8 characters, mixing letters with numbers or symbols." });
+    setBusy(true);
+    setResult(null);
+    const r = await updatePassword(password);
+    setBusy(false);
+    if (!r.ok) return setResult(r);
+    setState("done");
+    window.history.replaceState(null, "", "/reset-password");
+    window.setTimeout(() => router.push("/dashboard?tab=listings&map=full"), 2500);
+  };
+
+  if (state === "checking")
+    return (
+      <div className="flex flex-col items-center gap-4 text-center" aria-live="polite">
+        <span className="size-6 animate-spin rounded-full border-2 border-zinc-950 border-t-transparent" />
+        <p className="text-[14.5px] text-zinc-500">Checking your reset link…</p>
+      </div>
+    );
+
+  if (state === "invalid")
+    return (
+      <>
+        <h1 className="font-display text-[32px] font-bold tracking-tight text-zinc-950">Link not valid</h1>
+        <p className="mt-3 text-[15px] leading-relaxed text-zinc-600">
+          {why ?? "Open this page from the link in your reset email."} Reset links work once and expire after an hour, so request a new one.
+        </p>
+        <Link
+          href="/forgot-password"
+          className="mt-8 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-zinc-950 font-display text-[15px] font-semibold text-lime transition-colors hover:bg-zinc-800"
+        >
+          Send a new link <ArrowRight size={16} strokeWidth={2} />
+        </Link>
+        <p className="mt-8 text-center text-[14px] text-zinc-500">
+          <BackToLogin />
+        </p>
+      </>
+    );
+
+  if (state === "done")
+    return (
+      <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5, ease: EASE }} className="text-center">
+        <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-zinc-950 text-lime">
+          <Check size={24} strokeWidth={2.2} />
+        </span>
+        <h1 className="mt-6 font-display text-[28px] font-bold tracking-tight text-zinc-950">Password updated</h1>
+        <p className="mt-3 text-[14.5px] leading-relaxed text-zinc-600">You are signed in. Taking you to the dashboard…</p>
+      </motion.div>
+    );
+
+  return (
+    <>
+      <h1 className="font-display text-[32px] font-bold tracking-tight text-zinc-950">Choose a new password</h1>
+      <p className="mt-2 text-[15px] text-zinc-500">You will use it the next time you log in.</p>
+      <form onSubmit={submit} className="mt-8 space-y-5">
+        <Field label="New password">
+          {(id) => (
+            <>
+              <PasswordInput id={id} value={password} onChange={setPassword} autoComplete="new-password" />
+              <Strength pw={password} />
+            </>
+          )}
+        </Field>
+        <Field label="Confirm new password">{(id) => <PasswordInput id={id} value={confirm} onChange={setConfirm} autoComplete="new-password" />}</Field>
+        <SubmitButton busy={busy}>Save new password</SubmitButton>
+        <Notice result={result} />
+      </form>
+      <p className="mt-8 text-center text-[14px] text-zinc-500">
+        <BackToLogin />
       </p>
     </>
   );

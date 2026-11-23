@@ -1,17 +1,17 @@
 /*
- * AI Signal: analysis of the daily scrape (the "message of the day") and a
+ * AI Signal: analysis of the daily Index (the "message of the day") and a
  * short analyst note on every listing.
  *
  * This module is pure (no React, no fetch) so it runs on the server route and
  * in tests. It does two things:
  *   1. builds the FACTS the model is allowed to use (comps, price history,
- *      what changed in the scrape), so the AI never has to guess numbers;
+ *      what changed in the Index run), so the AI never has to guess numbers;
  *   2. writes a COMPUTED version of the same note from those facts. The API
  *      route returns it when no ANTHROPIC_API_KEY is set or the call fails,
  *      and marks it `source: "computed"` so the UI never claims otherwise.
  */
 
-import type { Listing, ScrapeRun } from "./aruba-data";
+import type { Listing, IndexRun } from "./aruba-data";
 
 /* ── Shapes returned to the UI ─────────────────────────────────────────── */
 
@@ -29,7 +29,7 @@ export interface ListingNote {
 export interface MarketBrief {
   headline: string;
   summary: string; // 2-3 sentences
-  points: string[]; // 3-5 takeaways from the latest scrapes
+  points: string[]; // 3-5 takeaways from the latest Index runs
   watch: Array<{ listing_id: string; reason: string }>; // up to 3 to look at today
 }
 
@@ -188,7 +188,7 @@ export function computedListingNote(f: ListingFacts): ListingNote {
   const analysis =
     `This ${f.kind} in ${f.district} is asking ${usd(f.asking_price_usd)}. ` +
     (cheap ? "On price per square foot it is one of the cheaper options in its set. " : rich ? "On price per square foot it is one of the dearer options in its set. " : "On price per square foot it sits close to its comps. ") +
-    (f.days_on_market === 0 ? "It first appeared in today's scrape, so expect interest from other agents quickly." : stale ? "Time on market is long for this segment, which usually means a softer seller." : cut ? "The seller has already lowered the price, so there may be more flexibility." : "Nothing in the history suggests pressure on the seller yet.");
+    (f.days_on_market === 0 ? "It first appeared in today's Index, so expect interest from other agents quickly." : stale ? "Time on market is long for this segment, which usually means a softer seller." : cut ? "The seller has already lowered the price, so there may be more flexibility." : "Nothing in the history suggests pressure on the seller yet.");
 
   const next_step =
     f.status === "De-listed"
@@ -209,7 +209,7 @@ export function computedListingNote(f: ListingFacts): ListingNote {
 /* ── Market brief facts ────────────────────────────────────────────────── */
 
 export interface BriefFacts {
-  scrape_date: string;
+  index_date: string;
   listings_checked_today: number;
   today: { new: number; price_drops: number; price_increases: number; under_contract: number; sold: number; de_listed: number };
   last_7_days: { new: number; price_drops: number; price_increases: number; under_contract: number; sold: number; de_listed: number };
@@ -220,7 +220,7 @@ export interface BriefFacts {
   stale_with_cuts: Array<{ listing_id: string; name: string; district: string; days_on_market: number; change_since_listed_pct: number }>;
 }
 
-export function briefFacts(runs: ScrapeRun[], all: Listing[]): BriefFacts {
+export function briefFacts(runs: IndexRun[], all: Listing[]): BriefFacts {
   const today = runs[0];
   const week = runs.slice(0, 7);
   const moves = week.flatMap((r) => r.price_changes);
@@ -231,7 +231,7 @@ export function briefFacts(runs: ScrapeRun[], all: Listing[]): BriefFacts {
   active.forEach((l) => byDistrict.set(l.district, [...(byDistrict.get(l.district) ?? []), l]));
 
   return {
-    scrape_date: today.date,
+    index_date: today.date,
     listings_checked_today: today.listings_checked,
     today: {
       new: today.new_listings.length,
@@ -311,7 +311,7 @@ export function computedBrief(f: BriefFacts): MarketBrief {
 
   return {
     headline: `Market ${tone}: ${t.new} new, ${t.price_drops} cut${t.price_drops === 1 ? "" : "s"}, ${t.price_increases} increase${t.price_increases === 1 ? "" : "s"} today.`,
-    summary: `Today's scrape checked ${f.listings_checked_today} listings. Over the past week there were ${w.new} new listings and ${w.price_drops + w.price_increases} price changes, with ${w.price_drops > w.price_increases ? "cuts outnumbering increases" : w.price_increases > w.price_drops ? "increases outnumbering cuts" : "cuts and increases evenly split"}.`,
+    summary: `Today's Index run checked ${f.listings_checked_today} listings. Over the past week there were ${w.new} new listings and ${w.price_drops + w.price_increases} price changes, with ${w.price_drops > w.price_increases ? "cuts outnumbering increases" : w.price_increases > w.price_drops ? "increases outnumbering cuts" : "cuts and increases evenly split"}.`,
     points: points.slice(0, 5),
     watch,
   };

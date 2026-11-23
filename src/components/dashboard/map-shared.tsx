@@ -10,12 +10,12 @@ export const SIGNAL_COLOR: Record<Signal, string> = {
   OVERPRICED: "#A05A5D",
 };
 export const SIGNAL_LABEL: Record<Signal, string> = {
-  UNDERVALUED: "Undervalued",
+  UNDERVALUED: "Below market",
   AT_MARKET: "At Market",
   OVERPRICED: "Overpriced",
 };
 
-/** 🔥 next to Undervalued: the AI rates it a great deal. */
+/** 🔥 next to Below market: the AI rates it a great deal. */
 export function HotFlame({ size = 12, className = "" }: { size?: number; className?: string }) {
   return (
     <span role="img" aria-label="Great deal" title="Great deal: priced 10%+ below its comps" className={`hot-flame inline-block leading-none ${className}`} style={{ fontSize: size }}>
@@ -28,7 +28,7 @@ export function HotFlame({ size = 12, className = "" }: { size?: number; classNa
 export const priceColor = (n: number) => (n > 0 ? "#2E9E5B" : n < 0 ? "#D64545" : "#E08A1E");
 
 /**
- * Listing agency logo. Uses the logo scraped from the agency's site; until we
+ * Listing agency logo. Uses the logo indexed from the agency's site; until we
  * have it, a monogram in the agency colour.
  */
 export function AgencyLogo({ agency, size = 24, rounded = 6 }: { agency: Agency; size?: number; rounded?: number }) {

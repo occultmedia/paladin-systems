@@ -2,7 +2,7 @@
 
 /**
  * Landing-page hero: a live-looking preview of the Terminal that cycles
- * through its real features (daily scrape, price history, watchlist,
+ * through its real features (daily Index, price history, watchlist,
  * interested clients). All data comes from the same mock
  * layer as the dashboard, prepared on the server and passed in as props.
  */
@@ -31,7 +31,7 @@ export interface PreviewRow {
 }
 
 export interface PreviewData {
-  headline?: string; // AI Signal headline for the latest scrape
+  headline?: string; // AI Signal headline for the latest Index run
   run: { time: string; newCount: number; drops: number; ups: number; statusChanges: number; checked: number };
   rows: PreviewRow[];
   featured: {
@@ -68,7 +68,7 @@ const DOWN = "#D64545";
 const FLAT = "#E08A1E";
 
 const FEATURES = [
-  { key: "scrape", label: "Daily scrape", sub: "New listings & price moves" },
+  { key: "index", label: "Daily Index", sub: "New listings & price moves" },
   { key: "history", label: "Price history", sub: "Asking vs. market value" },
   { key: "watchlist", label: "Watchlist", sub: "Pin and track properties" },
   { key: "clients", label: "Client leads", sub: "Who asked about what" },
@@ -76,13 +76,13 @@ const FEATURES = [
 type FeatureKey = (typeof FEATURES)[number]["key"];
 
 const TAB_FOR: Record<FeatureKey, string> = {
-  scrape: "Listings",
+  index: "Listings",
   history: "Listings",
   watchlist: "Watchlist",
   clients: "Listings",
 };
 const HREF_FOR: Record<FeatureKey, string> = {
-  scrape: "/dashboard?tab=listings",
+  index: "/dashboard?tab=listings",
   history: "/dashboard?tab=listings",
   clients: "/dashboard?tab=listings",
   watchlist: "/dashboard?tab=watchlist",
@@ -123,7 +123,7 @@ const STATUS_COLOR: Record<string, string> = { "For sale": UP, "Under contract":
 
 /* ── panes ─────────────────────────────────────────────────────────────── */
 
-function ScrapePane({ data }: { data: PreviewData }) {
+function IndexPane({ data }: { data: PreviewData }) {
   const r = data.run;
   return (
     <div className="flex h-full flex-col">
@@ -443,7 +443,7 @@ export function WatchPane({ data }: { data: PreviewData }) {
 /* ── shell ─────────────────────────────────────────────────────────────── */
 
 export function TerminalPreview({ data }: { data: PreviewData }) {
-  const [active, setActive] = useState<FeatureKey>("scrape");
+  const [active, setActive] = useState<FeatureKey>("index");
   const [paused, setPaused] = useState(false);
   const [cycle, setCycle] = useState(0);
   const reduced = useRef(false);
@@ -504,7 +504,7 @@ export function TerminalPreview({ data }: { data: PreviewData }) {
               exit={{ opacity: 0, y: -8, filter: "blur(4px)" }}
               transition={{ duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
             >
-              {active === "scrape" && <ScrapePane data={data} />}
+              {active === "index" && <IndexPane data={data} />}
               {active === "history" && <HistoryPane data={data} />}
               {active === "clients" && <ClientsPane data={data} />}
               {active === "watchlist" && <WatchPane data={data} />}

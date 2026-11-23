@@ -18,7 +18,7 @@ import { CONTACT_EMAIL, PLANS, SITE_DESCRIPTION, SITE_NAME, SITE_URL, YEARLY_SAV
 import { Faq, type FaqItem } from "@/components/landing/faq";
 import {
   ALL_LISTINGS,
-  SCRAPE_RUNS,
+  INDEX_RUNS,
   type Listing,
   type ListingSignal,
   type Signal,
@@ -34,7 +34,7 @@ const DASHBOARD = "/dashboard";
 const UP = "#3F7A55";
 const DOWN = "#A05A5D";
 const SIGNAL: Record<Signal, { label: string; color: string; bg: string }> = {
-  UNDERVALUED: { label: "Undervalued", color: UP, bg: "#E8F1EB" },
+  UNDERVALUED: { label: "Below market", color: UP, bg: "#E8F1EB" },
   AT_MARKET: { label: "At Market", color: "#3F3F46", bg: "#F1F1F3" },
   OVERPRICED: { label: "Overpriced", color: DOWN, bg: "#F6ECEC" },
 };
@@ -51,7 +51,7 @@ const NEW_THIS_WEEK = ALL_LISTINGS.filter((l) => l.days_on_market <= 7).length;
 
 /* ── Terminal preview (hero) ─────────────────────────────────────────── */
 
-const RUN = SCRAPE_RUNS[0];
+const RUN = INDEX_RUNS[0];
 const usdShort = (n: number) => (n >= 1e6 ? `$${(n / 1e6).toFixed(n >= 1e7 ? 1 : 2)}M` : `$${Math.round(n / 1000)}k`);
 const shortDate = (iso: string) => new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 
@@ -220,18 +220,18 @@ function heroData() {
     events.push({ ...at(c.listing), id: `px-${c.listing.listing_id}-${i}`, kind: p < 0 ? "Price cut" : "Price raised", tone: p < 0 ? "down" : "up", title: c.listing.asset_name, detail: `${c.listing.district} · ${c.listing.agency.name}`, value: `${pct(p)} → ${usdM(c.change.price_usd)}` });
   });
   if (best)
-    events.push({ ...at(best), id: `ai-${best.listing_id}`, kind: "AI Signal", tone: "up", title: best.asset_name, detail: `${usd(best.price_per_sqft_usd)}/ft² vs ${usd(best.comps_psf_usd)} for ${best.comps_count} comps`, value: `${pct(best.price_vs_comps_pct)} vs comps · Undervalued 🔥` });
+    events.push({ ...at(best), id: `ai-${best.listing_id}`, kind: "AI Signal", tone: "up", title: best.asset_name, detail: `${usd(best.price_per_sqft_usd)}/ft² vs ${usd(best.comps_psf_usd)} for ${best.comps_count} comps`, value: `${pct(best.price_vs_comps_pct)} vs comps · Below market 🔥` });
   status.forEach((l) => events.push({ ...at(l), id: `st-${l.listing_id}`, kind: l.status, tone: "warn", title: l.asset_name, detail: `${l.district} · ${l.agency.name}`, value: `Was ${usdM(l.asking_price_usd)}` }));
   if (fresh[1]) events.push({ ...at(fresh[1]), id: `new-${fresh[1].listing_id}`, kind: "New listing", tone: "mint", title: fresh[1].asset_name, detail: `${fresh[1].district} · ${fresh[1].agency.name}`, value: usdM(fresh[1].asking_price_usd) });
   if (doubt && doubt.confidence_score < 80)
     events.push({ ...at(doubt), id: `cf-${doubt.listing_id}`, kind: `Confidence ${doubt.confidence_score}%`, tone: "warn", title: doubt.asset_name, detail: "Missing from the agency site, price unchanged", value: "Possible ghost listing" });
 
-  const undervalued = ALL_LISTINGS.filter((l) => l.signal === "UNDERVALUED");
+  const belowMarket = ALL_LISTINGS.filter((l) => l.signal === "UNDERVALUED");
   const kpis: HeroKpi[] = [
     { label: "Listings", value: ALL_LISTINGS.length },
     { label: "New today", value: RUN.new_listings.length },
     { label: "Price moves", value: RUN.price_changes.length },
-    { label: "Undervalued", value: undervalued.length },
+    { label: "Below market", value: belowMarket.length },
   ];
   return { events, kpis, runLabel: `Read ${PREVIEW.run.time} · ${ALL_LISTINGS.length} listings · ${RUN.new_listings.length} new` };
 }
@@ -283,7 +283,7 @@ const INVESTOR: InvestorExample = {
     amount: "$650,000",
     district: "Noord",
   },
-  undervalued: ALL_LISTINGS.filter((l) => l.signal === "UNDERVALUED").length,
+  belowMarket: ALL_LISTINGS.filter((l) => l.signal === "UNDERVALUED").length,
   offMarket: 0,
 };
 
@@ -346,13 +346,13 @@ const AUDIENCES: Audience[] = [
 
 const HOW: Array<[string, string]> = [
   ["We collect", `Every agency, broker and developer website in Aruba, checked each morning. ${ALL_LISTINGS.length} listings in one place.`],
-  ["AI analyzes", "Each price against comparable listings. Undervalued, overpriced and ghost listings flagged."],
+  ["AI analyzes", "Each price against comparable listings. Below market, overpriced and ghost listings flagged."],
   ["You act first", "Read the morning brief, watch your pins and call the listing agent in one tap."],
 ];
 
 const FEATURES: Array<[typeof Rss, string, string]> = [
   [Rss, "Daily feed", "New listings, price changes and sales, every morning."],
-  [Scale, "Value signal", "Undervalued, At market or Overpriced against comps."],
+  [Scale, "Value signal", "Below market, At market or Overpriced against comps."],
   [LineChart, "Price history", "Every price change since the day it was listed."],
   [ShieldCheck, "Confidence Score", "Spots listings the agency forgot to take down."],
   [Sparkles, "AI Signal", "A morning briefing and a plain-English note per listing."],
@@ -433,8 +433,8 @@ const FAQ: FaqItem[] = [
     a: "Once a day, early in the morning, Aruba time. Each run picks up new listings, price changes and properties that went under contract, sold or came off the market, and adds them to the daily feed and to the price history of every listing.",
   },
   {
-    q: "What do Undervalued, At market and Overpriced mean?",
-    a: "Homes and condos are compared on price per square foot with similar listings: the same kind of property in the same district, or island-wide when a district has fewer than 3. Land and commercial property are compared with the district average. 10% or more below is Undervalued, 10% or more above is Overpriced, anything in between is At market.",
+    q: "What do Below market, At market and Overpriced mean?",
+    a: "Homes and condos are compared on price per square foot with similar listings: the same kind of property in the same district, or island-wide when a district has fewer than 3. Land and commercial property are compared with the district average. 10% or more below is marked Below market, 10% or more above is Overpriced, anything in between is At market.",
   },
   {
     q: "What is the Confidence Score?",

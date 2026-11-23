@@ -5,7 +5,7 @@
  * sees it on the dashboard, marked Off-market) or Only me. The duplicate
  * watch (lib/duplicates.ts) warns in the form; the database refuses likely
  * duplicates the agent did not confirm, and links an agent listing to the
- * scraped listing when it later turns up on a public site.
+ * indexed listing when it later turns up on a public site.
  *
  * Two backends:
  *  - Supabase `v_agent_listings` / `agent_listings` once accounts are live

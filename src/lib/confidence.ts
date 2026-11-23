@@ -6,10 +6,10 @@
  * The nightly job (scripts/confidence_score.py) runs this same algorithm over
  * the `property_master` table and overwrites `confidence_score`. Keep the two
  * in step: same rules, same numbers. The app only reads the stored score; it
- * runs this file itself for the mock data until the scraper is live.
+ * runs this file itself for the mock data until the Index is live.
  *
  * Rules (start at 100, clamp to 0..100):
- *  - Missing from the source site: -5 for every full week since the scraper
+ *  - Missing from the source site: -5 for every full week since the Index
  *    last found it there (`last_scraped_at`).
  *  - Long on the market: -10 after 180 days, -20 after 365 days.
  *  - Price flatlined: -10 when the price has not moved for 120+ days, -15
@@ -30,7 +30,7 @@ export const CONFIDENCE_RULES = {
 export const HIDDEN_AT = 0;
 
 export interface ConfidenceInput {
-  /** When the scraper last found the listing on its source site. */
+  /** When the Index last found the listing on its source site. */
   lastFoundAt: string;
   daysOnMarket: number;
   /** When the asking price last changed (or when it was first listed). */

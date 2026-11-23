@@ -157,7 +157,7 @@ export function AgentMorningCard({ m }: { m: AgentMorning }) {
 
 export type InvestorExample = {
   post: { name: string; company: string; title: string; body: string; amount: string; district: string };
-  undervalued: number;
+  belowMarket: number;
   offMarket: number;
 };
 
@@ -196,8 +196,8 @@ export function InvestorPostCard({ ex }: { ex: InvestorExample }) {
         </div>
       </div>
       <div className="glass absolute -right-2 -top-4 z-30 hidden rounded-2xl px-4 py-3 sm:block">
-        <p className="font-display text-[22px] font-bold leading-none text-zinc-950">{ex.undervalued}</p>
-        <p className="mt-1 text-[11px] text-zinc-500">undervalued today</p>
+        <p className="font-display text-[22px] font-bold leading-none text-zinc-950">{ex.belowMarket}</p>
+        <p className="mt-1 text-[11px] text-zinc-500">below market today</p>
       </div>
     </div>
   );

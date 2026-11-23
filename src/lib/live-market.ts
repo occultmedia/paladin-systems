@@ -1,9 +1,9 @@
 "use client";
 
 /*
- * The live Master Market: every active scraped listing from Supabase
+ * The live Master Market: every active indexed listing from Supabase
  * (`v_master_market`, see lib/master-market.ts). Starts empty and fills as
- * the scraper runs. The dashboard publishes the combined market (scraped +
+ * the Index runs. The dashboard publishes the combined market (indexed +
  * agent listings) here so other parts (the Deals listing picker and the
  * listing cards on posts) can look listings up without loading them again.
  */
@@ -13,7 +13,7 @@ import { supabase, useUser } from "./auth";
 import { MARKET_ID, type Listing } from "./aruba-data";
 import { fetchMasterMarket } from "./master-market";
 
-/** Scraped listings for the signed-in member. Empty (not mock) when signed out. */
+/** Indexed listings for the signed-in member. Empty (not mock) when signed out. */
 export function useMasterMarket() {
   const { user, ready } = useUser();
   const [state, setState] = useState<{ uid: string; listings: Listing[]; error: string | null } | null>(null);
@@ -36,7 +36,7 @@ export function useMasterMarket() {
   return { listings: state.listings, error: state.error };
 }
 
-/* ── the published market (scraped + agent listings) ──────────────────── */
+/* ── the published market (indexed + agent listings) ──────────────────── */
 
 let current: Listing[] = [];
 let byId = new Map<string, Listing>();

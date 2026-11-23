@@ -56,6 +56,6 @@ function useSignal<T>(key: string | null, body: object | null): State<T> & { loa
 export const useMarketBrief = (version: string | null) =>
   useSignal<WithSource<MarketBrief>>(version ? `brief:${version}` : null, version ? { kind: "brief" } : null);
 
-/** `version` changes when the listing does (price, status, last scrape). */
+/** `version` changes when the listing does (price, status, last Index run). */
 export const useListingNote = (id: string | null, version = "") =>
   useSignal<WithSource<ListingNote>>(id ? `listing:${id}:${version}` : null, id ? { kind: "listing", id } : null);

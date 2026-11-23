@@ -1,6 +1,6 @@
 /*
  * POST /api/signal
- *   { kind: "brief" }                -> AI Signal market brief for the latest scrape
+ *   { kind: "brief" }                -> AI Signal market brief for the latest Index run
  *   { kind: "listing", id: string }  -> AI note for one listing
  *
  * Members only: the request carries the member's Supabase access token, and
@@ -12,13 +12,13 @@
  * Without ANTHROPIC_API_KEY, or if the call fails, it returns the computed
  * note from the same facts with `source: "computed"`.
  *
- * Later: generate these in the daily scrape job and store them in Supabase
+ * Later: generate these in the daily Index job and store them in Supabase
  * next to the listing, so page views never wait on the model.
  */
 
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@supabase/supabase-js";
-import { MARKET_ID, buildScrapeRuns, type Listing } from "@/lib/aruba-data";
+import { MARKET_ID, buildIndexRuns, type Listing } from "@/lib/aruba-data";
 import { agentRowToListing } from "@/lib/agent-listing-map";
 import type { AgentListingViewRow, Database } from "@/lib/database.types";
 import { fetchMasterMarket } from "@/lib/master-market";
@@ -40,11 +40,12 @@ export const maxDuration = 60;
 const MODEL = "claude-opus-5-5";
 
 const SYSTEM = `You are AI Signal, the market analyst inside Terminal (by Sequence Data), an Aruba real estate intelligence terminal used by real estate agents and investors.
-You are given FACTS as JSON, computed from daily scrapes of agency websites. Write for a busy agent: plain English, specific, no hype, no emojis.
+You are given FACTS as JSON, computed from daily Index runs of agency websites. Write for a busy agent: plain English, specific, no hype, no emojis.
 Rules:
 - Use only numbers that appear in the facts (you may round them). Never invent comps, prices, dates, rents or names.
 - Listing status: "For sale" = active on the agency site; "Under contract" = agency marks it under offer or pending; "Sold" = agency marks it sold; "De-listed" = removed from the agency site without being marked sold (withdrawn, expired or sold privately; do not call it sold).
 - Prices are USD. "Erfpacht" is government leasehold land; "Eigendom" is freehold.
+- Wording: say "below market" (the facts call it UNDERVALUED), never "undervalued". Call the daily data collection "the Index", never "scrape" or "scraping".
 - Prefer concrete comparisons ("12% under the district median per sq ft") over adjectives.
 - Do not give legal, tax or financial advice; frame it as market observations and next steps for an agent.
 - Keep headline under 110 characters, analysis 2-3 sentences, each point one short sentence.`;
@@ -90,17 +91,17 @@ async function marketFor(req: Request): Promise<{ uid: string; visible: Listing[
   });
   const { data: auth } = await sb.auth.getUser(token);
   if (!auth.user) return null;
-  const [scraped, members] = await Promise.all([
+  const [indexed, members] = await Promise.all([
     fetchMasterMarket(sb, MARKET_ID),
     sb.from("v_agent_listings").select("*").eq("market_id", MARKET_ID).then(({ data, error }) => {
       if (error) throw error;
       return (data ?? []) as AgentListingViewRow[];
     }),
   ]);
-  const mine = members.map((r) => agentRowToListing(r, scraped, auth.user.id));
-  const visible = [...mine, ...scraped];
+  const mine = members.map((r) => agentRowToListing(r, indexed, auth.user.id));
+  const visible = [...mine, ...indexed];
   // Comps and the brief only use what every member can see, so shared cache entries never carry anyone's private listings.
-  const shared = [...mine.filter((l) => l.member?.visibility === "members"), ...scraped];
+  const shared = [...mine.filter((l) => l.member?.visibility === "members"), ...indexed];
   return { uid: auth.user.id, visible, shared };
 }
 
@@ -125,9 +126,9 @@ async function buildListing(l: Listing, comps: Listing[]): Promise<Cached | null
 
 async function buildBrief(all: Listing[]): Promise<Cached> {
   const latest = all.map((l) => l.last_scraped).sort().pop() ?? new Date().toISOString();
-  const facts = briefFacts(buildScrapeRuns(all, [], 7, latest), all);
+  const facts = briefFacts(buildIndexRuns(all, [], 7, latest), all);
   const ai = await askClaude<MarketBrief>(
-    "Write today's AI Signal briefing from the latest scrapes: a headline, a 2-3 sentence summary of what changed and what it says about the market, 3-5 takeaways, and up to 3 listings (by listing_id from the facts) worth looking at today with a one-line reason each.",
+    "Write today's AI Signal briefing from the latest Index runs: a headline, a 2-3 sentence summary of what changed and what it says about the market, 3-5 takeaways, and up to 3 listings (by listing_id from the facts) worth looking at today with a one-line reason each.",
     facts,
     MARKET_BRIEF_SCHEMA,
   );
