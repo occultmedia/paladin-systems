@@ -229,7 +229,7 @@ export function Hero({
         </motion.h1>
 
         <motion.p {...fade(0.16)} className="mt-6 max-w-[34rem] text-[16.5px] leading-relaxed text-zinc-500 sm:text-[17.5px]">
-          Terminal tracks listings from Aruba&rsquo;s real estate agencies, follows their prices and compares each one with similar properties, so agents, brokers and investors can read the market at a glance.
+          Terminal tracks listings from Aruba&rsquo;s real estate agencies and follows their prices. AI then analyzes the data, comparing each listing with similar properties, so agents, brokers and investors can read the market at a glance.
         </motion.p>
 
         <motion.div {...fade(0.24)} className="mt-8 flex items-center gap-2.5">
