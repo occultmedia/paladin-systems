@@ -224,8 +224,8 @@ export function Hero({
     <section ref={ref} className="relative w-full bg-white" aria-label="Terminal: Aruba real estate market intelligence">
       <div className="mx-auto flex max-w-[1240px] flex-col items-center px-5 pb-16 pt-32 text-center sm:pb-20 sm:pt-40">
         <motion.h1 {...fade(0.08)} className="font-display text-[clamp(40px,6vw,72px)] leading-[1.02] tracking-[-0.035em] text-[#15171C]">
-          Aruba real estate <br className="hidden sm:block" />
-          market intelligence.
+          Aruba Real Estate <br className="hidden sm:block" />
+          Market Intelligence Tool
         </motion.h1>
 
         <motion.p {...fade(0.16)} className="mt-6 max-w-[34rem] text-[16.5px] leading-relaxed text-zinc-500 sm:text-[17.5px]">
