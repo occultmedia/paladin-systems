@@ -8,7 +8,7 @@ export const SITE_NAME = "Terminal";
 export const SITE_TITLE =
   "Terminal · Aruba Real Estate Market Intelligence | Powered by Sequence Data";
 export const SITE_DESCRIPTION =
-  "Every home, land and commercial listing in Aruba, checked daily: price history, estimated market value, listing agents, a watchlist and interested clients on every property. For real estate agents and investors.";
+  "Aruba real estate market intelligence: listings from local agencies checked daily, with price history, estimated market value, listing agents, a watchlist and interested clients. For real estate agents and investors.";
 export const CONTACT_EMAIL = "ops@sequencedata.aw";
 
 /** Pricing: one plan, billed monthly or once a year. */

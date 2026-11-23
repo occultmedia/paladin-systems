@@ -561,7 +561,7 @@ export function SignupForm({ initialPlan = "monthly" }: { initialPlan?: Billing 
     <>
       <StepLabel step={1} />
       <h1 className="mt-3 font-display text-[32px] font-bold tracking-tight text-zinc-950">Create your account</h1>
-      <p className="mt-2 text-[15px] text-zinc-500">The whole Aruba market, read for you every morning.</p>
+      <p className="mt-2 text-[15px] text-zinc-500">The Aruba real estate market, read for you every morning.</p>
       <form onSubmit={next} className="mt-8 space-y-5">
         <Field label="Full name">
           {(id) => <input id={id} required autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} className={inputCls} placeholder="Maria Croes" />}

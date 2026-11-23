@@ -1,8 +1,8 @@
 "use client";
 
 /*
- * Landing hero. Calm and product-first: an announcement pill, a tight
- * two-line headline, two small actions, then the real Terminal in a light
+ * Landing hero. Calm and product-first: what Terminal is in one headline
+ * and one sentence, two small actions, then the real Terminal in a light
  * browser window over an Aruba photograph. The window is live: the 3D map
  * tours today's market events, the feed follows it, the numbers count up.
  * Motion stops for prefers-reduced-motion and while the hero is off screen.
@@ -13,7 +13,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
-import { ChevronRight, LayoutList, Megaphone, Pin, Search, Settings, Sparkles } from "lucide-react";
+import { LayoutList, Megaphone, Pin, Search, Settings, Sparkles } from "lucide-react";
 import { CountUp } from "@/components/motion/reveal";
 import { GrainField } from "./grain-field";
 import type { Listing } from "@/lib/aruba-data";
@@ -223,20 +223,13 @@ export function Hero({
   return (
     <section ref={ref} className="relative w-full bg-white" aria-label="Terminal: Aruba real estate market intelligence">
       <div className="mx-auto flex max-w-[1240px] flex-col items-center px-5 pb-16 pt-32 text-center sm:pb-20 sm:pt-40">
-        <motion.a {...fade(0)} href="#ai-signal" className="glass group inline-flex items-center gap-2 rounded-full py-1 pl-1 pr-3 text-[13px] text-zinc-600 transition-colors hover:border-zinc-300">
-          <span className="rounded-full bg-lime px-2 py-0.5 text-[11.5px] font-medium text-zinc-950">New</span>
-          <span className="sm:hidden">AI Signal prices every listing</span>
-          <span className="hidden sm:inline">AI Signal now prices every listing against its comps</span>
-          <ChevronRight size={14} className="text-zinc-400 transition-transform group-hover:translate-x-0.5" />
-        </motion.a>
-
-        <motion.h1 {...fade(0.08)} className="mt-6 font-display text-[clamp(40px,6vw,72px)] leading-[1.02] tracking-[-0.035em] text-[#15171C]">
-          Every property for sale in Aruba. <br className="hidden sm:block" />
-          One screen.
+        <motion.h1 {...fade(0.08)} className="font-display text-[clamp(40px,6vw,72px)] leading-[1.02] tracking-[-0.035em] text-[#15171C]">
+          Aruba real estate <br className="hidden sm:block" />
+          market intelligence.
         </motion.h1>
 
         <motion.p {...fade(0.16)} className="mt-6 max-w-[34rem] text-[16.5px] leading-relaxed text-zinc-500 sm:text-[17.5px]">
-          Terminal checks every agency website each morning and shows you what changed and what each listing is really worth. Built for agents, brokers and investors.
+          Terminal tracks listings from Aruba&rsquo;s real estate agencies, follows their prices and compares each one with similar properties, so agents, brokers and investors can read the market at a glance.
         </motion.p>
 
         <motion.div {...fade(0.24)} className="mt-8 flex items-center gap-2.5">

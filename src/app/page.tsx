@@ -345,7 +345,7 @@ const AUDIENCES: Audience[] = [
 ];
 
 const HOW: Array<[string, string]> = [
-  ["We collect", `Every agency, broker and developer website in Aruba, checked each morning. ${ALL_LISTINGS.length} listings in one place.`],
+  ["We collect", "Listings from agency, broker and developer websites across Aruba, checked each morning and gathered in one place."],
   ["AI analyzes", "Each price against comparable listings. Below market, overpriced and ghost listings flagged."],
   ["You act first", "Read the morning brief, watch your pins and call the listing agent in one tap."],
 ];
@@ -360,7 +360,7 @@ const FEATURES: Array<[typeof Rss, string, string]> = [
   [Users, "Interested clients", "Buyers on each listing with phone and notes."],
   [MessageCircle, "Agent contact", "Call, WhatsApp or e-mail the listing agent in one tap."],
   [Handshake, "Market feed", "The one page every member sees: off-market deals, buyer requests and rentals."],
-  [MapIcon, "3D map", "Every listing on a map of the island, with filters."],
+  [MapIcon, "3D map", "Tracked listings on a map of the island, with filters."],
   [FileSpreadsheet, "CSV export", "Take any filtered list into your own spreadsheet."],
   [Flag, "Flag sold listings", "Mark a listing as gone and it disappears for every member."],
 ];
@@ -502,7 +502,7 @@ export default function Home() {
         {/* How it works */}
         <section id="how" className="scroll-mt-16 bg-white">
           <div className="mx-auto max-w-[1240px] px-5 py-16 sm:px-6 sm:py-24">
-            <SectionHeading eyebrow="How it works" title="One screen. Every listing. Every morning." />
+            <SectionHeading eyebrow="How it works" title="One screen. Fresh market data every morning." />
             <Stagger className="mt-10 grid gap-4 md:grid-cols-3" gap={0.1}>
               {HOW.map(([k, v], i) => (
                 <StaggerItem key={k} className="glass relative rounded-2xl p-6">
@@ -594,7 +594,7 @@ export default function Home() {
           <div className="mx-auto max-w-[1240px] px-5 py-16 sm:px-6 sm:py-24">
             <Reveal className="text-center">
               <Eyebrow>Pricing</Eyebrow>
-              <h2 className="mt-4 font-display text-[30px] font-bold tracking-tight text-zinc-950 sm:text-[44px]">One plan. The whole market.</h2>
+              <h2 className="mt-4 font-display text-[30px] font-bold tracking-tight text-zinc-950 sm:text-[44px]">One plan. Full access.</h2>
             </Reveal>
             <div className="relative mx-auto mt-10 max-w-[1000px] sm:mt-12">
             {/* soft shapes behind the glass so the frost has something to blur */}
@@ -613,7 +613,7 @@ export default function Home() {
                 </div>
                 <ul className="mt-8 space-y-3">
                   {[
-                    "Every listing in Aruba, updated daily",
+                    "Listings from Aruba agencies, updated daily",
                     "Value signal, price history and Confidence Score",
                     "AI morning briefing and a note on every listing",
                     "Watchlist and interested clients",
