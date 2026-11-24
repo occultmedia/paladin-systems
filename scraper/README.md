@@ -1,17 +1,20 @@
 # Terminal spider fleet (Level 1 ingestion)
 
 Reads agency websites and upserts what it finds into Supabase `raw_listings`
-(one row per listing URL). The normaliser that turns `raw_listings` into
-`property_master` (dedupe, districts, $/sq ft, signals) is the next stage and
-is not part of this folder yet.
+(one row per listing URL). The normaliser (`normalise.py`) then turns `raw_listings` into
+`property_master`, which the dashboard reads.
 
 ```
 scraper/
   requirements.txt
   env.example                 copy to .env and fill in (gitignored)
   terminal_spider/
-    base.py                   BaseSpider: browser, politeness, robots.txt, records, Supabase upserts
-    kw_aruba.py               KWArubaSpider: selectors and pagination for kw-aruba.com only
+    base.py                   BaseSpider: politeness, robots.txt, what to open tonight, records, Supabase upserts
+    fetch.py                  HttpEngine (fast, default) and BrowserEngine (Playwright, for sites that need scripts)
+    doc.py                    Doc: a parsed page; a missing element is None, never an error
+    kw_aruba.py               KWArubaSpider: selectors for kw-aruba.com only
+    all_property_aruba.py     AllPropertyArubaSpider: selectors for allpropertyaruba.com only
+    normalise.py              raw_listings -> property_master (runs at the end of every crawl)
     parsing.py                "USD 3.900.000" -> 3900000, "10 bedroom(s)" -> 10, currency, Cloudflare e-mails
     __init__.py               SPIDERS registry
     __main__.py               command line + the scrape_runs row
@@ -39,8 +42,7 @@ pip install -r requirements.txt
 python -m playwright install chromium
 ```
 
-That installs `playwright`, `supabase` (supabase-py) and `python-dotenv`, plus
-Playwright's own Chromium. Then:
+The last step is only needed for spiders with `engine = "browser"`. Then:
 
 ```bash
 cp env.example .env
@@ -66,7 +68,8 @@ python -m terminal_spider
 ```
 
 Options: `--limit N`, `--start-url URL` (only that index page),
-`--refresh-days N` (re-open unchanged listing pages after N days, default 7),
+`--refresh-days N` (re-read unchanged listings every N days, default 7),
+`--jobs N` (agencies at the same time, default 6), `--no-normalise`,
 `--headed` (watch the browser), `-v` (debug log).
 
 ## What one run does
@@ -87,24 +90,34 @@ Options: `--limit N`, `--start-url URL` (only that index page),
 Listings that disappear from the site are not deleted: their
 `last_scraped_at` stops moving and the Confidence Score drops them.
 
+## Speed
+
+A run takes as long as its slowest site, because agencies are crawled side by
+side (`--jobs`, default 6). Each site is still read one page at a time. What
+makes it quick:
+
+- **HTTP engine.** One small request per page instead of a whole browser.
+- **Few pages.** New and changed listings are opened; unchanged ones are only
+  marked "still listed". Re-reads rotate: 1/`refresh_days` of a site per
+  night, oldest first. Sold listings are not re-read while they stay sold.
+- **No extra waiting.** robots.txt `Crawl-delay` is kept exactly, plus up to
+  one random second; sites without one get 2-4 seconds.
+
+Measured 24 Nov 2026: KW Aruba (186 listings) and All Property Aruba (11) took
+2.1 minutes together. KW's 20-second Crawl-delay sets that time: 5 index pages
+plus the pages opened. On the nights re-reads are due, add about 7 minutes.
+
 ## Politeness and blocking
 
 - robots.txt is read every run; Disallow rules and `Crawl-delay` are honoured.
-  KW Aruba asks for **20 seconds** between requests, so the spider waits
-  20-30 s (random) between page loads.
-- One realistic desktop Chrome user agent (matching the bundled Chromium
-  version) and window size are picked at random per run, with normal
-  `Accept-Language` headers. Images, fonts and video are not downloaded.
+  Do not lower a site's delay to go faster.
 - HTTP 403/429/503 → backs off (60 s, 120 s, 180 s). A Cloudflare/CAPTCHA
   challenge page stops that agency's run and is recorded in
   `scrape_runs.error`. The spider does **not** try to get around blocks or
   solve challenges: if a site blocks us, look at it by hand (or ask the
   agency for a feed).
-
-Run time for KW Aruba: the first full run reads every listing page (about
-200 listings × ~25 s ≈ 1.5 hours). After that a night is the 5 index pages,
-the listings whose card changed, and a seventh of the rest: usually 10-20
-minutes.
+- A listing page that fails to load keeps what was read before and is tried
+  again the next night.
 
 ## KW Aruba selectors (kw-aruba.com, checked 23 Nov 2026)
 
@@ -158,10 +171,12 @@ On land, a "Bedrooms 0" in the table is stored as null (not applicable).
 
 1. Copy `kw_aruba.py` to `<agency>.py`; set `agency_id` (slug, lowercase),
    `agency_name`, `website`, `start_urls`.
-2. Rewrite `parse_index`, `next_page_url` and `parse_detail` with that site's
-   selectors. Use the `self.text / texts / attr / attrs / block_text` helpers:
-   they return None instead of raising when an element is missing.
+2. Rewrite `parse_index` and `parse_detail` with that site's selectors. They
+   get a `Doc`; its `text / texts / attr / attrs / block_text / table` return
+   None or an empty list when an element is missing.
+   If the listings are not in the page's HTML, set `engine = "browser"`.
 3. Register the class in `terminal_spider/__init__.py` (`SPIDERS`).
-4. Add its photo host to `src/lib/photo-hosts.ts`, so its photos are resized.
+4. Add its photo host to `src/lib/photo-hosts.ts`, so its photos are resized
+   (not needed for Framer sites, whose image host resizes by itself).
 5. Check its robots.txt and terms first, then
    `python -m terminal_spider <agency> --dry-run --limit 3`.

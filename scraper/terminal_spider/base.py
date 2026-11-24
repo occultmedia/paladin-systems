@@ -1,7 +1,8 @@
 """
 BaseSpider: everything a Terminal spider needs except the site itself.
 
-A site-specific spider (see kw_aruba.py) only answers three questions:
+A site-specific spider (see kw_aruba.py, all_property_aruba.py) only answers
+three questions:
 
     1. Which pages list the inventory?            start_urls
     2. What is on each listing card, and where
@@ -10,20 +11,22 @@ A site-specific spider (see kw_aruba.py) only answers three questions:
 
 This class does the rest, identically for every agency:
 
-    - opens Playwright (Chromium) with a rotating desktop user agent, a random
-      window size and normal browser headers;
-    - reads the site's robots.txt and honours its Disallow rules and its
-      Crawl-delay (KW Aruba asks for 20 seconds between requests);
-    - waits a random interval between page loads and backs off on errors;
+    - loads pages with the fast HTTP engine, or a real browser for sites that
+      need one (engine = "browser"); see fetch.py;
+    - reads robots.txt and honours its Disallow rules and Crawl-delay;
+    - keeps requests to one site at least min_delay apart and backs off on
+      errors. Different agencies run side by side, each at its own pace;
     - stops (does not try to get around it) if the site serves a bot challenge;
     - turns every listing into one standard record, hashes it, and upserts it
       into Supabase `raw_listings` on `source_url`, stamping `last_scraped_at`.
 
-Politeness also saves work: a listing's own page is only re-opened when its
-card on the index page changed (price, status, beds...) or the last full read
-is older than `refresh_days`. Listings that are still there but unchanged
-just get `last_scraped_at` bumped, which is what keeps their Confidence
-Score up.
+What keeps a nightly run short is opening few pages, not opening them faster:
+
+    - unchanged card, read recently     only marked "still listed"
+    - new listing or changed card       opened tonight
+    - unchanged but read long ago       re-read in rotation: 1/refresh_days of
+                                        the site per night, oldest first
+    - sold and unchanged                never opened again
 """
 
 from __future__ import annotations
@@ -33,6 +36,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import math
 import random
 import time
 import urllib.robotparser
@@ -41,40 +45,11 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 from urllib.parse import urljoin, urlparse
 
-from playwright.async_api import Browser, BrowserContext, Locator, Page, Response, async_playwright
-
+from .doc import Doc
+from .fetch import BrowserEngine, HttpEngine
 from .parsing import clean, parse_currency, parse_int, parse_number
 
 log = logging.getLogger("terminal_spider")
-
-# ── browser emulation ──────────────────────────────────────────────────────
-
-# Desktop Chrome / Edge on the three platforms agents and investors use. The
-# version is filled in at run time from the Chromium that Playwright ships,
-# so the user agent always matches the engine actually rendering the page.
-USER_AGENT_TEMPLATES = [
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{v}.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{v}.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{v}.0.0.0 Safari/537.36 Edg/{v}.0.0.0",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{v}.0.0.0 Safari/537.36",
-]
-
-# Common laptop and desktop window sizes; one is picked per run.
-VIEWPORTS = [(1280, 800), (1366, 768), (1440, 900), (1536, 864), (1680, 1050), (1920, 1080)]
-
-# Sent with every request, like a normal English-language browser.
-EXTRA_HEADERS = {
-    "Accept-Language": "en-US,en;q=0.9",
-    "Upgrade-Insecure-Requests": "1",
-}
-
-# Things a listing page does not need to be read. Not downloading them is
-# faster for us and lighter on the agency's server.
-BLOCKED_RESOURCES = {"image", "media", "font"}
-
-# Pages that mean "you look like a bot". We stop the run instead of trying
-# to get past them.
-CHALLENGE_MARKERS = ("Just a moment...", "Attention Required!", "cf-challenge", "captcha")
 
 # The columns of raw_listings this pipeline writes on a full read. Every full
 # row carries all of them (PostgREST bulk upserts need the same keys per row).
@@ -97,6 +72,8 @@ class SpiderStats:
     rows_new: int = 0
     rows_changed: int = 0
     rows_unchanged: int = 0
+    index_failures: int = 0       # index pages that would not load
+    seconds: float = 0.0
     field_misses: dict[str, int] = field(default_factory=dict)  # selector -> times it found nothing
 
 
@@ -110,6 +87,10 @@ class PreviousRow:
 
 def sha256(data: Any) -> str:
     return hashlib.sha256(json.dumps(data, sort_keys=True, ensure_ascii=False, default=str).encode()).hexdigest()
+
+
+def card_hash_of(card: dict[str, Any]) -> str:
+    return sha256({k: v for k, v in card.items() if k != "index_pages"})
 
 
 def num_text(value: float | int | None) -> str | None:
@@ -141,13 +122,14 @@ class BaseSpider(abc.ABC):
     agency_name: str          # "Keller Williams Aruba"
     website: str              # "https://kw-aruba.com"
     start_urls: list[str]     # index pages that list the inventory
+    logo_url: str | None = None  # the agency's own logo, shown next to every listing
 
     # ---- optional tuning -------------------------------------------------
-    min_delay: float = 6.0    # seconds between page loads (raised to robots.txt Crawl-delay)
-    max_delay: float = 12.0
+    engine: str = "http"            # "http", or "browser" when listings need scripts to appear
+    min_delay: float = 2.0          # seconds between page loads; robots.txt Crawl-delay raises it
+    jitter: float = 1.0             # up to this many random seconds on top
     max_pages_per_index: int = 50   # guard against pagination loops
     max_photos: int = 1             # only the main photo is kept (raw_photos[0])
-    page_timeout_ms: int = 45_000
     retries: int = 3
 
     def __init__(
@@ -170,106 +152,51 @@ class BaseSpider(abc.ABC):
         self.stats = SpiderStats()
         self.records: list[dict[str, Any]] = []  # what a dry run prints / saves
         self._robots: urllib.robotparser.RobotFileParser | None = None
+        self._web: Any = None  # the open engine
         self._last_request = 0.0
         self.source_website = urlparse(self.website).netloc.removeprefix("www.")
 
     # ---- what each site implements ----------------------------------------
 
     @abc.abstractmethod
-    async def parse_index(self, page: Page) -> list[dict[str, Any]]:
+    def parse_index(self, page: Doc) -> list[dict[str, Any]]:
         """
-        Read every listing card on the index page that is open in `page`.
-        Return one dict per card with at least {"source_url": ...}; anything
-        else on the card (price text, beds, status label...) is used to tell
-        whether the listing changed since the last run.
+        Read every listing card on an index page. Return one dict per card
+        with at least {"source_url": ...}; anything else on the card (price
+        text, beds, status label...) is used to tell whether the listing
+        changed since the last run.
         """
+
+    def next_page_url(self, page: Doc) -> str | None:
+        """The next index page, or None on the last one."""
+        return self.absolute(page.attr('a[rel="next"], .pagination a.next, .pagination__next a', "href"))
 
     @abc.abstractmethod
-    async def next_page_url(self, page: Page) -> str | None:
-        """The next index page after the one open in `page`, or None on the last page."""
-
-    @abc.abstractmethod
-    async def parse_detail(self, page: Page, card: dict[str, Any]) -> dict[str, Any]:
+    def parse_detail(self, page: Doc, card: dict[str, Any]) -> dict[str, Any]:
         """
-        Read the listing page open in `page` and return the standard record
-        (see `normalise`). `card` is what parse_index() found for it, so the
-        detail parser can fall back to the card when a field is missing.
+        Read a listing page and return the standard record (see `normalise`).
+        `card` is what parse_index() found for it, so the detail parser can
+        fall back to the card when a field is missing.
         """
 
-    # ---- safe DOM helpers (a missing element gives None, never an exception) ----
+    async def prepare(self) -> None:
+        """Optional: load anything shared by all listings (an agents page, a category list) with self.load()."""
 
-    async def text(self, scope: Page | Locator, selector: str, *, key: str | None = None) -> str | None:
-        """Text of the first match of `selector`, cleaned; None if absent.
+    def is_closed(self, card: dict[str, Any]) -> bool:
+        """True when the card says the listing is sold: it is not re-read while it stays that way."""
+        return (card.get("label") or "").strip().lower() == "sold"
 
-        Uses textContent, not innerText: the text as written in the page, not
-        as styled (KW uppercases districts with CSS), and it also works inside
-        hidden tabs."""
-        try:
-            loc = scope.locator(selector).first
-            if await loc.count() == 0:
-                self._miss(key or selector)
-                return None
-            return clean(await loc.text_content(timeout=2_000))
-        except Exception as exc:  # noqa: BLE001 - any DOM failure is just "no value"
-            log.debug("text(%s) failed: %s", selector, exc)
+    # ---- helpers for spiders ------------------------------------------------
+
+    def text(self, scope: Doc, selector: str, *, key: str | None = None) -> str | None:
+        """Text of the first match; None (and counted as a miss) if absent."""
+        value = scope.text(selector)
+        if value is None:
             self._miss(key or selector)
-            return None
+        return value
 
-    async def texts(self, scope: Page | Locator, selector: str) -> list[str]:
-        """Texts of every match of `selector` (empty list if none)."""
-        try:
-            return [t for t in (clean(x) for x in await scope.locator(selector).all_text_contents()) if t]
-        except Exception as exc:  # noqa: BLE001
-            log.debug("texts(%s) failed: %s", selector, exc)
-            return []
-
-    async def attr(self, scope: Page | Locator, selector: str, name: str) -> str | None:
-        """Attribute `name` of the first match of `selector`; None if absent."""
-        try:
-            loc = scope.locator(selector).first
-            if await loc.count() == 0:
-                return None
-            return clean(await loc.get_attribute(name, timeout=2_000))
-        except Exception as exc:  # noqa: BLE001
-            log.debug("attr(%s, %s) failed: %s", selector, name, exc)
-            return None
-
-    async def attrs(self, scope: Page | Locator, selector: str, name: str) -> list[str]:
-        """Attribute `name` of every match of `selector`."""
-        try:
-            values = await scope.locator(selector).evaluate_all(f"els => els.map(e => e.getAttribute({json.dumps(name)}))")
-            return [v for v in (clean(x) for x in values) if v]
-        except Exception as exc:  # noqa: BLE001
-            log.debug("attrs(%s, %s) failed: %s", selector, name, exc)
-            return []
-
-    async def block_text(self, scope: Page | Locator, selector: str) -> str | None:
-        """Readable text of a rich-text block (description), one line per heading, paragraph or bullet.
-        Works on hidden tabs, where innerText would run everything together."""
-        try:
-            loc = scope.locator(selector).first
-            if await loc.count() == 0:
-                self._miss(selector)
-                return None
-            return await loc.evaluate(
-                """el => {
-                    // textContent, but with <br> kept as a line break
-                    const text = n => Array.from(n.childNodes).map(c =>
-                        c.nodeName === 'BR' ? '\\n' : c.nodeType === 3 ? c.textContent : text(c)).join('');
-                    const parts = Array.from(el.querySelectorAll('h1,h2,h3,h4,h5,p,li,td'))
-                        .filter(e => !e.querySelector('p,li'))
-                        .map(e => text(e).split('\\n').map(l => l.replace(/\\s+/g, ' ').trim()).filter(Boolean).join('\\n'))
-                        .filter(Boolean);
-                    return parts.length ? parts.join('\\n') : el.textContent;
-                }"""
-            )
-        except Exception as exc:  # noqa: BLE001
-            log.debug("block_text(%s) failed: %s", selector, exc)
-            self._miss(selector)
-            return None
-
-    def absolute(self, href: str | None) -> str | None:
-        return urljoin(self.website + "/", href) if href else None
+    def absolute(self, href: str | None, base: str | None = None) -> str | None:
+        return urljoin(base or self.website + "/", href) if href else None
 
     def _miss(self, key: str) -> None:
         self.stats.field_misses[key] = self.stats.field_misses.get(key, 0) + 1
@@ -317,8 +244,8 @@ class BaseSpider(abc.ABC):
             "extra": data.get("extra") or {},
         }
 
-    def to_row(self, rec: dict[str, Any], card_hash: str, seen_at: str) -> dict[str, Any]:
-        """The raw_listings row for a fully read listing."""
+    def to_row(self, rec: dict[str, Any], card_hash: str, seen_at: str, *, read: bool = True) -> dict[str, Any]:
+        """The raw_listings row for a listing. read=False: only its card could be read; the next run tries its page again."""
         # The delta key: everything we read, minus timestamps. When this
         # changes, the database re-queues the listing for normalising.
         content_hash = sha256(rec)
@@ -348,7 +275,7 @@ class BaseSpider(abc.ABC):
                 "source_website": rec["source_website"],
                 "price_text": rec["price_text"],         # as printed, e.g. "USD 3.900.000 (AWG 6.942.000)"
                 "card_hash": card_hash,                  # tells the next run whether the card changed
-                "detail_read_at": seen_at,
+                "detail_read_at": seen_at if read else None,
                 **rec["extra"],
             },
             "content_hash": content_hash,
@@ -360,12 +287,12 @@ class BaseSpider(abc.ABC):
 
     # ---- polite page loading ----------------------------------------------------
 
-    async def _load_robots(self, context: BrowserContext) -> None:
+    async def _load_robots(self) -> None:
         """Read robots.txt once. If it can't be read, assume everything is allowed (the standard rule)."""
         rp = urllib.robotparser.RobotFileParser()
         try:
-            resp = await context.request.get(urljoin(self.website + "/", "robots.txt"), timeout=20_000)
-            rp.parse((await resp.text()).splitlines() if resp.ok else [])
+            page = await self._web.get(urljoin(self.website + "/", "robots.txt"))
+            rp.parse(page.html.splitlines() if page.status < 400 else [])
         except Exception as exc:  # noqa: BLE001
             log.warning("[%s] robots.txt unreadable (%s); continuing with default delays", self.agency_id, exc)
             rp.parse([])
@@ -373,47 +300,45 @@ class BaseSpider(abc.ABC):
         crawl_delay = rp.crawl_delay("*")
         if crawl_delay:
             self.min_delay = max(self.min_delay, float(crawl_delay))
-            self.max_delay = max(self.max_delay, self.min_delay * 1.5)
-        log.info("[%s] waiting %.0f-%.0f s between pages (robots.txt Crawl-delay: %s)", self.agency_id, self.min_delay, self.max_delay, crawl_delay)
+        log.info("[%s] %s engine, %.0f-%.0f s between pages (robots.txt Crawl-delay: %s)", self.agency_id, self._web.name, self.min_delay, self.min_delay + self.jitter, crawl_delay)
 
     def allowed(self, url: str) -> bool:
         return self._robots is None or self._robots.can_fetch("*", url)
 
     async def _pause(self) -> None:
-        """Random wait so requests are at least min_delay apart."""
-        wait = random.uniform(self.min_delay, self.max_delay) - (time.monotonic() - self._last_request)
+        """Keep requests to this site at least min_delay apart."""
+        wait = self.min_delay + random.uniform(0, self.jitter) - (time.monotonic() - self._last_request)
         if wait > 0 and self._last_request:
             await asyncio.sleep(wait)
 
-    async def goto(self, page: Page, url: str) -> bool:
+    async def load(self, url: str) -> Doc | None:
         """
-        Open `url` politely. Returns True when the page loaded, False when it
-        could not (404, robots.txt forbids it, kept failing). Raises
-        SiteBlockedError on a bot challenge or repeated 403/429.
+        Load `url` politely. None when it could not be loaded (404, robots.txt
+        forbids it, kept failing). Raises SiteBlockedError on a bot challenge
+        or repeated 403/429.
         """
         if not self.allowed(url):
             log.info("[%s] robots.txt disallows %s; skipped", self.agency_id, url)
-            return False
+            return None
         status = 0
         for attempt in range(1, self.retries + 1):
             await self._pause()
             self._last_request = time.monotonic()
             try:
-                resp: Response | None = await page.goto(url, wait_until="domcontentloaded", timeout=self.page_timeout_ms)
-                status = resp.status if resp else 0
-                title = (await page.title()) or ""
-                if any(m.lower() in title.lower() for m in CHALLENGE_MARKERS):
-                    raise SiteBlockedError(f"bot challenge on {url} ({title!r})")
+                page = await self._web.get(url)
+                status = page.status
+                if page.is_challenge:
+                    raise SiteBlockedError(f"bot challenge on {url} ({page.title!r})")
                 if status in (403, 429, 503):
                     backoff = 60 * attempt
                     log.warning("[%s] HTTP %s on %s; backing off %ss (%s/%s)", self.agency_id, status, url, backoff, attempt, self.retries)
                     await asyncio.sleep(backoff)
                     continue
                 if status == 404:
-                    return False
+                    return None
                 if status >= 400:
                     raise RuntimeError(f"HTTP {status}")
-                return True
+                return Doc.parse(page.html)
             except SiteBlockedError:
                 raise
             except Exception as exc:  # noqa: BLE001 - network blips, timeouts
@@ -422,23 +347,26 @@ class BaseSpider(abc.ABC):
                 await asyncio.sleep(backoff)
         if status in (403, 429, 503):
             raise SiteBlockedError(f"{url} keeps answering HTTP {status}")
-        return False
+        return None
 
     # ---- database ------------------------------------------------------------------
 
+    # Spiders run side by side but share one database connection: one call at a time.
+    _db_lock = asyncio.Lock()
+
     async def _db(self, fn):
         """supabase-py is synchronous; run its calls off the event loop."""
-        return await asyncio.to_thread(fn)
+        async with self._db_lock:
+            return await asyncio.to_thread(fn)
 
     async def _ensure_agency(self) -> None:
         """Make sure the agencies row exists (raw_listings.agency_id points at it). Keeps an existing logo."""
         if not self.db:
             return
-        await self._db(
-            lambda: self.db.table("agencies")
-            .upsert({"id": self.agency_id, "name": self.agency_name, "website": self.website, "is_active": True}, on_conflict="id")
-            .execute()
-        )
+        row = {"id": self.agency_id, "name": self.agency_name, "website": self.website, "is_active": True}
+        if self.logo_url:
+            row["logo_url"] = self.logo_url
+        await self._db(lambda: self.db.table("agencies").upsert(row, on_conflict="id").execute())
 
     async def _previous_rows(self) -> dict[str, PreviousRow]:
         """Everything raw_listings already has for this agency, keyed by URL."""
@@ -460,6 +388,16 @@ class BaseSpider(abc.ABC):
                 return out
             start += 1000
 
+    def _seen_row(self, url: str, prev: PreviousRow, seen_at: str) -> dict[str, Any]:
+        """Still listed, nothing new: only the timestamps move."""
+        return {
+            "agency_id": self.agency_id,
+            "source_url": url,
+            "content_hash": prev.content_hash,
+            "last_scraped_at": seen_at,
+            "last_run_id": self.run_id,
+        }
+
     async def _upsert(self, rows: list[dict[str, Any]]) -> None:
         """Upsert on source_url in batches. Rows in one call must share the same keys."""
         if not self.db or not rows:
@@ -470,16 +408,13 @@ class BaseSpider(abc.ABC):
 
     # ---- the run ----------------------------------------------------------------------
 
-    def _needs_detail(self, prev: PreviousRow | None, card_hash: str) -> bool:
-        if prev is None or prev.card_hash != card_hash or not prev.detail_read_at:
-            return True
+    def _age(self, prev: PreviousRow) -> timedelta:
         try:
-            read_at = datetime.fromisoformat(prev.detail_read_at)
+            return datetime.now(timezone.utc) - datetime.fromisoformat(prev.detail_read_at or "")
         except ValueError:
-            return True
-        return datetime.now(timezone.utc) - read_at > timedelta(days=self.refresh_days)
+            return timedelta.max
 
-    async def _collect_cards(self, page: Page) -> list[dict[str, Any]]:
+    async def _collect_cards(self) -> list[dict[str, Any]]:
         """Walk every index page (following next_page_url) and gather unique cards."""
         cards: dict[str, dict[str, Any]] = {}
         for start in self.start_urls:
@@ -487,110 +422,101 @@ class BaseSpider(abc.ABC):
             visited: set[str] = set()
             while url and url not in visited and len(visited) < self.max_pages_per_index:
                 visited.add(url)
-                if not await self.goto(page, url):
+                page = await self.load(url)
+                if page is None:
                     log.warning("[%s] index page did not load: %s", self.agency_id, url)
+                    self.stats.index_failures += 1
                     break
-                found = await self.parse_index(page)
+                found = self.parse_index(page)
                 for card in found:
-                    card.setdefault("index_pages", [])
-                    if card["source_url"] in cards:
-                        # The same listing on two index pages (e.g. Condo and New development): keep both pages.
-                        cards[card["source_url"]]["index_pages"].append(url)
-                    else:
-                        card["index_pages"].append(url)
-                        cards[card["source_url"]] = card
+                    known = cards.setdefault(card["source_url"], card)
+                    # the same listing can be on two index pages (e.g. Condo and New development)
+                    known.setdefault("index_pages", []).append(url)
                 log.info("[%s] %s: %s listings", self.agency_id, url, len(found))
-                url = await self.next_page_url(page)
-                if self.limit and len(cards) >= self.limit:
-                    break
-            if self.limit and len(cards) >= self.limit:
-                break
-        out = list(cards.values())
-        return out[: self.limit] if self.limit else out
+                url = self.next_page_url(page)
+        return list(cards.values())
+
+    def _plan(self, cards: list[dict[str, Any]], previous: dict[str, PreviousRow]) -> list[dict[str, Any]]:
+        """The cards whose page is opened this run (see the module docstring)."""
+        must, due = [], []
+        for card in cards:
+            prev = previous.get(card["source_url"])
+            if prev is None or not prev.detail_read_at or prev.card_hash != card_hash_of(card):
+                must.append(card)
+            elif not self.is_closed(card) and self._age(prev) > timedelta(days=self.refresh_days):
+                due.append(card)
+        due.sort(key=lambda c: previous[c["source_url"]].detail_read_at or "")
+        tonight = due[: math.ceil(len(cards) / max(1, self.refresh_days))]
+        log.info(
+            "[%s] %s listings: %s new or changed, %s of %s due for a re-read, %s sold or recent",
+            self.agency_id, len(cards), len(must), len(tonight), len(due), len(cards) - len(must) - len(tonight),
+        )
+        return must + tonight
 
     async def run(self) -> SpiderStats:
         """Crawl the site and write raw_listings. Returns the run's counters."""
+        began = time.monotonic()
         await self._ensure_agency()
         previous = await self._previous_rows()
 
-        async with async_playwright() as pw:
-            browser: Browser = await pw.chromium.launch(headless=self.headless)
-            # One user agent and window size per run, chosen at random.
-            major = browser.version.split(".")[0]
-            ua = random.choice(USER_AGENT_TEMPLATES).format(v=major)
-            width, height = random.choice(VIEWPORTS)
-            log.info("[%s] browser: Chrome %s, %sx%s, %s", self.agency_id, major, width, height, ua.split("(")[1].split(")")[0])
-            context = await browser.new_context(
-                user_agent=ua,
-                viewport={"width": width, "height": height},
-                locale="en-US",
-                timezone_id="America/Aruba",
-                extra_http_headers=EXTRA_HEADERS,
-            )
-            await context.route(
-                "**/*",
-                lambda route: route.abort() if route.request.resource_type in BLOCKED_RESOURCES else route.continue_(),
-            )
-            page = await context.new_page()
-            try:
-                await self._load_robots(context)
-                cards = await self._collect_cards(page)
-                self.stats.listings_found = len(cards)
-                log.info("[%s] %s listings on the index pages", self.agency_id, len(cards))
+        async with (BrowserEngine(self.headless) if self.engine == "browser" else HttpEngine()) as web:
+            self._web = web
+            await self._load_robots()
+            await self.prepare()
+            cards = await self._collect_cards()
+            self.stats.listings_found = len(cards)
+            if self.limit:
+                cards = cards[: self.limit]
+            plan = self._plan(cards, previous)
+            log.info("[%s] opening %s pages, about %.0f min", self.agency_id, len(plan), len(plan) * (self.min_delay + self.jitter / 2) / 60)
 
-                seen_at = now_iso()
-                full_rows: list[dict[str, Any]] = []
-                seen_rows: list[dict[str, Any]] = []
-                for n, card in enumerate(cards, 1):
-                    url = card["source_url"]
-                    card_hash = sha256({k: v for k, v in card.items() if k != "index_pages"})
-                    prev = previous.get(url)
+            seen_at = now_iso()
+            opening = {c["source_url"] for c in plan}
+            seen_rows = [self._seen_row(c["source_url"], previous[c["source_url"]], seen_at) for c in cards if c["source_url"] not in opening]
+            self.stats.rows_unchanged += len(seen_rows)
+            await self._upsert(seen_rows)
 
-                    if self.db and not self._needs_detail(prev, card_hash):
-                        # Same card as last time and read recently: just record that it is still listed.
-                        seen_rows.append({
-                            "agency_id": self.agency_id,
-                            "source_url": url,
-                            "content_hash": prev.content_hash,
-                            "last_scraped_at": seen_at,
-                            "last_run_id": self.run_id,
-                        })
-                        self.stats.rows_unchanged += 1
-                        continue
+            full_rows: list[dict[str, Any]] = []
+            for n, card in enumerate(plan, 1):
+                url = card["source_url"]
+                prev = previous.get(url)
+                data: dict[str, Any] | None = None
+                page = await self.load(url)
+                if page is None:
+                    log.warning("[%s] listing page did not load: %s", self.agency_id, url)
+                else:
+                    try:
+                        data = self.parse_detail(page, card)
+                        self.stats.details_read += 1
+                    except Exception as exc:  # noqa: BLE001 - one bad page never stops the run
+                        log.exception("[%s] could not read %s: %s", self.agency_id, url, exc)
+                if data is None and prev is not None:
+                    # Keep what we read before; it is still on the index, and the next run tries again.
+                    self.stats.rows_unchanged += 1
+                    await self._upsert([self._seen_row(url, prev, seen_at)])
+                    continue
+                read = data is not None
+                data = {**card} if data is None else data
+                data["source_url"] = url
+                rec = self.normalise(data)
+                row = self.to_row(rec, card_hash_of(card), seen_at, read=read)
+                self.records.append(rec)
 
-                    if not await self.goto(page, url):
-                        log.warning("[%s] listing page did not load, using the card only: %s", self.agency_id, url)
-                        data = {**card}
-                    else:
-                        try:
-                            data = await self.parse_detail(page, card)
-                            self.stats.details_read += 1
-                        except Exception as exc:  # noqa: BLE001 - one bad page never stops the run
-                            log.exception("[%s] could not read %s: %s", self.agency_id, url, exc)
-                            data = {**card}
-                    data["source_url"] = url
-                    rec = self.normalise(data)
-                    row = self.to_row(rec, card_hash, seen_at)
-                    self.records.append(rec)
+                if prev is None:
+                    self.stats.rows_new += 1
+                elif prev.content_hash != row["content_hash"]:
+                    self.stats.rows_changed += 1
+                else:
+                    self.stats.rows_unchanged += 1
+                full_rows.append(row)
+                log.info("[%s] %s/%s %s | %s %s | %s bd %s ba", self.agency_id, n, len(plan), rec["raw_address"], rec["raw_currency"], rec["raw_price"], rec["raw_beds"], rec["raw_baths"])
 
-                    if prev is None:
-                        self.stats.rows_new += 1
-                    elif prev.content_hash != row["content_hash"]:
-                        self.stats.rows_changed += 1
-                    else:
-                        self.stats.rows_unchanged += 1
-                    full_rows.append(row)
-                    log.info("[%s] %s/%s %s | %s %s | %s bd %s ba", self.agency_id, n, len(cards), rec["raw_address"], rec["raw_currency"], rec["raw_price"], rec["raw_beds"], rec["raw_baths"])
-
-                    # Write as we go, so a crash halfway keeps what was read.
-                    if len(full_rows) >= 25:
-                        await self._upsert(full_rows)
-                        full_rows = []
-                await self._upsert(full_rows)
-                await self._upsert(seen_rows)
-            finally:
-                await context.close()
-                await browser.close()
+                # Write as we go, so a crash halfway keeps what was read.
+                if len(full_rows) >= 25:
+                    await self._upsert(full_rows)
+                    full_rows = []
+            await self._upsert(full_rows)
+        self.stats.seconds = time.monotonic() - began
 
         if self.stats.field_misses:
             log.info("[%s] fields not found (selector: times): %s", self.agency_id, self.stats.field_misses)

@@ -73,6 +73,7 @@ async def main() -> int:
     ap.add_argument("--start-url", action="append", help="only crawl this index page (repeatable)")
     ap.add_argument("--refresh-days", type=int, default=7, help="re-open unchanged listing pages after N days (default 7)")
     ap.add_argument("--out", help="dry run: save the records to this JSON file")
+    ap.add_argument("--jobs", type=int, default=6, help="agencies crawled at the same time (default 6)")
     ap.add_argument("--headed", action="store_true", help="show the browser window")
     ap.add_argument("--no-normalise", action="store_true", help="only fill raw_listings; skip the normaliser")
     ap.add_argument("-v", "--verbose", action="store_true")
@@ -96,29 +97,38 @@ async def main() -> int:
     totals = SpiderStats()
     errors: list[str] = []
     records: list[dict] = []
-    for name in names:
+    # Agencies run side by side, so a run takes as long as its slowest site.
+    # Each site is still visited one page at a time, at its own pace.
+    gate = asyncio.Semaphore(max(1, args.jobs))
+
+    async def crawl(name: str) -> None:
         spider = SPIDERS[name](db=db, run_id=run_id, limit=args.limit, refresh_days=args.refresh_days, start_urls=args.start_url, headless=not args.headed)
-        try:
-            stats = await spider.run()
-        except SiteBlockedError as exc:
-            # Never fight a block: log it, move on to the next agency, look at it by hand.
-            errors.append(f"{name}: blocked ({exc})")
-            log.error("[%s] stopped: %s", name, exc)
-            continue
-        except Exception as exc:  # noqa: BLE001 - one agency failing never stops the others
-            errors.append(f"{name}: {exc}")
-            log.exception("[%s] failed", name)
-            continue
-        finally:
-            records.extend(spider.records)
+        async with gate:
+            try:
+                stats = await spider.run()
+            except SiteBlockedError as exc:
+                # Never fight a block: log it, carry on with the other agencies, look at it by hand.
+                errors.append(f"{name}: blocked ({exc})")
+                log.error("[%s] stopped: %s", name, exc)
+                return
+            except Exception as exc:  # noqa: BLE001 - one agency failing never stops the others
+                errors.append(f"{name}: {exc}")
+                log.exception("[%s] failed", name)
+                return
+            finally:
+                records.extend(spider.records)
+        if stats.index_failures:
+            errors.append(f"{name}: {stats.index_failures} index page(s) did not load")
         log.info(
-            "[%s] done: %s found, %s pages read, %s new, %s changed, %s unchanged",
-            name, stats.listings_found, stats.details_read, stats.rows_new, stats.rows_changed, stats.rows_unchanged,
+            "[%s] done in %.1f min: %s found, %s pages read, %s new, %s changed, %s unchanged",
+            name, stats.seconds / 60, stats.listings_found, stats.details_read, stats.rows_new, stats.rows_changed, stats.rows_unchanged,
         )
         totals.listings_found += stats.listings_found
         totals.rows_new += stats.rows_new
         totals.rows_changed += stats.rows_changed
         totals.rows_unchanged += stats.rows_unchanged
+
+    await asyncio.gather(*(crawl(n) for n in names))
 
     if db and run_id:
         db.table("scrape_runs").update({

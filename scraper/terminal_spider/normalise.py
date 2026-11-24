@@ -4,6 +4,7 @@ Level 2: the normaliser. raw_listings -> property_master (what the dashboard rea
     python -m terminal_spider.normalise              # process every waiting raw row
     python -m terminal_spider.normalise --dry-run    # show what it would write, write nothing
     python -m terminal_spider.normalise --limit 5
+    python -m terminal_spider.normalise --all        # re-read every raw row (after changing the rules below)
 
 It runs automatically at the end of a spider run (python -m terminal_spider),
 and can be run on its own.
@@ -12,11 +13,15 @@ For each raw row that is new or changed (the `raw_listing_deltas` queue):
 
   1. Read the raw text into Terminal's fields: category and property type,
      district, USD price, beds, baths, sizes in sq ft, pool, tenure, status,
-     map pin (district centre when the page has none), agent, main photo.
+     map pin, agent, main photo. A page without a pin borrows the pin of the
+     same building project listed elsewhere, else gets a spot near the
+     district centre.
   2. Find its golden record:
        - the one it was merged into before (raw.property_id), else
        - the same property already listed by ANOTHER agency (same match score
-         as the duplicate watch in the app: 70+ = same property), else
+         as the duplicate watch in the app: 70+ = same property). Only pins
+         printed on the page count as a location, and two different unit
+         numbers (Waykiri C12, Waykiri C-09) are never the same property, else
        - a new property_master row with a fresh public ref (AW-XXXXX).
   3. Write it. Only the agency that first listed a property (its primary
      source) updates the details; other agencies' copies just keep it
@@ -83,7 +88,10 @@ DISTRICT_ALIASES = {
     "san nicolaas": "San Nicolas", "pos chikito": "Pos Chiquito", "brasil": "Pos Chiquito",
     "spaans lagoen": "Pos Chiquito", "balashi": "Pos Chiquito", "piedra plat": "Paradera", "ayo": "Paradera",
     "jamanota": "Santa Cruz", "cunucu abao": "Oranjestad", "dakota": "Oranjestad", "madiki": "Oranjestad",
-    "wayaca": "Oranjestad", "bushiri": "Oranjestad", "barcadera": "Pos Chiquito",
+    "wayaca": "Oranjestad", "bushiri": "Oranjestad", "barcadera": "Pos Chiquito", "ponton": "Oranjestad",
+    "weststraat": "Oranjestad", "pos abou": "Eagle Beach", "pos abao": "Eagle Beach", "sero pita": "Paradera",
+    "seroe pita": "Paradera", "rooi santo": "Noord", "opal": "Noord", "nanki beach": "San Nicolas",
+    "rodgers beach": "San Nicolas", "rodger's beach": "San Nicolas", "baby beach": "San Nicolas",
 }
 ISLAND_CENTER = (12.52, -70.0)
 ARUBA_BOUNDS = ((12.3, 12.7), (-70.2, -69.8))
@@ -117,22 +125,30 @@ def to_sqft(text: str | None) -> int | None:
     return round(sqft) if sqft and sqft > 0 else None
 
 
-def district_of(raw: str | None, lat: float | None, lng: float | None) -> str:
-    """Terminal district for an agency's location text; nearest centre when the text is unknown but a pin exists."""
+def _has_word(words: str, text: str) -> bool:
+    return re.search(rf"(?<![a-z]){re.escape(words)}(?![a-z])", text) is not None
+
+
+def district_of(raw: str | None, lat: float | None, lng: float | None, description: str = "") -> str:
+    """Terminal district for an agency's location text, else the one the description says it is in."""
     text = (clean(raw) or "").strip()
     low = text.lower()
     for name in DISTRICT_CENTERS:
         if name.lower() == low:
             return name
     for alias, name in DISTRICT_ALIASES.items():
-        if alias in low:
+        if _has_word(alias, low):
             return name
     for name in DISTRICT_CENTERS:
-        if name.lower() in low:
+        if _has_word(name.lower(), low):
             return name
+    said = re.search(rf"\b(?:in|heart of|located at)\s+(?:the\s+)?({'|'.join(DISTRICT_CENTERS)})\b", re.sub(r"\s+", " ", description), re.I)
+    if said:
+        return next(n for n in DISTRICT_CENTERS if n.lower() == said.group(1).lower())
     if lat is not None and lng is not None and not text:
         return min(DISTRICT_CENTERS, key=lambda n: (DISTRICT_CENTERS[n][0] - lat) ** 2 + (DISTRICT_CENTERS[n][1] - lng) ** 2)
-    return text.title()[:60] if text else "Aruba"
+    # a street address is not a district
+    return text.title()[:60] if text and not re.search(r"\d", text) else "Aruba"
 
 
 def approx_pin(district: str, key: str) -> tuple[float, float]:
@@ -151,7 +167,7 @@ def in_aruba(lat: Any, lng: Any) -> bool:
         return False
 
 
-def classify(raw_type: str | None, title: str, desc: str) -> tuple[str, str, str | None]:
+def classify(raw_type: str | None, title: str, desc: str, beds: float | None = None) -> tuple[str, str, str | None]:
     """(asset_class, property_type, commercial_use) from the agency's type and the listing text."""
     t = (raw_type or "").lower()
     name = title.lower()
@@ -168,22 +184,36 @@ def classify(raw_type: str | None, title: str, desc: str) -> tuple[str, str, str
             else None
         )
         return "Commercial", "Commercial", use
-    # Homes. Decide by the title first (the most specific words), then the description.
+
+    # The agency says it is a unit (or a new project, which usually sells
+    # units). "House" and "Residence" in a building's name then say nothing:
+    # Harbour House and Azure Beach Residences are condos.
+    unit = bool(re.search(r"condo|town ?house|apartment", t))
+    project = "development" in t
     for words, kind in (
         (r"penthouse", "Penthouse"),
         (r"beach ?house", "Beach House"),
         (r"town ?house|duplex", "Townhouse"),
+        (r"\bvillas?\b" if unit or project else r"$^", "Villa"),
         (r"apartment|studio|\bapt\b", "Apartment"),
         (r"condo", "Condo"),
         (r"estate\b", "Estate"),
-        (r"villa|house|home|residence|bungalow|cunucu", "Villa"),
+        (r"$^" if unit or project else r"villa|house|home|residence|bungalow|cunucu", "Villa"),
     ):
         if re.search(words, name):
             return "Property", kind, None
-    if "condo" in t or "townhouse" in t:
+    if unit:
+        if re.search(r"condo", text):
+            return "Property", "Condo", None
         if re.search(r"town ?house|duplex", text):
             return "Property", "Townhouse", None
         return "Property", "Apartment" if re.search(r"apartment|studio", text) else "Condo", None
+    if project:
+        if re.search(r"condo", text):
+            return "Property", "Condo", None
+        if re.search(r"apartment|studio", text) or (beds is not None and beds <= 2):
+            return "Property", "Apartment" if re.search(r"apartment|studio", text) else "Condo", None
+        return "Property", "Villa", None
     if re.search(r"condo", text):
         return "Property", "Condo", None
     return "Property", "Villa", None
@@ -233,6 +263,7 @@ class Fields:
     """One raw row read into property_master columns (without ids and lifecycle)."""
     row: dict[str, Any]
     agent: dict[str, Any] | None
+    pin_exact: bool  # the pin was printed on the listing page
 
 
 def read_raw(raw: dict[str, Any]) -> Fields:
@@ -253,8 +284,8 @@ def read_raw(raw: dict[str, Any]) -> Fields:
     elif currency != "USD":
         raise ValueError(f"price in {currency}, not converted")
 
-    asset_class, ptype, use = classify(raw.get("raw_property_type"), title, desc)
     beds = parse_number(raw.get("raw_beds"))
+    asset_class, ptype, use = classify(raw.get("raw_property_type"), title, desc, beds)
     baths = parse_number(raw.get("raw_baths"))
     # Sizes below these are typos on the source page ("3 m²"): treat them as unknown.
     built = to_sqft(raw.get("raw_built_area"))
@@ -267,8 +298,9 @@ def read_raw(raw: dict[str, Any]) -> Fields:
         raise ValueError("land without a lot size")
 
     lat, lng = raw.get("raw_lat"), raw.get("raw_lng")
-    district = district_of(raw.get("raw_district"), lat, lng)
-    if not in_aruba(lat, lng):
+    district = district_of(raw.get("raw_district"), lat, lng, desc)
+    pin_exact = in_aruba(lat, lng)
+    if not pin_exact:
         lat, lng = approx_pin(district, raw["source_url"])
 
     tenure, lease_left = tenure_of(features, desc)
@@ -316,7 +348,7 @@ def read_raw(raw: dict[str, Any]) -> Fields:
         "last_scraped_at": raw.get("last_scraped_at"),
         "last_run_id": raw.get("last_run_id"),
     }
-    return Fields(row, agent)
+    return Fields(row, agent, pin_exact)
 
 
 # ── duplicate match (same scoring as src/lib/duplicates.ts and SQL listing_match_score) ──
@@ -344,9 +376,40 @@ def distance_m(a_lat: float, a_lng: float, b_lat: float, b_lng: float) -> float:
     return math.hypot(dx, dy)
 
 
+def unit_tokens(name: str) -> set[str]:
+    """Unit and house numbers in a name: "Waykiri C-08" -> {"c8"}, "Harbour House 613S" -> {"613s"}."""
+    found = re.findall(r"(?<![a-z0-9])([a-z]{0,2})-?0*(\d{1,4})([a-z]{0,2})(?![a-z0-9])", name.lower())
+    return {f"{a}{n}{b}" for a, n, b in found}
+
+
+# Words in a project's name that say nothing about which project it is.
+GENERIC = set("""a an and at by de del in near of on the to with aruba luxury living residence residences condo condos condominium condominiums
+apartment apartments villa villas unit units resort boutique branded new home homes house beach ocean sea view views property for sale""".split())
+
+
+def project_key(name: str) -> set[str]:
+    """The words that identify a building project: "L'Aquila Residences – Eagle Beach" -> {"aquila", "eagle"}."""
+    words = re.findall(r"[a-zà-ÿ]{3,}", re.sub(r"\b[ld]['’]", " ", name.lower()))
+    return {w for w in words if w not in GENERIC}
+
+
+def project_pin(row: dict[str, Any], masters: list[dict[str, Any]], exact: set[str]) -> dict[str, Any] | None:
+    """A listing of the same building project whose page prints a pin. Units only: houses do not share a name."""
+    key = project_key(row["asset_name"])
+    if row["property_type"] not in UNIT_TYPES or not key or max(map(len, key)) < 4:
+        return None
+    for m in masters:
+        if m["id"] in exact and m.get("property_type") in UNIT_TYPES and key <= project_key(m["asset_name"]):
+            return m
+    return None
+
+
 def match_score(a: dict[str, Any], b: dict[str, Any]) -> int:
     if a["asset_class"] != b["asset_class"]:
         return 0
+    ua, ub = unit_tokens(a["asset_name"]), unit_tokens(b["asset_name"])
+    if ua and ub and not ua & ub:
+        return 0  # both name a unit, and not the same one
     s = 0
     if None not in (a["lat"], a["lng"], b["lat"], b["lng"]):
         d = distance_m(a["lat"], a["lng"], b["lat"], b["lng"])
@@ -377,7 +440,7 @@ def match_score(a: dict[str, Any], b: dict[str, Any]) -> int:
 
 # ── database work ─────────────────────────────────────────────────────────
 
-MATCH_COLS = "id,listing_id,agency_id,asset_class,lat,lng,district,bedrooms,built_sqft,lot_sqft,asking_price_usd,asset_name,address"
+MATCH_COLS = "id,listing_id,agency_id,source_url,asset_class,property_type,lat,lng,district,bedrooms,built_sqft,lot_sqft,asking_price_usd,asset_name,address"
 RAW_COLS = (
     "id,agency_id,source_url,raw_title,raw_price,raw_currency,raw_beds,raw_baths,raw_built_area,raw_lot_area,"
     "raw_property_type,raw_status,raw_address,raw_district,raw_description,raw_agent,raw_photos,raw_lat,raw_lng,"
@@ -410,8 +473,9 @@ def _same(a: Any, b: Any) -> bool:
 
 
 class Normaliser:
-    def __init__(self, db: Any, *, dry_run: bool = False, limit: int | None = None) -> None:
+    def __init__(self, db: Any, *, dry_run: bool = False, limit: int | None = None, everything: bool = False) -> None:
         self.db = db
+        self.everything = everything
         self.dry_run = dry_run
         self.limit = limit
         self.stats = {"read": 0, "inserted": 0, "updated": 0, "merged": 0, "failed": 0, "signals": 0}
@@ -434,12 +498,23 @@ class Normaliser:
             self.db.rpc("mark_raw_processed", {"p_raw_id": raw_id, "p_property_id": property_id, "p_error": error}).execute()
 
     def process_queue(self) -> None:
-        q = lambda: self.db.table("raw_listing_deltas").select(RAW_COLS).order("id")  # noqa: E731
+        source = "raw_listings" if self.everything else "raw_listing_deltas"
+        q = lambda: self.db.table(source).select(RAW_COLS).order("id")  # noqa: E731
         raws = _all(q)
         if self.limit:
             raws = raws[: self.limit]
         masters = _all(lambda: self.db.table("property_master").select(MATCH_COLS).eq("status", "active"))
         by_id = {m["id"]: m for m in masters}
+        # Listings whose own page prints a map pin. The others sit near their
+        # district centre, which must not count as "the same spot".
+        pinned_urls = {r["source_url"] for r in _all(lambda: self.db.table("raw_listings").select("source_url").not_.is_("raw_lat", "null").order("id"))}
+        exact = {m["id"] for m in masters if m["source_url"] in pinned_urls}
+
+        def located(m: dict[str, Any], is_exact: bool) -> dict[str, Any]:
+            return m if is_exact else {**m, "lat": None, "lng": None}
+
+        # pages with a pin first, so the ones without can borrow from them
+        raws.sort(key=lambda r: r.get("raw_lat") is None)
         taken = {r["listing_id"] for r in _all(lambda: self.db.table("property_master").select("listing_id"))}
         log.info("normalising %s raw rows (%s listings on the market)", len(raws), len(masters))
 
@@ -455,13 +530,18 @@ class Normaliser:
                 continue
 
             try:
+                if not f.pin_exact:
+                    near = project_pin(f.row, masters, exact)
+                    if near:
+                        f.row.update(lat=near["lat"], lng=near["lng"], district=near["district"])
+                        log.info("pin of %s borrowed from %s", f.row["asset_name"], near["listing_id"])
                 pid = raw.get("property_id")
                 master = by_id.get(pid) if pid else None
                 if master is None and not pid:
                     # Same property already listed by another agency?
-                    cand = {**f.row, "id": None}
+                    cand = located({**f.row, "id": None}, f.pin_exact)
                     best = max(
-                        ((match_score(cand, m), m) for m in masters if m["agency_id"] != raw["agency_id"]),
+                        ((match_score(cand, located(m, m["id"] in exact)), m) for m in masters if m["agency_id"] != raw["agency_id"]),
                         key=lambda x: x[0],
                         default=(0, None),
                     )
@@ -496,6 +576,8 @@ class Normaliser:
                     m = {k: row.get(k) for k in MATCH_COLS.split(",")} | {"id": new_id}
                     masters.append(m)
                     by_id[new_id] = m
+                    if f.pin_exact:
+                        exact.add(new_id)
                     self._mark(raw["id"], None if self.dry_run else new_id)
                 log.info("%s  %s | %s %s | %s | USD %s", ref if not (master or pid) else "update", f.row["asset_name"], f.row["asset_class"], f.row["property_type"], f.row["district"], f"{f.row['asking_price_usd']:,.0f}")
             except Exception as exc:  # noqa: BLE001
@@ -557,11 +639,12 @@ def main() -> int:
     ap = argparse.ArgumentParser(prog="terminal_spider.normalise", description="raw_listings -> property_master")
     ap.add_argument("--dry-run", action="store_true", help="read and print, write nothing")
     ap.add_argument("--limit", type=int, help="process at most N raw rows")
+    ap.add_argument("--all", action="store_true", help="re-read every raw row, not only new and changed ones")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args()
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO, format="%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S")
     logging.getLogger("httpx").setLevel(logging.WARNING)
-    n = Normaliser(make_client(), dry_run=args.dry_run, limit=args.limit)
+    n = Normaliser(make_client(), dry_run=args.dry_run, limit=args.limit, everything=args.all)
     n.run()
     if args.dry_run:
         for p in n.planned:

@@ -30,6 +30,8 @@ export function photoSrc(src: string, w: number, h: number): string {
     return src;
   }
   if (url.hostname === "images.unsplash.com") return `${src}?auto=format&fit=crop&w=${w * 2}&h=${h * 2}&q=60`;
+  // Framer-built agency sites resize their own images
+  if (url.hostname === "framerusercontent.com" && url.pathname.startsWith("/images/")) return `${src}?scale-down-to=${w * 2 <= 512 ? 512 : 1024}`;
   if (!resizable(url)) return src; // includes photos still in the browser (data: URLs)
   return `/_next/image?url=${encodeURIComponent(src)}&w=${w * 2 <= THUMB ? THUMB : CARD}&q=75`;
 }
