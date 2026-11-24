@@ -19,10 +19,11 @@ import { Wordmark } from "@/components/logo";
 import { GrainField } from "@/components/landing/grain-field";
 import { PostCard, SharedNotice } from "@/components/feed/feed-view";
 import { BAND_COLOR, confidenceBand } from "@/lib/confidence";
-import type { Listing } from "@/lib/aruba-data";
+import { STATUS_TAB, isClosed, type Listing, type ListingStatus } from "@/lib/aruba-data";
+import { shortSize } from "@/lib/units";
 import { DEAL_TTL_DAYS, POST_KINDS, useFeed, type PostKind } from "@/lib/feed";
 import { useWatchlist } from "@/lib/watchlist";
-import { HotFlame, AgencyLogo, SIGNAL_COLOR, SIGNAL_LABEL } from "./map-shared";
+import { HotFlame, AgencyLogo, SIGNAL_COLOR, SIGNAL_LABEL, STATUS_PILL } from "./map-shared";
 import { ListingPopup, ViewToggle, kindOf, usdShort } from "./listing-popup";
 
 const ArubaMap = dynamic(() => import("./aruba-map"), {
@@ -105,22 +106,32 @@ function Row({
         >
           {l.district} · {kindOf(l)}
         </span>
+        <span className={`block truncate text-[11.5px] tabular-nums ${on ? "text-zinc-300" : "text-zinc-700"}`}>{shortSize(l)}</span>
         <span className="mt-1 flex items-center gap-2 text-[11px]">
-          <span
-            className="inline-flex items-center gap-1 font-semibold"
-            style={{ color: on ? undefined : SIGNAL_COLOR[l.signal] }}
-          >
+          {l.status !== "For sale" && (
+            <span className="rounded-full px-1.5 py-px text-[10px] font-semibold" style={{ color: STATUS_PILL[l.status].color, background: STATUS_PILL[l.status].bg }}>
+              {l.status}
+            </span>
+          )}
+          {!isClosed(l) && (
             <span
-              className="size-1.5 rounded-full"
-              style={{ background: SIGNAL_COLOR[l.signal] }}
-            />
-            {SIGNAL_LABEL[l.signal]}
-            {l.signal === "UNDERVALUED" && <HotFlame size={12} />}
-          </span>
+              className="inline-flex items-center gap-1 font-semibold"
+              style={{ color: on ? undefined : SIGNAL_COLOR[l.signal] }}
+            >
+              <span
+                className="size-1.5 rounded-full"
+                style={{ background: SIGNAL_COLOR[l.signal] }}
+              />
+              {SIGNAL_LABEL[l.signal]}
+              {l.signal === "UNDERVALUED" && <HotFlame size={12} />}
+            </span>
+          )}
           {extra ?? (l.member ? (
             <span className={`rounded px-1.5 py-px text-[9.5px] font-semibold tracking-wide ${l.member.visibility === "private" ? "bg-zinc-200 text-zinc-700" : "bg-lime text-zinc-950"}`}>
               {l.member.visibility === "private" ? "ONLY ME" : "OFF-MARKET"}
             </span>
+          ) : isClosed(l) ? (
+            <span className={on ? "text-zinc-400" : "text-zinc-500"}>last asking</span>
           ) : (
             <span
               className="tabular-nums"
@@ -352,6 +363,9 @@ export function MapFullscreen({
   agency,
   agencies,
   onAgency,
+  status,
+  statusCounts,
+  onStatus,
 }: {
   open: boolean;
   listings: Listing[];
@@ -370,6 +384,10 @@ export function MapFullscreen({
   agency: string;
   agencies: AgencyOption[];
   onAgency: (key: string) => void;
+  /** Available / Under contract / Sold, shared with the normal view. */
+  status: ListingStatus;
+  statusCounts: Record<ListingStatus, number>;
+  onStatus: (s: ListingStatus) => void;
 }) {
   const [panel, setPanel] = useState<FullPanel>("Listings");
   const [mobileView, setMobileView] = useState<"Map" | FullPanel>("Map");
@@ -430,6 +448,25 @@ export function MapFullscreen({
   };
   if (!mounted) return null;
 
+  const statusTabs = (
+    <div role="group" aria-label="Status" className="mb-2 flex gap-1">
+      {(Object.keys(STATUS_TAB) as ListingStatus[])
+        .filter((st) => st !== "De-listed" || status === st || statusCounts[st] > 0)
+        .map((st) => (
+          <button
+            key={st}
+            type="button"
+            aria-pressed={status === st}
+            onClick={() => onStatus(st)}
+            className={`flex-auto whitespace-nowrap rounded-full border px-2 py-1.5 text-[12px] font-semibold transition-colors ${
+              status === st ? "border-zinc-950 bg-zinc-950 text-lime" : "border-zinc-300 bg-white text-zinc-600 hover:border-zinc-950 hover:text-zinc-950"
+            }`}
+          >
+            {STATUS_TAB[st]} <span className={`tabular-nums ${status === st ? "text-lime/70" : "text-zinc-400"}`}>{statusCounts[st]}</span>
+          </button>
+        ))}
+    </div>
+  );
   const agencySelect = (
     <label className="block">
       <span className="sr-only">Agency</span>
@@ -504,7 +541,7 @@ export function MapFullscreen({
       ) : (
         <Empty
           title="No listings match"
-          text="Exit and loosen your filters to see more."
+          text="Try another tab, or exit and loosen your filters."
         />
       )}
       </>
@@ -557,7 +594,12 @@ export function MapFullscreen({
             <aside className={`glass absolute bottom-3 left-3 top-3 z-[4] hidden w-[380px] flex-col overflow-hidden rounded-2xl ${panel === "Market feed" ? "" : "lg:flex"}`}>
               <div className="border-b border-white/60 p-3">
                 <PanelTabs value={panel} onChange={setPanel} />
-                {panel === "Listings" && <div className="mt-2">{agencySelect}</div>}
+                {panel === "Listings" && (
+                  <div className="mt-2">
+                    {statusTabs}
+                    {agencySelect}
+                  </div>
+                )}
               </div>
               <div
                 ref={panelRef}
@@ -653,7 +695,12 @@ export function MapFullscreen({
                   data-lenis-prevent
                   className="absolute inset-0 z-[4] space-y-1 overflow-y-auto overscroll-contain bg-white p-2 lg:hidden"
                 >
-                  {mobileView === "Listings" && <div className="pb-1">{agencySelect}</div>}
+                  {mobileView === "Listings" && (
+                    <div className="pb-1">
+                      {statusTabs}
+                      {agencySelect}
+                    </div>
+                  )}
                   {list(mobileView)}
                   {mobileView === "Listings" && pager}
                 </motion.div>

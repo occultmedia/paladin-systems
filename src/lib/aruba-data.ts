@@ -71,6 +71,16 @@ export const TENURE_HINT: Record<Tenure, string> = {
 export type ListingStatus = "For sale" | "Under contract" | "Sold" | "De-listed";
 export const LISTING_STATUSES: ListingStatus[] = ["For sale", "Under contract", "Sold", "De-listed"];
 /** How the Index decides each status (shown as help text in the UI). */
+/** The tabs listings are split into. Only "Available" shows by default. */
+export const STATUS_TAB: Record<ListingStatus, string> = {
+  "For sale": "Available",
+  "Under contract": "Under contract",
+  Sold: "Sold",
+  "De-listed": "De-listed",
+};
+/** Off the market: no value signal or confidence, and the price is the last one asked. */
+export const isClosed = (l: { status: ListingStatus }) => l.status === "Sold" || l.status === "De-listed";
+
 export const STATUS_HINT: Record<ListingStatus, string> = {
   "For sale": "Listed and active on the agency's website.",
   "Under contract": "The agency marks it under contract, under offer or sale pending.",
@@ -1138,7 +1148,8 @@ export function buildIndexRuns(listings: Listing[], rentals: VacationRental[], d
       date,
       listings_checked: listings.filter((l) => l.price_history[0].date <= date).length,
       rentals_checked: rentals.filter((r) => r.first_seen <= date).length,
-      new_listings: listings.filter((l) => l.price_history[0].date === date),
+      // a property that was already sold when first indexed is not a new listing
+      new_listings: listings.filter((l) => l.price_history[0].date === date && !isClosed(l)),
       status_changes: listings.filter((l) => l.status_changed === date),
       price_changes,
     };

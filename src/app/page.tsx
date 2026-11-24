@@ -1,3 +1,4 @@
+import { perM2 } from "@/lib/units";
 import { RunLine } from "@/components/run-line";
 import Link from "next/link";
 import { ArrowRight, ArrowUpRight, FileSpreadsheet, Flag, Handshake, LineChart, Map as MapIcon, MessageCircle, Pin, Rss, Scale, ShieldCheck, Sparkles, Users } from "lucide-react";
@@ -220,7 +221,7 @@ function heroData() {
     events.push({ ...at(c.listing), id: `px-${c.listing.listing_id}-${i}`, kind: p < 0 ? "Price cut" : "Price raised", tone: p < 0 ? "down" : "up", title: c.listing.asset_name, detail: `${c.listing.district} · ${c.listing.agency.name}`, value: `${pct(p)} → ${usdM(c.change.price_usd)}` });
   });
   if (best)
-    events.push({ ...at(best), id: `ai-${best.listing_id}`, kind: "AI Signal", tone: "up", title: best.asset_name, detail: `${usd(best.price_per_sqft_usd)}/ft² vs ${usd(best.comps_psf_usd)} for ${best.comps_count} comps`, value: `${pct(best.price_vs_comps_pct)} vs comps · Below market 🔥` });
+    events.push({ ...at(best), id: `ai-${best.listing_id}`, kind: "AI Signal", tone: "up", title: best.asset_name, detail: `${usd(perM2(best.price_per_sqft_usd))}/m² vs ${usd(perM2(best.comps_psf_usd))} for ${best.comps_count} comps`, value: `${pct(best.price_vs_comps_pct)} vs comps · Below market 🔥` });
   status.forEach((l) => events.push({ ...at(l), id: `st-${l.listing_id}`, kind: l.status, tone: "warn", title: l.asset_name, detail: `${l.district} · ${l.agency.name}`, value: `Was ${usdM(l.asking_price_usd)}` }));
   if (fresh[1]) events.push({ ...at(fresh[1]), id: `new-${fresh[1].listing_id}`, kind: "New listing", tone: "mint", title: fresh[1].asset_name, detail: `${fresh[1].district} · ${fresh[1].agency.name}`, value: usdM(fresh[1].asking_price_usd) });
   if (doubt && doubt.confidence_score < 80)
@@ -255,7 +256,7 @@ function aiExamples(): AiExamples {
   return {
     note: { listing: BEST.asset_name, district: BEST.district, verdict: note.verdict, headline: note.headline },
     brief: { headline: BRIEF.headline, time: PREVIEW.run.time },
-    comps: { listing: BEST.asset_name, psf: BEST.price_per_sqft_usd, compsPsf: BEST.comps_psf_usd, pct: BEST.price_vs_comps_pct, basis: facts.comps.basis },
+    comps: { listing: BEST.asset_name, perM2: perM2(BEST.price_per_sqft_usd), compsPerM2: perM2(BEST.comps_psf_usd), pct: BEST.price_vs_comps_pct, basis: facts.comps.basis },
     ghost: { listing: GHOST.asset_name, score: GHOST.confidence_score, reason: why.map((r) => r.label).join(" · ") || "Missing from the agency site" },
   };
 }
@@ -312,7 +313,7 @@ const AUDIENCES: Audience[] = [
     title: "Know the market before your first call.",
     points: [
       "Every new listing, price cut and sale on the island, ready by 7 AM.",
-      "Price with proof: $/ft² against comparable homes in the same district.",
+      "Price with proof: $/m² against comparable homes in the same district.",
       "Save interested clients on each listing. When the price drops, call them first.",
     ],
     cta: { label: "Start as an agent", href: "/signup" },

@@ -3,7 +3,8 @@
 /* Shared pieces for the Aruba map (Mapbox and Leaflet versions). */
 
 import { ListingPhoto } from "@/components/listing-photo";
-import { PLATFORM_LABEL, type Agency, type DistrictStats, type Listing, type RentalPlatform, type Signal, type VacationRental } from "@/lib/aruba-data";
+import { pricePerM2, sizeLines } from "@/lib/units";
+import { PLATFORM_LABEL, isClosed, type Agency, type DistrictStats, type Listing, type RentalPlatform, type Signal, type VacationRental } from "@/lib/aruba-data";
 
 export const SIGNAL_COLOR: Record<Signal, string> = {
   UNDERVALUED: "#3F7A55",
@@ -81,7 +82,7 @@ export const usd = (n: number) =>
 export const num = (n: number) => n.toLocaleString("en-US");
 export const pct = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : "±"}${Math.abs(n).toFixed(1)}%`;
 
-const STATUS_PILL: Record<Listing["status"], { color: string; bg: string }> = {
+export const STATUS_PILL: Record<Listing["status"], { color: string; bg: string }> = {
   "For sale": { color: "#1F7A45", bg: "#E6F4EC" },
   "Under contract": { color: "#9A5B00", bg: "#FDF1DC" },
   Sold: { color: "#B42318", bg: "#FDE8E7" },
@@ -118,15 +119,14 @@ export function HoverCard({ l }: { l: Listing }) {
   const color = SIGNAL_COLOR[l.signal];
   const facts =
     l.category === "Property"
-      ? `${l.bedrooms} beds · ${l.bathrooms} baths${l.built_sqft ? ` · ${num(l.built_sqft)} sq ft built` : ""}${l.lot_sqft ? ` · ${num(l.lot_sqft)} lot` : ""}`
+      ? `${l.bedrooms} beds · ${l.bathrooms} baths`
       : l.category === "Land"
-        ? `${num(l.lot_sqft)} sq ft lot · ${l.zoning} zoning`
-        : `${l.commercial_use}${l.built_sqft ? ` · ${num(l.built_sqft)} sq ft built` : ""}${l.lot_sqft ? ` · ${num(l.lot_sqft)} lot` : ""}`;
+        ? `${l.zoning} zoning`
+        : l.commercial_use;
+  const m2Price = pricePerM2(l);
+  const closed = isClosed(l);
   const status = STATUS_PILL[l.status];
-  const metric =
-    l.category === "Property"
-      ? { value: l.price_per_sqft_usd ? `$${num(l.price_per_sqft_usd)}/sq ft` : "Size not stated", label: l.price_per_sqft_usd ? `${pct(l.price_vs_comps_pct)} vs comps` : "no $/sq ft" }
-      : { value: l.price_per_sqft_usd ? `$${num(l.price_per_sqft_usd)}/sq ft` : "Size not stated", label: l.price_per_sqft_usd ? `${pct(l.price_vs_district_pct)} vs district` : "no $/sq ft" };
+  const vs = l.category === "Property" ? `${pct(l.price_vs_comps_pct)} vs comps` : `${pct(l.price_vs_district_pct)} vs district`;
   return (
     <div style={{ width: 250 }}>
       {l.photo_url && (
@@ -148,13 +148,21 @@ export function HoverCard({ l }: { l: Listing }) {
         <div style={{ color: "#71717A", fontSize: 11, marginTop: 2 }}>
           {l.category === "Commercial" ? "Commercial" : l.property_type} · {l.district} · {l.tenure}
         </div>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 8 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, marginTop: 8 }}>
           <span style={{ fontWeight: 700, fontSize: 16, color: "#09090B", fontVariantNumeric: "tabular-nums" }}>{usd(l.asking_price_usd)}</span>
-          <span style={{ fontSize: 12, color: "#09090B", fontVariantNumeric: "tabular-nums" }}>
-            <b>{metric.value}</b> <span style={{ color: "#71717A" }}>{metric.label}</span>
-          </span>
+          <span style={{ fontSize: 11, color: "#71717A", fontVariantNumeric: "tabular-nums", textAlign: "right" }}>{closed ? "last asking" : m2Price ? vs : ""}</span>
         </div>
-        <div style={{ color: "#3F3F46", fontSize: 11, marginTop: 4 }}>{facts}</div>
+        {m2Price > 0 && (
+          <div style={{ fontSize: 11.5, color: "#71717A", marginTop: 2, fontVariantNumeric: "tabular-nums" }}>
+            <b style={{ color: "#09090B" }}>${num(m2Price)}/m²</b> · ${num(l.price_per_sqft_usd)}/sq ft
+          </div>
+        )}
+        <div style={{ color: "#3F3F46", fontSize: 11, marginTop: 4, lineHeight: 1.5 }}>
+          {facts}
+          {sizeLines(l).map((s) => (
+            <div key={s}>{s}</div>
+          ))}
+        </div>
         <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
           <span style={{ color: status.color, background: status.bg, fontSize: 10, fontWeight: 700, borderRadius: 999, padding: "2px 8px" }}>
             {l.status}
@@ -166,9 +174,13 @@ export function HoverCard({ l }: { l: Listing }) {
           )}
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8, paddingTop: 8, borderTop: "1px solid #F4F4F5" }}>
-          <span style={{ color, fontSize: 11, fontWeight: 600 }}>
-            ● {SIGNAL_LABEL[l.signal]} {l.signal === "UNDERVALUED" && <HotFlame size={11} />}
-          </span>
+          {closed ? (
+            <span style={{ color: status.color, fontSize: 11, fontWeight: 600 }}>● {l.status}</span>
+          ) : (
+            <span style={{ color, fontSize: 11, fontWeight: 600 }}>
+              ● {SIGNAL_LABEL[l.signal]} {l.signal === "UNDERVALUED" && <HotFlame size={11} />}
+            </span>
+          )}
           <span style={{ color: "#A1A1AA", fontSize: 11 }}>
             {l.is_new ? "Found today" : `${l.days_on_market} days listed`}
             {" · "}

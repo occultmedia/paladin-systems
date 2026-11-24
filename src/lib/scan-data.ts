@@ -17,6 +17,7 @@ function tagFor(l: Listing): Pick<ScanRow, "tag" | "tone"> {
   if (last && last.event === "Price drop" && last.change_pct !== null) return { tag: `Cut ${Math.abs(last.change_pct).toFixed(1)}%`, tone: "down" };
   if (last && last.event === "Price increase" && last.change_pct !== null) return { tag: `Up ${last.change_pct.toFixed(1)}%`, tone: "up" };
   const vs = listingFacts(l, ALL_LISTINGS).comps.vs_median_pct;
+  if (vs === null) return { tag: l.district, tone: "flat" };
   if (vs <= -10) return { tag: `${Math.abs(vs).toFixed(0)}% under comps`, tone: "up" };
   if (vs >= 15) return { tag: `${vs.toFixed(0)}% over comps`, tone: "down" };
   return { tag: "In line with comps", tone: "flat" };

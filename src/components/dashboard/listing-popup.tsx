@@ -11,9 +11,10 @@ import { ListingPhoto } from "@/components/listing-photo";
 import { motion } from "framer-motion";
 import { ArrowUpRight, Pin, X } from "lucide-react";
 import { BAND_COLOR, confidenceBand } from "@/lib/confidence";
-import type { Listing } from "@/lib/aruba-data";
+import { isClosed, type Listing } from "@/lib/aruba-data";
+import { pricePerM2, sizeLines } from "@/lib/units";
 import { useWatchlist } from "@/lib/watchlist";
-import { AgencyLogo, HotFlame, SIGNAL_COLOR, SIGNAL_LABEL } from "./map-shared";
+import { AgencyLogo, HotFlame, SIGNAL_COLOR, SIGNAL_LABEL, STATUS_PILL } from "./map-shared";
 
 export const usdShort = (n: number) => (n >= 1e6 ? `$${(n / 1e6).toFixed(2)}M` : `$${Math.round(n / 1000)}k`);
 export const kindOf = (l: Listing) =>
@@ -35,10 +36,12 @@ export function ListingPopup({
   const { isPinned, toggle } = useWatchlist();
   const pinned = isPinned(l.listing_id);
   const conf = BAND_COLOR[confidenceBand(l.confidence_score)];
-  const stats: Array<[string, string, string | undefined]> = [
-    ["Asking", usdShort(l.asking_price_usd), undefined],
-    ["$ / ft²", l.price_per_sqft_usd ? `$${l.price_per_sqft_usd.toLocaleString("en-US")}` : "—", undefined],
-    ["Confidence", `${l.confidence_score}%`, conf],
+  const closed = isClosed(l);
+  const m2Price = pricePerM2(l);
+  const stats: Array<[string, string, string | undefined, string?]> = [
+    [closed ? "Last asking" : "Asking", usdShort(l.asking_price_usd), undefined],
+    ["$ / m²", m2Price ? `$${m2Price.toLocaleString("en-US")}` : "—", undefined, m2Price ? `$${l.price_per_sqft_usd.toLocaleString("en-US")} / sq ft` : undefined],
+    closed ? ["Status", l.status, STATUS_PILL[l.status].color] : ["Confidence", `${l.confidence_score}%`, conf],
   ];
   return (
     <motion.div
@@ -71,11 +74,17 @@ export function ListingPopup({
         >
           <X size={15} strokeWidth={2.2} />
         </button>
-        <span className="glass absolute bottom-2 left-2 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11.5px] font-semibold" style={{ color: SIGNAL_COLOR[l.signal] }}>
-          <span className="size-1.5 rounded-full" style={{ background: SIGNAL_COLOR[l.signal] }} />
-          {SIGNAL_LABEL[l.signal]}
-          {l.signal === "UNDERVALUED" && <HotFlame size={13} />}
-        </span>
+        {closed ? (
+          <span className="absolute bottom-2 left-2 rounded-full px-2.5 py-1 text-[11.5px] font-semibold" style={{ color: STATUS_PILL[l.status].color, background: STATUS_PILL[l.status].bg }}>
+            {l.status}
+          </span>
+        ) : (
+          <span className="glass absolute bottom-2 left-2 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11.5px] font-semibold" style={{ color: SIGNAL_COLOR[l.signal] }}>
+            <span className="size-1.5 rounded-full" style={{ background: SIGNAL_COLOR[l.signal] }} />
+            {SIGNAL_LABEL[l.signal]}
+            {l.signal === "UNDERVALUED" && <HotFlame size={13} />}
+          </span>
+        )}
       </div>
 
       <div className="px-2 pb-1 pt-3">
@@ -89,13 +98,20 @@ export function ListingPopup({
           </div>
         </div>
 
-        <dl className="mt-3 grid grid-cols-3 gap-1.5 text-[11px]">
-          {stats.map(([k, v, c]) => (
+        <p className="mt-2 text-[12px] leading-relaxed text-zinc-700">
+          {sizeLines(l).map((s) => (
+            <span key={s} className="block tabular-nums">{s}</span>
+          ))}
+        </p>
+
+        <dl className="mt-2.5 grid grid-cols-3 gap-1.5 text-[11px]">
+          {stats.map(([k, v, c, sub]) => (
             <div key={k} className="rounded-lg border border-white/70 bg-white/55 p-2">
               <dt className="text-zinc-500">{k}</dt>
               <dd className="mt-0.5 font-display text-[14px] tabular-nums text-zinc-950" style={c ? { color: c } : undefined}>
                 {v}
               </dd>
+              {sub && <dd className="mt-0.5 whitespace-nowrap text-[10.5px] tabular-nums text-zinc-500">{sub}</dd>}
             </div>
           ))}
         </dl>

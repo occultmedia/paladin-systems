@@ -26,7 +26,7 @@ const UNIT_TYPES = ["Condo", "Apartment", "Townhouse"];
 
 /** Same idea as the indexed listings: compare $/sq ft with similar listings, same district when there are 3+. */
 function compsFor(row: AgentListingViewRow, market: Listing[]) {
-  const live = market.filter((l) => l.category === row.asset_class && !l.member && l.status !== "Sold" && l.status !== "De-listed");
+  const live = market.filter((l) => l.category === row.asset_class && !l.member && l.status !== "Sold" && l.status !== "De-listed" && l.price_per_sqft_usd > 0);
   const kind =
     row.asset_class === "Property"
       ? live.filter((l) => UNIT_TYPES.includes(l.property_type) === UNIT_TYPES.includes(row.property_type))

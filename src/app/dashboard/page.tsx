@@ -16,6 +16,7 @@ import { Fragment, Suspense, createContext, useCallback, useContext, useDeferred
 import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ListingPhoto } from "@/components/listing-photo";
+import { fmtArea, fmtPerArea, fmtSqft, perM2, pricePerM2, shortSize, toM2, toSqft } from "@/lib/units";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { ListingPopup, ViewToggle } from "@/components/dashboard/listing-popup";
@@ -42,6 +43,8 @@ import {
   buildIndexRuns,
   RESIDENTIAL_TYPES,
   LISTING_STATUSES,
+  STATUS_TAB,
+  isClosed,
   STATUS_HINT,
   TENURES,
   TENURE_HINT,
@@ -203,13 +206,13 @@ function TabSwitch({ tab, onTab, watchCount, full = false }: { tab: Tab; onTab: 
             role="tab"
             aria-selected={on}
             onClick={() => onTab(t)}
-            className={`relative inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full ${full ? "px-2" : "px-4"} py-1.5 text-[13px] font-medium transition-colors ${
+            className={`relative inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full ${full ? "px-1 text-[12.5px]" : "px-4 text-[13px]"} py-1.5 font-medium transition-colors ${
               on ? "text-zinc-950" : "text-zinc-400 hover:text-white"
             }`}
           >
             {on && <motion.span layoutId={full ? "tab-pill-mobile" : "tab-pill"} className="absolute inset-0 rounded-full bg-lime" transition={{ type: "spring", stiffness: 500, damping: 40 }} />}
             <span className="relative inline-flex items-center gap-2">
-              <Icon size={14} strokeWidth={1.75} fill={t === "Watchlist" && on ? "currentColor" : "none"} />
+              {!full && <Icon size={14} strokeWidth={1.75} fill={t === "Watchlist" && on ? "currentColor" : "none"} />}
               {t}
               {t === "Watchlist" && watchCount > 0 && (
                 <span
@@ -511,7 +514,7 @@ const MOBILE_SORTS: Array<[SortKey, "asc" | "desc", string]> = [
   ["asking", "desc", "Price: high to low"],
   ["asking", "asc", "Price: low to high"],
   ["vsDistrict", "asc", "Cheapest vs comps"],
-  ["psf", "asc", "Lowest $ / sq ft"],
+  ["psf", "asc", "Lowest $ / m²"],
   ["beds", "desc", "Most bedrooms"],
   ["built", "desc", "Largest built-up"],
   ["lot", "desc", "Largest lot"],
@@ -554,7 +557,7 @@ const TYPE_OPTIONS: Record<Category, string[]> = {
 };
 const TYPE_LABEL: Record<Category, string> = { All: "Type", Property: "Home type", Land: "Zoning", Commercial: "Use" };
 const PRICE_STEPS = [250_000, 500_000, 750_000, 1_000_000, 2_000_000, 3_000_000, 5_000_000, 7_500_000, 10_000_000, 15_000_000];
-const SIZE_STEPS = [1_000, 2_500, 5_000, 10_000, 20_000, 50_000];
+const SIZE_STEPS = [75, 100, 150, 200, 300, 500, 1_000, 2_500, 5_000]; // m²
 
 /** The value a listing's type chip compares against, given the category view. */
 function subtypeOf(l: Listing, category: Category): string {
@@ -573,9 +576,6 @@ const median = (xs: number[]) => {
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 };
 
-/** Sizes and $/sq ft of 0 mean "not stated on the source page". */
-const fmtSqft = (n: number) => (n > 0 ? `${int.format(n)} sq ft` : "Not stated");
-const fmtPsf = (n: number) => (n > 0 ? fmtUsd(n) : "—");
 const fmtDate = (iso: string) =>
   new Date(iso.length === 10 ? `${iso}T00:00:00Z` : iso).toLocaleDateString("en-US", {
     month: "short",
@@ -585,6 +585,22 @@ const fmtDate = (iso: string) =>
   });
 const fmtPriceStep = (n: number) => (n >= 1_000_000 ? `$${n / 1_000_000}M` : `$${n / 1000}k`);
 const DASH = <span className="text-zinc-300">—</span>;
+const STATUS_TITLE: Record<ListingStatus, string> = {
+  "For sale": "Available Listings",
+  "Under contract": "Under Contract",
+  Sold: "Sold Properties",
+  "De-listed": "De-listed",
+};
+
+/** Table cell: m² with sq ft underneath. */
+function BothAreas({ sqft }: { sqft: number }) {
+  return (
+    <>
+      {int.format(toM2(sqft))}
+      <p className="mt-1 whitespace-nowrap text-[11px] text-zinc-500">{int.format(sqft)} ft²</p>
+    </>
+  );
+}
 
 function downloadCsv(rows: Listing[]) {
   const p = (l: Listing) => (l.category === "Property" ? l : null);
@@ -612,16 +628,19 @@ function downloadCsv(rows: Listing[]) {
     ["Last price change", (l) => l.last_price_change?.date],
     ["Bedrooms", (l) => p(l)?.bedrooms],
     ["Bathrooms", (l) => p(l)?.bathrooms],
-    ["Built-up sq ft", (l) => (l.category === "Land" ? null : l.built_sqft)],
-    ["Lot sq ft", (l) => l.lot_sqft],
+    ["Built-up m2", (l) => (l.category === "Land" || !l.built_sqft ? null : toM2(l.built_sqft))],
+    ["Built-up sq ft", (l) => (l.category === "Land" ? null : l.built_sqft || null)],
+    ["Lot m2", (l) => (l.lot_sqft ? toM2(l.lot_sqft) : null)],
+    ["Lot sq ft", (l) => l.lot_sqft || null],
     ["Asking price USD", (l) => l.asking_price_usd],
-    ["Price per sq ft USD", (l) => l.price_per_sqft_usd],
+    ["Price per m2 USD", (l) => pricePerM2(l) || null],
+    ["Price per sq ft USD", (l) => l.price_per_sqft_usd || null],
     ["Price change %", (l) => l.price_change_pct],
     ["District avg per sq ft USD", (l) => d(l)?.district_land_psf_usd ?? c(l)?.district_commercial_psf_usd],
     ["Price vs district %", (l) => (l.category === "Property" ? null : l.price_vs_district_pct)],
     ["Comparable listings median per sq ft USD", (l) => p(l)?.comps_psf_usd],
     ["Price vs comparable listings %", (l) => p(l)?.price_vs_comps_pct],
-    ["Value", (l) => SIGNAL_STYLE[l.signal].label],
+    ["Value", (l) => (isClosed(l) ? null : SIGNAL_STYLE[l.signal].label)],
     ["Days on market", (l) => l.days_on_market],
     ["First seen", (l) => l.first_seen],
     ["Last indexed", (l) => l.last_scraped],
@@ -1192,7 +1211,7 @@ function StatusBadge({ l, withDate = false, align = "start" }: { l: Listing; wit
         <span className="h-1.5 w-1.5 rounded-full" style={{ background: st.color }} />
         {l.status}
       </span>
-      {withDate && <span className="text-[10px] text-zinc-400">{l.status_changed ? `since ${fmtDate(l.status_changed)}` : `since ${fmtDate(l.first_seen)}`}</span>}
+      {withDate && <span className="text-[10px] text-zinc-400">{l.status_changed ? `since ${fmtDate(l.status_changed)}` : l.status === "For sale" ? `since ${fmtDate(l.first_seen)}` : `already so on ${fmtDate(l.first_seen)}`}</span>}
       {withDate && <span className="max-w-[220px] text-[10.5px] leading-snug text-zinc-500">{STATUS_HINT[l.status]}</span>}
     </span>
   );
@@ -1818,7 +1837,7 @@ function ListingDetails({ l }: { l: Listing }) {
   const shared = (
     <>
       <DetailItem label="Status" value={<StatusBadge l={l} withDate />} />
-      <DetailItem label="Asking price" value={fmtUsd(l.asking_price_usd)} />
+      <DetailItem label={isClosed(l) ? "Last asking price" : "Asking price"} value={fmtUsd(l.asking_price_usd)} />
       <DetailItem
         label="Price change"
         value={<PriceMove pct={l.price_change_pct} />}
@@ -1849,14 +1868,14 @@ function ListingDetails({ l }: { l: Listing }) {
       <>
         <DetailItem label="Type" value="Land parcel" />
         <DetailItem label="Zoning" value={l.zoning} />
-        <DetailItem label="Lot size (land)" value={fmtSqft(l.lot_sqft)} />
+        <DetailItem label="Lot size (land)" value={fmtArea(l.lot_sqft)} />
         <DetailItem label="Built-up size" value="None (vacant land)" />
-        <DetailItem label="Price / sq ft" value={fmtPsf(l.price_per_sqft_usd)} />
-        <DetailItem label="District land avg" value={`${fmtUsd(l.district_land_psf_usd)} / sq ft`} />
+        <DetailItem label="Price / m²" value={fmtPerArea(l.price_per_sqft_usd)} />
+        <DetailItem label="District land avg" value={fmtPerArea(l.district_land_psf_usd)} />
         <DetailItem
           label="Vs. district avg"
-          value={`${fmtDelta(l.price_vs_district_pct)} ${l.price_vs_district_pct < 0 ? "cheaper" : "pricier"}`}
-          color={deltaColor(-l.price_vs_district_pct)}
+          value={l.price_per_sqft_usd > 0 ? `${fmtDelta(l.price_vs_district_pct)} ${l.price_vs_district_pct < 0 ? "cheaper" : "pricier"}` : "—"}
+          color={l.price_per_sqft_usd > 0 ? deltaColor(-l.price_vs_district_pct) : undefined}
         />
       </>
     );
@@ -1864,15 +1883,15 @@ function ListingDetails({ l }: { l: Listing }) {
     facts = (
       <>
         <DetailItem label="Use" value={l.commercial_use} />
-        <DetailItem label="Built-up size (total)" value={fmtSqft(l.built_sqft)} />
-        <DetailItem label="Lot size (land)" value={l.lot_sqft ? fmtSqft(l.lot_sqft) : "No land (unit in building)"} />
+        <DetailItem label="Built-up size (total)" value={fmtArea(l.built_sqft)} />
+        <DetailItem label="Lot size (land)" value={l.lot_sqft ? fmtArea(l.lot_sqft) : "No land (unit in building)"} />
         <DetailItem label="Pool" value={l.pool ?? "—"} />
-        <DetailItem label="Price / sq ft" value={fmtPsf(l.price_per_sqft_usd)} />
-        <DetailItem label="District commercial avg" value={`${fmtUsd(l.district_commercial_psf_usd)} / sq ft`} />
+        <DetailItem label="Price / m²" value={fmtPerArea(l.price_per_sqft_usd)} />
+        <DetailItem label="District commercial avg" value={fmtPerArea(l.district_commercial_psf_usd)} />
         <DetailItem
           label="Vs. district avg"
-          value={`${fmtDelta(l.price_vs_district_pct)} ${l.price_vs_district_pct < 0 ? "cheaper" : "pricier"}`}
-          color={deltaColor(-l.price_vs_district_pct)}
+          value={l.price_per_sqft_usd > 0 ? `${fmtDelta(l.price_vs_district_pct)} ${l.price_vs_district_pct < 0 ? "cheaper" : "pricier"}` : "—"}
+          color={l.price_per_sqft_usd > 0 ? deltaColor(-l.price_vs_district_pct) : undefined}
         />
       </>
     );
@@ -1882,8 +1901,8 @@ function ListingDetails({ l }: { l: Listing }) {
         <DetailItem label="Property type" value={l.property_type} />
         <DetailItem label="Bedrooms" value={l.bedrooms} />
         <DetailItem label="Bathrooms" value={l.bathrooms} />
-        <DetailItem label="Built-up size (total)" value={fmtSqft(l.built_sqft)} />
-        <DetailItem label="Lot size (land)" value={l.lot_sqft ? fmtSqft(l.lot_sqft) : "No land (unit in building)"} />
+        <DetailItem label="Built-up size (total)" value={fmtArea(l.built_sqft)} />
+        <DetailItem label="Lot size (land)" value={l.lot_sqft ? fmtArea(l.lot_sqft) : "No land (unit in building)"} />
         <DetailItem
           label="Pool"
           value={
@@ -1893,12 +1912,12 @@ function ListingDetails({ l }: { l: Listing }) {
             </span>
           }
         />
-        <DetailItem label="Price / sq ft" value={fmtPsf(l.price_per_sqft_usd)} />
-        <DetailItem label="Comparable $ / sq ft" value={`${fmtUsd(l.comps_psf_usd)} (${l.comps_count} listings)`} />
+        <DetailItem label="Price / m²" value={fmtPerArea(l.price_per_sqft_usd)} />
+        <DetailItem label={`Comparable $ / m² · ${l.comps_count} listings`} value={fmtPerArea(l.comps_psf_usd)} />
         <DetailItem
           label="Vs. comps"
-          value={`${fmtDelta(l.price_vs_comps_pct)} ${l.price_vs_comps_pct < 0 ? "cheaper" : "pricier"}`}
-          color={deltaColor(-l.price_vs_comps_pct)}
+          value={l.price_per_sqft_usd > 0 ? `${fmtDelta(l.price_vs_comps_pct)} ${l.price_vs_comps_pct < 0 ? "cheaper" : "pricier"}` : "—"}
+          color={l.price_per_sqft_usd > 0 ? deltaColor(-l.price_vs_comps_pct) : undefined}
         />
       </>
     );
@@ -1931,14 +1950,18 @@ function ListingDetails({ l }: { l: Listing }) {
               <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11.5px] text-zinc-500">
                 <StatusBadge l={l} />
                 <span>
-                  {l.status_changed ? `${l.status === "For sale" ? "Back on sale" : "Marked"} ${fmtDate(l.status_changed)}` : `For sale since ${fmtDate(l.first_seen)}`}
+                  {l.status_changed
+                    ? `${l.status === "For sale" ? "Back on sale" : "Marked"} ${fmtDate(l.status_changed)}`
+                    : l.status === "For sale"
+                      ? `For sale since ${fmtDate(l.first_seen)}`
+                      : `Already marked when first indexed on ${fmtDate(l.first_seen)}`}
                 </span>
               </p>
             </div>
             <WatchButton l={l} />
           </div>
           <AINote l={l} />
-          {l.member ? <MemberListingPanel l={l} /> : <ConfidencePanel l={l} />}
+          {l.member ? <MemberListingPanel l={l} /> : !isClosed(l) && <ConfidencePanel l={l} />}
           <dl className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-3 xl:grid-cols-4">
             {facts}
             {shared}
@@ -1995,7 +2018,15 @@ function ActiveListings({
 }) {
   const [query, setQuery] = useState(initialQuery ?? "");
   const [tenure, setTenure] = useState<Tenure | "All">("All");
-  const [status, setStatus] = useState<ListingStatus | "All">("All");
+  // Available, Under contract and Sold are tabs: only one shows at a time
+  const [status, setStatus] = useState<ListingStatus>("For sale");
+  const [revealId, setRevealId] = useState(initialOpenId ?? null);
+  if (revealId && listings) {
+    // a linked listing opens on the tab it belongs to
+    const l = listings.find((x) => x.listing_id === revealId);
+    if (l) setStatus(l.status);
+    setRevealId(null);
+  }
   const [pool, setPool] = useState<"Any" | "Has pool" | Pool>("Any");
   const [newToday, setNewToday] = useState(Boolean(initialNewToday));
   const [offMarket, setOffMarket] = useState(false);
@@ -2077,40 +2108,49 @@ function ActiveListings({
     const byKey = new Map<string, { key: string; name: string; count: number }>();
     for (const l of listings ?? []) {
       const key = agencyKey(l);
+      const n = l.status === status ? 1 : 0;
       const a = byKey.get(key);
-      if (a) a.count++;
-      else byKey.set(key, { key, name: l.agency.name.trim(), count: 1 });
+      if (a) a.count += n;
+      else byKey.set(key, { key, name: l.agency.name.trim(), count: n });
     }
     return [...byKey.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
-  }, [listings]);
+  }, [listings, status]);
 
   const deferredQuery = useDeferredValue(query);
-  const rows = useMemo(() => {
+  // Everything the filters match, over all the status tabs.
+  const matched = useMemo(() => {
     if (!listings) return [];
     const q = deferredQuery.trim().toLowerCase();
-    const filtered = listings.filter((l) => {
+    return listings.filter((l) => {
       const size = l.category === "Land" ? l.lot_sqft : l.built_sqft;
       return (
         (category === "All" || l.category === category) &&
         (!subtypes.length || subtypes.includes(subtypeOf(l, category))) &&
         (district === "All" || l.district === district) &&
         (agency === "All" || agencyKey(l) === agency) &&
-        (signal === "ALL" || l.signal === signal) &&
+        (signal === "ALL" || isClosed(l) || l.signal === signal) &&
         (tenure === "All" || l.tenure === tenure) &&
-        (status === "All" || l.status === status) &&
         (pool === "Any" || (pool === "Has pool" ? l.pool === "Private pool" || l.pool === "Shared pool" : l.pool === pool)) &&
         (!newToday || l.is_new) &&
         (!offMarket || Boolean(l.member)) &&
         (!priceMin || l.asking_price_usd >= priceMin) &&
         (!priceMax || l.asking_price_usd <= priceMax) &&
         (!bedsMin || (l.category === "Property" && l.bedrooms >= bedsMin)) &&
-        (!sizeMin || size >= sizeMin) &&
+        (!sizeMin || (size ? toM2(size) : 0) >= sizeMin) &&
         (!newOnly || l.days_on_market <= 7) &&
         (!dropsOnly || l.price_change_pct < 0) &&
         (!reliableOnly || l.confidence_score >= 80) &&
         (!q || `${l.asset_name} ${l.district} ${l.listing_id} ${l.source} ${typeLine(l)} ${l.tenure}`.toLowerCase().includes(q))
       );
     });
+  }, [listings, deferredQuery, category, subtypes, district, agency, signal, priceMin, priceMax, bedsMin, sizeMin, newOnly, dropsOnly, reliableOnly, tenure, newToday, offMarket, pool]);
+  const statusCounts = useMemo(() => {
+    const n: Record<ListingStatus, number> = { "For sale": 0, "Under contract": 0, Sold: 0, "De-listed": 0 };
+    for (const l of matched) n[l.status]++;
+    return n;
+  }, [matched]);
+  const rows = useMemo(() => {
+    const filtered = matched.filter((l) => l.status === status);
     const dir = sort.dir === "asc" ? 1 : -1;
     const get = SORT_VALUE[sort.key];
     return filtered.sort((a, b) => {
@@ -2121,7 +2161,7 @@ function ActiveListings({
       if (y === null) return -1;
       return (typeof x === "string" ? x.localeCompare(y as string) : x - (y as number)) * dir;
     });
-  }, [listings, deferredQuery, category, subtypes, district, agency, signal, priceMin, priceMax, bedsMin, sizeMin, newOnly, dropsOnly, reliableOnly, sort, tenure, newToday, offMarket, status, pool]);
+  }, [matched, status, sort]);
 
   // 25 per page; back to page 1 whenever filters or sort change the result set
   const [page, setPage] = useState(0);
@@ -2145,6 +2185,12 @@ function ActiveListings({
   };
   /** Flip to the page holding a listing, so it can be opened and scrolled to. */
   const showListing = (id: string) => {
+    const l = listings?.find((x) => x.listing_id === id);
+    if (l && l.status !== status) {
+      setStatus(l.status); // it lives in another tab
+      setDeepLink(id);
+      return;
+    }
     const i = rows.findIndex((r) => r.listing_id === id);
     if (i >= 0) setPage(Math.floor(i / PAGE_SIZE));
   };
@@ -2180,11 +2226,10 @@ function ActiveListings({
 
   const moreCount =
     [priceMin, priceMax, bedsMin, sizeMin].filter(Boolean).length + (newOnly ? 1 : 0) + (dropsOnly ? 1 : 0) + (reliableOnly ? 1 : 0) + (pool !== "Any" ? 1 : 0);
-  const filtersActive = Boolean(query) || tenure !== "All" || status !== "All" || newToday || offMarket || category !== "All" || subtypes.length > 0 || district !== "All" || agency !== "All" || signal !== "ALL" || moreCount > 0;
+  const filtersActive = Boolean(query) || tenure !== "All" || newToday || offMarket || category !== "All" || subtypes.length > 0 || district !== "All" || agency !== "All" || signal !== "ALL" || moreCount > 0;
   const clearAll = () => {
     setQuery("");
     setTenure("All");
-    setStatus("All");
     setPool("Any");
     setNewToday(false);
     setOffMarket(false);
@@ -2229,10 +2274,11 @@ function ActiveListings({
       <div className="flex flex-wrap items-end justify-between gap-4 border-b border-white/10 py-6 sm:py-8">
         <div>
           <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500">Aruba · Read daily by AI Signal</p>
-          <h1 className="mt-2 font-display text-[28px] font-bold tracking-tight text-white sm:text-[34px]">Active Listings</h1>
+          <h1 className="mt-2 font-display text-[28px] font-bold tracking-tight text-white sm:text-[34px]">{STATUS_TITLE[status]}</h1>
           <p className="mt-1 max-w-[72ch] text-[13px] leading-relaxed text-zinc-400">
-            Every home, condo, piece of land and commercial property for sale in Aruba. Hover a pin for a quick look, click it
-            for full details in the list below.
+            {status === "Sold"
+              ? "Properties the agencies marked sold. Prices are the last asking price; the price it sold for is not published."
+              : "Homes, condos, land and commercial property from Aruba's agencies. Hover a pin for a quick look, click it for full details in the list below."}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -2265,8 +2311,8 @@ function ActiveListings({
           ["Residential", listings ? int.format(stats.residential) : "—", undefined],
           ["Land", listings ? int.format(stats.land) : "—", undefined],
           ["Commercial", listings ? int.format(stats.commercial) : "—", undefined],
-          ["Median asking", listings && stats.count ? fmtUsdCompact(stats.medianAsk) : "—", undefined],
-          ["Below market", listings ? int.format(stats.belowMarket) : "—", listings ? "#7FD3A0" : undefined],
+          [isClosed({ status }) ? "Median last asking" : "Median asking", listings && stats.count ? fmtUsdCompact(stats.medianAsk) : "—", undefined],
+          ["Below market", listings && !isClosed({ status }) ? int.format(stats.belowMarket) : "—", listings && !isClosed({ status }) ? "#7FD3A0" : undefined],
         ].map(([label, value, color], i) => (
           <div key={label} className={`py-3 sm:py-6 ${i > 0 ? "lg:border-l lg:border-white/10 lg:pl-6" : ""}`}>
             <p className="truncate text-[9px] uppercase tracking-[0.12em] text-zinc-500 sm:text-[10px] sm:tracking-[0.14em]">{label}</p>
@@ -2281,6 +2327,27 @@ function ActiveListings({
 
       {/* filters */}
       <div className="space-y-3 py-5">
+        <div role="group" aria-label="Status" className="no-scrollbar flex gap-1.5 overflow-x-auto sm:gap-2">
+          {LISTING_STATUSES.filter((st) => st !== "De-listed" || status === st || statusCounts[st] > 0).map((st) => (
+            <button
+              key={st}
+              type="button"
+              onClick={() => {
+                setStatus(st);
+                setOpenId(null);
+                setPopupId(null);
+              }}
+              aria-pressed={status === st}
+              title={STATUS_HINT[st]}
+              className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-2 font-display text-[13px] font-semibold sm:gap-2 sm:px-4 sm:text-[14px] transition-colors ${
+                status === st ? "border-zinc-950 bg-zinc-950 text-lime" : "border-zinc-300 bg-white text-zinc-600 hover:border-zinc-950 hover:text-zinc-950"
+              }`}
+            >
+              {STATUS_TAB[st]}
+              <span className={`${MONO} text-[12px] ${status === st ? "text-lime/70" : "text-zinc-400"}`}>{listings ? int.format(statusCounts[st]) : "—"}</span>
+            </button>
+          ))}
+        </div>
         <div className="flex flex-wrap items-center gap-3">
           <div className="no-scrollbar flex max-w-full overflow-x-auto rounded-md border border-zinc-950" role="group" aria-label="Category">
             {CATEGORY_FILTERS.map((f) => (
@@ -2312,25 +2379,15 @@ function ActiveListings({
               <option key={a.key} value={a.key}>{`${a.name} (${a.count})`}</option>
             ))}
           </select>
-          <div className="no-scrollbar flex max-w-full overflow-x-auto rounded-md border border-zinc-300" role="group" aria-label="Value">
-            {SIGNAL_FILTERS.map((f) => (
-              <button key={f.value} type="button" onClick={() => setSignal(f.value)} aria-pressed={signal === f.value} className={segBtn(signal === f.value)}>
-                {f.label}
-              </button>
-            ))}
-          </div>
-          <div className="no-scrollbar flex max-w-full overflow-x-auto rounded-md border border-zinc-300" role="group" aria-label="Status">
-            {(["All", ...LISTING_STATUSES] as const).map((st) => (
-              <button key={st} type="button" onClick={() => setStatus(st)} aria-pressed={status === st} className={segBtn(status === st)}>
-                {st === "All" ? "Any status" : st}
-                {st !== "All" && listings && (
-                  <span className={`${MONO} ml-1.5 text-[10px] ${status === st ? "text-lime/70" : "text-zinc-400"}`}>
-                    {listings.filter((l) => l.status === st).length}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
+          {!isClosed({ status }) && (
+            <div className="no-scrollbar flex max-w-full overflow-x-auto rounded-md border border-zinc-300" role="group" aria-label="Value">
+              {SIGNAL_FILTERS.map((f) => (
+                <button key={f.value} type="button" onClick={() => setSignal(f.value)} aria-pressed={signal === f.value} className={segBtn(signal === f.value)}>
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="no-scrollbar flex max-w-full overflow-x-auto rounded-md border border-zinc-300" role="group" aria-label="Land title">
             {(["All", ...TENURES] as const).map((t) => (
               <button
@@ -2349,7 +2406,7 @@ function ActiveListings({
             New today
             {listings && (
               <span className={`${MONO} rounded-full px-1.5 text-[10px] ${newToday ? "bg-lime text-zinc-950" : "bg-zinc-950 text-lime"}`}>
-                {listings.filter((l) => l.is_new).length}
+                {listings.filter((l) => l.is_new && l.status === status).length}
               </span>
             )}
           </button>
@@ -2363,7 +2420,7 @@ function ActiveListings({
             Off-market
             {listings && (
               <span className={`${MONO} rounded-full px-1.5 text-[10px] ${offMarket ? "bg-lime text-zinc-950" : "bg-zinc-950 text-lime"}`}>
-                {listings.filter((l) => l.member).length}
+                {listings.filter((l) => l.member && l.status === status).length}
               </span>
             )}
           </button>
@@ -2427,7 +2484,7 @@ function ActiveListings({
               <select value={sizeMin} onChange={(e) => setSizeMin(Number(e.target.value))} className={`${selectCls} mt-1.5 block`}>
                 <option value={0}>Any</option>
                 {SIZE_STEPS.map((s) => (
-                  <option key={s} value={s}>{int.format(s)}+ sq ft</option>
+                  <option key={s} value={s}>{`${int.format(s)}+ m² (${fmtSqft(toSqft(s))})`}</option>
                 ))}
               </select>
             </label>
@@ -2501,6 +2558,12 @@ function ActiveListings({
         agency={agency}
         agencies={agencies}
         onAgency={setAgency}
+        status={status}
+        statusCounts={statusCounts}
+        onStatus={(st) => {
+          setStatus(st);
+          setOpenId(null);
+        }}
       />
 
       {/* list */}
@@ -2541,7 +2604,7 @@ function ActiveListings({
         )}
         {listings && listings.length > 0 && !rows.length && (
           <li className="py-12 text-center text-[13px] text-zinc-500">
-            No listings match these filters.{" "}
+            No listings match these filters in this tab. {matched.length > 0 && `${int.format(matched.length)} in the other tabs. `}
             <button type="button" onClick={clearAll} className="underline underline-offset-4">
               Clear all
             </button>
@@ -2574,6 +2637,7 @@ function ActiveListings({
                   <span className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-500">
                     {l.district} · {typeLine(l)}
                   </span>
+                  <span className="mt-0.5 block text-[11.5px] tabular-nums text-zinc-700">{shortSize(l)}</span>
                   <span className="mt-1.5 flex flex-wrap items-center gap-1.5">
                     <IndexTags l={l} />
                     <TenureTag l={l} />
@@ -2589,8 +2653,12 @@ function ActiveListings({
                     </span>
                     <span className="flex flex-col items-end gap-1">
                       <StatusBadge l={l} align="end" />
-                      <SignalBadge signal={l.signal} />
-                      <ConfidenceBadge l={l} />
+                      {!isClosed(l) && (
+                        <>
+                          <SignalBadge signal={l.signal} />
+                          <ConfidenceBadge l={l} />
+                        </>
+                      )}
                     </span>
                   </span>
                   <span className="mt-2 block truncate text-[11px] text-zinc-500">
@@ -2630,10 +2698,10 @@ function ActiveListings({
               ) : (
                 <SortHeader label="Bd / Ba" k="beds" sort={sort} onSort={onSort} />
               )}
-              {!landOnly && <SortHeader label="Built ft²" k="built" sort={sort} onSort={onSort} />}
-              <SortHeader label="Lot ft²" k="lot" sort={sort} onSort={onSort} />
-              <SortHeader label="Asking" k="asking" sort={sort} onSort={onSort} />
-              <SortHeader label="$ / ft²" k="psf" sort={sort} onSort={onSort} />
+              {!landOnly && <SortHeader label="Built m²" k="built" sort={sort} onSort={onSort} />}
+              <SortHeader label="Lot m²" k="lot" sort={sort} onSort={onSort} />
+              <SortHeader label={isClosed({ status }) ? "Last asking" : "Asking"} k="asking" sort={sort} onSort={onSort} />
+              <SortHeader label="$ / m²" k="psf" sort={sort} onSort={onSort} />
               <SortHeader label="Vs. comps" k="vsDistrict" sort={sort} onSort={onSort} />
               <SortHeader label="Status" k="status" sort={sort} onSort={onSort} />
               <SortHeader
@@ -2672,7 +2740,7 @@ function ActiveListings({
             {listings && listings.length > 0 && !rows.length && (
               <tr>
                 <td colSpan={colCount} className="py-16 text-center text-[13px] text-zinc-500">
-                  No listings match these filters.{" "}
+                  No listings match these filters in this tab. {matched.length > 0 && `${int.format(matched.length)} in the other tabs. `}
                   <button type="button" onClick={clearAll} className="underline underline-offset-4 hover:text-zinc-950">
                     Clear all
                   </button>
@@ -2740,22 +2808,31 @@ function ActiveListings({
                         )}
                       </td>
                     )}
-                    {!landOnly && <td className={num}>{l.category === "Land" || !l.built_sqft ? DASH : int.format(l.built_sqft)}</td>}
-                    <td className={num}>{l.lot_sqft ? int.format(l.lot_sqft) : DASH}</td>
+                    {!landOnly && <td className={num}>{l.category === "Land" || !l.built_sqft ? DASH : <BothAreas sqft={l.built_sqft} />}</td>}
+                    <td className={num}>{l.lot_sqft ? <BothAreas sqft={l.lot_sqft} /> : DASH}</td>
                     <td className={`${num} text-zinc-950`}>
                       {fmtUsdCompact(l.asking_price_usd)}
                       <p className="mt-1 text-[11px]">
                         <PriceMove pct={l.price_change_pct} size={11} />
                       </p>
                     </td>
-                    <td className={num}>{l.price_per_sqft_usd > 0 ? fmtUsd(l.price_per_sqft_usd) : DASH}</td>
+                    <td className={num}>
+                      {l.price_per_sqft_usd > 0 ? (
+                        <>
+                          {fmtUsd(pricePerM2(l))}
+                          <p className="mt-1 whitespace-nowrap text-[11px] text-zinc-500">{fmtUsd(l.price_per_sqft_usd)} /ft²</p>
+                        </>
+                      ) : (
+                        DASH
+                      )}
+                    </td>
                     <td className={`${td} ${MONO} text-right`}>
                       {l.price_per_sqft_usd > 0 && compsPsf > 0 ? (
                         <>
                           <p className="text-[13px]" style={{ color: deltaColor(-vsPct) }}>
                             {fmtDelta(vsPct)}
                           </p>
-                          <p className="mt-1 text-[11px] text-zinc-500">comps {fmtUsd(compsPsf)}/ft²</p>
+                          <p className="mt-1 text-[11px] text-zinc-500">comps {fmtUsd(perM2(compsPsf))}/m²</p>
                         </>
                       ) : (
                         DASH
@@ -2764,12 +2841,8 @@ function ActiveListings({
                     <td className={`${td} text-right`}>
                       <StatusBadge l={l} align="end" />
                     </td>
-                    <td className={`${td} text-right`}>
-                      <ConfidenceBadge l={l} />
-                    </td>
-                    <td className={`${td} text-right`}>
-                      <SignalBadge signal={l.signal} />
-                    </td>
+                    <td className={`${td} text-right`}>{isClosed(l) ? DASH : <ConfidenceBadge l={l} />}</td>
+                    <td className={`${td} text-right`}>{isClosed(l) ? DASH : <SignalBadge signal={l.signal} />}</td>
                     <td className={num}>{l.is_new ? <span className="font-semibold text-zinc-950">Today</span> : `${l.days_on_market}d`}</td>
                     <td className={`${td} pr-3 text-right`}>
                       <span className="flex items-center justify-end gap-1">
@@ -2797,13 +2870,13 @@ function ActiveListings({
       </div>
       <div className="mt-4 space-y-1 text-[11px] leading-relaxed text-zinc-500">
         <p>
-          <span className="text-zinc-700">Homes and condos</span> are scored on price per sq ft against comparable listings: the
+          <span className="text-zinc-700">Homes and condos</span> are scored on price per m² against comparable listings: the
           same kind of property (villas and estates, or condos and apartments) in the same district, or island-wide when the
           district has fewer than 3. 10% or more below is marked Below market, 10% or more above is Overpriced.
         </p>
         <p>
           <span className="text-zinc-700">Land</span> and <span className="text-zinc-700">commercial</span> listings are
-          scored on price per sq ft against the district average: 10% or more below is marked Below market, 10% or more above is
+          scored on price per m² against the district average: 10% or more below is marked Below market, 10% or more above is
           Overpriced.
         </p>
       </div>
@@ -2996,6 +3069,7 @@ function Watchlist({ listings, runs, onOpenListing, onBrowse }: { listings?: Lis
                               {l.district} · {typeLine(l)}
                               <span className="hidden sm:inline"> · {l.listing_id}</span>
                             </span>
+                            <span className="mt-0.5 block text-[11.5px] tabular-nums text-zinc-700">{shortSize(l)}</span>
                           </button>
                           <WatchButton l={l} variant="icon" />
                         </div>
@@ -3003,7 +3077,7 @@ function Watchlist({ listings, runs, onOpenListing, onBrowse }: { listings?: Lis
                           <StatusBadge l={l} />
                           <IndexTags l={l} />
                           <TenureTag l={l} />
-                          <SignalBadge signal={l.signal} />
+                          {!isClosed(l) && <SignalBadge signal={l.signal} />}
                           <ClientCount id={l.listing_id} />
                         </div>
                       </div>

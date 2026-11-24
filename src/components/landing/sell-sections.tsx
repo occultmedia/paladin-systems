@@ -13,12 +13,12 @@ import { FloorPlan } from "./floor-plan";
 export type AiExamples = {
   note: { listing: string; district: string; verdict: string; headline: string };
   brief: { headline: string; time: string };
-  comps: { listing: string; psf: number; compsPsf: number; pct: number; basis: string };
+  comps: { listing: string; perM2: number; compsPerM2: number; pct: number; basis: string };
   ghost: { listing: string; score: number; reason: string };
 };
 
 export function AiCapabilities({ ex }: { ex: AiExamples }) {
-  const ratio = Math.max(0.08, Math.min(1, ex.comps.psf / ex.comps.compsPsf));
+  const ratio = Math.max(0.08, Math.min(1, ex.comps.perM2 / ex.comps.compsPerM2));
   return (
     <Stagger className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-4" gap={0.08}>
       <StaggerItem className="flex flex-col rounded-2xl border border-zinc-200 bg-white p-5">
@@ -52,7 +52,7 @@ export function AiCapabilities({ ex }: { ex: AiExamples }) {
             <div>
               <div className="flex justify-between">
                 <span>This listing</span>
-                <b className="tabular-nums text-zinc-950">${ex.comps.psf.toLocaleString("en-US")}/ft²</b>
+                <b className="tabular-nums text-zinc-950">${ex.comps.perM2.toLocaleString("en-US")}/m²</b>
               </div>
               <div className="mt-1 h-1.5 rounded-full bg-zinc-200">
                 <div className="h-full rounded-full bg-zinc-950" style={{ width: `${ratio * 100}%` }} />
@@ -61,7 +61,7 @@ export function AiCapabilities({ ex }: { ex: AiExamples }) {
             <div>
               <div className="flex justify-between">
                 <span>Comps median</span>
-                <b className="tabular-nums text-zinc-950">${ex.comps.compsPsf.toLocaleString("en-US")}/ft²</b>
+                <b className="tabular-nums text-zinc-950">${ex.comps.compsPerM2.toLocaleString("en-US")}/m²</b>
               </div>
               <div className="mt-1 h-1.5 rounded-full bg-lime" />
             </div>

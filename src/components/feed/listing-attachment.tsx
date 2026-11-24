@@ -9,9 +9,10 @@
 import { ListingPhoto } from "@/components/listing-photo";
 import { ArrowUpRight, Building2, Search, X } from "lucide-react";
 import { useMemo, useState } from "react";
-import type { Listing } from "@/lib/aruba-data";
+import { isClosed, type Listing } from "@/lib/aruba-data";
+import { shortSize } from "@/lib/units";
 import { useListingById, useMarketListings } from "@/lib/live-market";
-import { HotFlame, SIGNAL_COLOR, SIGNAL_LABEL } from "@/components/dashboard/map-shared";
+import { HotFlame, SIGNAL_COLOR, SIGNAL_LABEL, STATUS_PILL } from "@/components/dashboard/map-shared";
 
 
 const usdShort = (n: number) => (n >= 1e6 ? `$${(n / 1e6).toFixed(2)}M` : `$${Math.round(n / 1000)}k`);
@@ -44,19 +45,26 @@ export function AttachedListing({ id, onOpen, compact = false }: { id: string | 
         </span>
         <span className="mt-0.5 block truncate text-[13.5px] font-semibold text-zinc-950">{l.asset_name}</span>
         <span className="block truncate text-[11.5px] text-zinc-500">
-          {l.district} · {kindOf(l)}
+          {l.district} · {kindOf(l)} · {shortSize(l)}
         </span>
-        {!compact && (
+        {!compact && isClosed(l) && (
+          <span className="mt-1 inline-block rounded-full px-2 py-px text-[11px] font-semibold" style={{ color: STATUS_PILL[l.status].color, background: STATUS_PILL[l.status].bg }}>
+            {l.status}
+          </span>
+        )}
+        {!compact && !isClosed(l) && (
           <span className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11.5px]">
             <span className="inline-flex items-center gap-1 font-semibold" style={{ color: SIGNAL_COLOR[l.signal] }}>
               <span className="size-1.5 rounded-full" style={{ background: SIGNAL_COLOR[l.signal] }} />
               {SIGNAL_LABEL[l.signal]}
               {l.signal === "UNDERVALUED" && <HotFlame size={12} />}
             </span>
-            <span className="tabular-nums text-zinc-500">
-              {pct > 0 ? "+" : ""}
-              {pct.toFixed(0)}% vs comps
-            </span>
+            {l.price_per_sqft_usd > 0 && (
+              <span className="tabular-nums text-zinc-500">
+                {pct > 0 ? "+" : ""}
+                {pct.toFixed(0)}% vs comps
+              </span>
+            )}
             <span className="tabular-nums text-zinc-500">{l.confidence_score}% confidence</span>
           </span>
         )}

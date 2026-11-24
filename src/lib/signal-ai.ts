@@ -12,6 +12,7 @@
  */
 
 import type { Listing, IndexRun } from "./aruba-data";
+import { perM2, pricePerM2, toM2 } from "./units";
 
 /* ── Shapes returned to the UI ─────────────────────────────────────────── */
 
@@ -65,7 +66,9 @@ export interface ListingFacts {
   tenure: string;
   lease_years_left: number | null;
   asking_price_usd: number;
-  price_per_sqft_usd: number;
+  /** null = the agency does not state the size, so there is nothing to compare */
+  price_per_m2_usd: number | null;
+  price_per_sqft_usd: number | null;
   days_on_market: number;
   change_since_listed_pct: number;
   price_history: Array<{ date: string; event: string; price_usd: number; change_pct: number | null }>;
@@ -75,10 +78,11 @@ export interface ListingFacts {
   comps: {
     basis: string;
     count: number;
-    median_psf_usd: number;
-    vs_median_pct: number; // this listing's $/sqft vs the comp median
+    median_per_m2_usd: number;
+    median_per_sqft_usd: number;
+    vs_median_pct: number | null; // this listing's price per m² vs the comp median
     median_days_on_market: number;
-    rank_cheapest_psf: number; // 1 = cheapest per sqft among comps
+    rank_cheapest: number | null; // 1 = cheapest per m² among comps
   };
   scoring: Record<string, number | string>;
 }
@@ -91,27 +95,27 @@ export function listingFacts(l: Listing, all: Listing[]): ListingFacts {
   const sameCat = all.filter((x) => segmentOf(x) === seg && x.status !== "Sold" && x.status !== "De-listed");
   const inDistrict = sameCat.filter((x) => x.district === l.district);
   const pool = inDistrict.length >= 3 ? inDistrict : sameCat;
-  const psfs = pool.map((x) => x.price_per_sqft_usd);
+  const psf = l.price_per_sqft_usd > 0 ? l.price_per_sqft_usd : null;
+  const psfs = pool.map((x) => x.price_per_sqft_usd).filter((x) => x > 0);
   const medPsf = median(psfs);
-  const rank = [...psfs].sort((a, b) => a - b).indexOf(l.price_per_sqft_usd) + 1;
+  const rank = psf === null ? 0 : [...psfs].sort((a, b) => a - b).indexOf(psf) + 1;
+  const area = (sqft: number | null) => (sqft ? { m2: toM2(sqft), sqft } : { m2: null, sqft: null });
 
   const size: ListingFacts["size"] =
     l.category === "Property"
-      ? { bedrooms: l.bedrooms, bathrooms: l.bathrooms, built_sqft: l.built_sqft, lot_sqft: l.lot_sqft, pool: l.pool }
+      ? { bedrooms: l.bedrooms, bathrooms: l.bathrooms, built_m2: area(l.built_sqft).m2, built_sqft: area(l.built_sqft).sqft, lot_m2: area(l.lot_sqft).m2, lot_sqft: area(l.lot_sqft).sqft, pool: l.pool }
       : l.category === "Land"
-        ? { lot_sqft: l.lot_sqft, zoning: l.zoning }
-        : { built_sqft: l.built_sqft, lot_sqft: l.lot_sqft, use: l.commercial_use };
+        ? { lot_m2: area(l.lot_sqft).m2, lot_sqft: area(l.lot_sqft).sqft, zoning: l.zoning }
+        : { built_m2: area(l.built_sqft).m2, built_sqft: area(l.built_sqft).sqft, lot_m2: area(l.lot_sqft).m2, lot_sqft: area(l.lot_sqft).sqft, use: l.commercial_use };
 
   const scoring: ListingFacts["scoring"] =
-    l.category === "Property"
-      ? {
-          signal: l.signal,
-          comps_psf_usd: l.comps_psf_usd,
-          price_vs_comps_pct: l.price_vs_comps_pct,
-        }
-      : l.category === "Land"
-        ? { signal: l.signal, district_land_psf_usd: l.district_land_psf_usd, price_vs_district_pct: l.price_vs_district_pct }
-        : { signal: l.signal, district_commercial_psf_usd: l.district_commercial_psf_usd, price_vs_district_pct: l.price_vs_district_pct };
+    psf === null
+      ? { signal: "not scored: the agency does not state the size" }
+      : l.category === "Property"
+        ? { signal: l.signal, comps_per_m2_usd: perM2(l.comps_psf_usd), price_vs_comps_pct: l.price_vs_comps_pct }
+        : l.category === "Land"
+          ? { signal: l.signal, district_land_per_m2_usd: perM2(l.district_land_psf_usd), price_vs_district_pct: l.price_vs_district_pct }
+          : { signal: l.signal, district_commercial_per_m2_usd: perM2(l.district_commercial_psf_usd), price_vs_district_pct: l.price_vs_district_pct };
 
   return {
     listing_id: l.listing_id,
@@ -122,7 +126,8 @@ export function listingFacts(l: Listing, all: Listing[]): ListingFacts {
     tenure: l.tenure,
     lease_years_left: l.lease_years_left,
     asking_price_usd: l.asking_price_usd,
-    price_per_sqft_usd: l.price_per_sqft_usd,
+    price_per_m2_usd: psf === null ? null : pricePerM2(l),
+    price_per_sqft_usd: psf,
     days_on_market: l.days_on_market,
     change_since_listed_pct: l.price_change_pct,
     price_history: l.price_history.map((e) => ({ date: e.date, event: e.event, price_usd: e.price_usd, change_pct: e.change_pct })),
@@ -131,11 +136,12 @@ export function listingFacts(l: Listing, all: Listing[]): ListingFacts {
     size,
     comps: {
       basis: pool === inDistrict ? `${seg} in ${l.district}` : `${seg} island-wide`,
-      count: pool.length,
-      median_psf_usd: Math.round(medPsf),
-      vs_median_pct: medPsf ? Math.round(((l.price_per_sqft_usd - medPsf) / medPsf) * 1000) / 10 : 0,
+      count: psfs.length,
+      median_per_m2_usd: perM2(medPsf),
+      median_per_sqft_usd: Math.round(medPsf),
+      vs_median_pct: psf !== null && medPsf ? Math.round(((psf - medPsf) / medPsf) * 1000) / 10 : null,
       median_days_on_market: Math.round(median(pool.map((x) => x.days_on_market))),
-      rank_cheapest_psf: rank,
+      rank_cheapest: rank || null,
     },
     scoring,
   };
@@ -144,8 +150,9 @@ export function listingFacts(l: Listing, all: Listing[]): ListingFacts {
 /** Rule-based note from the facts (used when the model is unavailable). */
 export function computedListingNote(f: ListingFacts): ListingNote {
   const c = f.comps;
-  const cheap = c.vs_median_pct <= -10;
-  const rich = c.vs_median_pct >= 15;
+  const vs = c.vs_median_pct ?? 0; // no size: neither cheap nor dear
+  const cheap = vs <= -10;
+  const rich = vs >= 15;
   const stale = f.days_on_market > Math.max(90, c.median_days_on_market * 1.5);
   const cut = f.change_since_listed_pct <= -3;
 
@@ -156,39 +163,44 @@ export function computedListingNote(f: ListingFacts): ListingNote {
         ? "Opportunity"
         : rich
           ? "Overpriced"
-          : stale || cut
+          : stale || cut || c.vs_median_pct === null
             ? "Watch"
             : "Fair value";
 
   const segName = c.basis.replace(/ (in .*|island-wide)$/, "");
-  const psfLine = `${usd(f.price_per_sqft_usd)}/sq ft is ${Math.abs(c.vs_median_pct).toFixed(0)}% ${c.vs_median_pct < 0 ? "below" : "above"} the ${usd(c.median_psf_usd)} median for ${c.basis} (${c.count} comps).`;
+  const psfLine =
+    f.price_per_m2_usd === null || c.vs_median_pct === null
+      ? "The agency does not state the size, so the price cannot be compared per m². Ask the agent for it."
+      : `${usd(f.price_per_m2_usd)}/m² is ${Math.abs(vs).toFixed(0)}% ${vs < 0 ? "below" : "above"} the ${usd(c.median_per_m2_usd)}/m² median for ${c.basis} (${c.count} comps).`;
   const headline =
     f.status !== "For sale"
       ? f.status === "De-listed"
         ? `Taken off the agency site after ${f.days_on_market} days; call the agent to ask if it is still available.`
-        : `${f.status} after ${f.days_on_market} days; useful as a pricing comp for ${f.district}.`
+        : `${f.status}; last asked ${usd(f.asking_price_usd)}. Useful as a pricing comp for ${f.district}.`
       : verdict === "Opportunity"
-        ? `${Math.abs(c.vs_median_pct).toFixed(0)}% under comparable ${segName} per sq ft${cut ? " after a price cut" : ""}: worth a call today.`
+        ? `${Math.abs(vs).toFixed(0)}% under comparable ${segName} per m²${cut ? " after a price cut" : ""}: worth a call today.`
         : verdict === "Overpriced"
-          ? `${c.vs_median_pct.toFixed(0)}% above comparable ${segName} per sq ft; expect room to negotiate.`
+          ? `${vs.toFixed(0)}% above comparable ${segName} per m²; expect room to negotiate.`
           : verdict === "Watch"
-            ? stale
-              ? `${f.days_on_market} days listed with ${f.drops ? `${f.drops} price cut${f.drops > 1 ? "s" : ""}` : "no cuts yet"}; the seller may be ready to move.`
-              : `Price is moving: ${pct(f.change_since_listed_pct)} since listed.`
+            ? c.vs_median_pct === null && !stale && !cut
+              ? `Size not stated; ask the agent before comparing it with other listings in ${f.district}.`
+              : stale
+                ? `${f.days_on_market} days listed with ${f.drops ? `${f.drops} price cut${f.drops > 1 ? "s" : ""}` : "no cuts yet"}; the seller may be ready to move.`
+                : `Price is moving: ${pct(f.change_since_listed_pct)} since listed.`
             : `In line with its comps; a fair ask for ${f.district}.`;
 
   const points = [psfLine];
   if (f.drops || f.increases)
     points.push(`${f.drops} price drop${f.drops === 1 ? "" : "s"}, ${f.increases} increase${f.increases === 1 ? "" : "s"}; ${pct(f.change_since_listed_pct)} since first listed.`);
-  else if (f.days_on_market === 0) points.push("Listed today, so there is no price history yet.");
+  else if (f.days_on_market === 0) points.push("First indexed today, so there is no price history yet.");
   else points.push(`No price changes since it was listed ${f.days_on_market} day${f.days_on_market === 1 ? "" : "s"} ago.`);
   if (f.days_on_market > 0) points.push(`${f.days_on_market} days on market vs a ${c.median_days_on_market}-day median for its comps.`);
   if (f.tenure === "Erfpacht") points.push(`Leasehold (erfpacht)${f.lease_years_left ? ` with ${f.lease_years_left} years left` : ""}; check the lease terms.`);
 
   const analysis =
-    `This ${f.kind} in ${f.district} is asking ${usd(f.asking_price_usd)}. ` +
-    (cheap ? "On price per square foot it is one of the cheaper options in its set. " : rich ? "On price per square foot it is one of the dearer options in its set. " : "On price per square foot it sits close to its comps. ") +
-    (f.days_on_market === 0 ? "It first appeared in today's Index, so expect interest from other agents quickly." : stale ? "Time on market is long for this segment, which usually means a softer seller." : cut ? "The seller has already lowered the price, so there may be more flexibility." : "Nothing in the history suggests pressure on the seller yet.");
+    `This ${f.kind} in ${f.district} ${f.status === "Sold" || f.status === "De-listed" ? "last asked" : "is asking"} ${usd(f.asking_price_usd)}. ` +
+    (c.vs_median_pct === null ? "Its size is not stated, so it cannot be placed against its comps. " : cheap ? "On price per m² it is one of the cheaper options in its set. " : rich ? "On price per m² it is one of the dearer options in its set. " : "On price per m² it sits close to its comps. ") +
+    (f.status !== "For sale" ? `The agency marks it ${f.status.toLowerCase()}.` : f.days_on_market === 0 ? "It first appeared in today's Index, so expect interest from other agents quickly." : stale ? "Time on market is long for this segment, which usually means a softer seller." : cut ? "The seller has already lowered the price, so there may be more flexibility." : "Nothing in the history suggests pressure on the seller yet.");
 
   const next_step =
     f.status === "De-listed"
@@ -198,10 +210,12 @@ export function computedListingNote(f: ListingFacts): ListingNote {
       : verdict === "Opportunity"
         ? "Match it with interested clients and book a viewing before it moves."
         : verdict === "Overpriced"
-          ? `Pin it and wait for a cut; a fair offer is closer to ${usd(c.median_psf_usd * (f.asking_price_usd / f.price_per_sqft_usd))}.`
-          : verdict === "Watch"
-            ? "Pin it and call the listing agent to test how flexible the seller is."
-            : "Send it to clients who want this area and budget.";
+          ? `Pin it and wait for a cut; a fair offer is closer to ${usd(Math.round(f.asking_price_usd / (1 + vs / 100)))}.`
+          : c.vs_median_pct === null
+            ? "Ask the listing agent for the size, then compare it again."
+            : verdict === "Watch"
+              ? "Pin it and call the listing agent to test how flexible the seller is."
+              : "Send it to clients who want this area and budget.";
 
   return { verdict, headline, analysis, points: points.slice(0, 4), next_step };
 }
@@ -214,7 +228,7 @@ export interface BriefFacts {
   today: { new: number; price_drops: number; price_increases: number; under_contract: number; sold: number; de_listed: number };
   last_7_days: { new: number; price_drops: number; price_increases: number; under_contract: number; sold: number; de_listed: number };
   biggest_moves_7d: Array<{ listing_id: string; name: string; district: string; kind: string; from_usd: number; to_usd: number; change_pct: number; date: string }>;
-  new_today: Array<{ listing_id: string; name: string; district: string; kind: string; asking_usd: number; vs_comp_median_psf_pct: number }>;
+  new_today: Array<{ listing_id: string; name: string; district: string; kind: string; asking_usd: number; vs_comp_median_pct: number | null }>;
   went_off_market_7d: Array<{ listing_id: string; name: string; district: string; status: string; asking_usd: number; days_on_market: number }>;
   active_by_district: Array<{ district: string; active: number; median_asking_usd: number }>;
   stale_with_cuts: Array<{ listing_id: string; name: string; district: string; days_on_market: number; change_since_listed_pct: number }>;
@@ -268,7 +282,7 @@ export function briefFacts(runs: IndexRun[], all: Listing[]): BriefFacts {
       district: l.district,
       kind: kindOf(l),
       asking_usd: l.asking_price_usd,
-      vs_comp_median_psf_pct: listingFacts(l, all).comps.vs_median_pct,
+      vs_comp_median_pct: listingFacts(l, all).comps.vs_median_pct,
     })),
     went_off_market_7d: week
       .flatMap((r) => r.status_changes)
@@ -302,7 +316,10 @@ export function computedBrief(f: BriefFacts): MarketBrief {
   if (busiest) points.push(`${busiest.district} has the most supply: ${busiest.active} active listings, median ask ${usd(busiest.median_asking_usd)}.`);
 
   const watch = [
-    ...f.new_today.filter((n) => n.vs_comp_median_psf_pct <= -5).map((n) => ({ listing_id: n.listing_id, reason: `New today and ${Math.abs(n.vs_comp_median_psf_pct).toFixed(0)}% under its comps per sq ft.` })),
+    ...f.new_today.flatMap((n) => {
+      const vs = n.vs_comp_median_pct;
+      return vs !== null && vs <= -5 ? [{ listing_id: n.listing_id, reason: `New today and ${Math.abs(vs).toFixed(0)}% under its comps per m².` }] : [];
+    }),
     ...f.biggest_moves_7d.filter((m) => m.change_pct < 0).map((m) => ({ listing_id: m.listing_id, reason: `Price cut ${Math.abs(m.change_pct).toFixed(1)}% to ${usd(m.to_usd)}.` })),
     ...f.stale_with_cuts.map((s) => ({ listing_id: s.listing_id, reason: `${s.days_on_market} days listed and ${pct(s.change_since_listed_pct)} since listing; seller may negotiate.` })),
   ]

@@ -7,6 +7,7 @@
  * different property before it can be saved (the database checks again).
  */
 
+import { fmtSqft, toM2, toSqft } from "@/lib/units";
 import { useDeferredValue, useMemo, useRef, useState } from "react";
 import { AlertTriangle, Camera, Check, Loader2, Lock, MapPin, Trash2, Users } from "lucide-react";
 import { Dialog } from "@/components/feed/profile-dialog";
@@ -104,8 +105,8 @@ function draftFrom(row?: AgentListingViewRow): Draft {
     price: withCommas(String(Math.round(Number(row.asking_price_usd)))),
     beds: row.bedrooms != null ? String(row.bedrooms) : "",
     baths: row.bathrooms != null ? String(row.bathrooms) : "",
-    built: row.built_sqft ? withCommas(String(row.built_sqft)) : "",
-    lot: row.lot_sqft ? withCommas(String(row.lot_sqft)) : "",
+    built: row.built_sqft ? withCommas(String(toM2(row.built_sqft))) : "",
+    lot: row.lot_sqft ? withCommas(String(toM2(row.lot_sqft))) : "",
     pool: row.pool ?? "No pool",
     tenure: row.tenure,
     lease: row.lease_years_left != null ? String(row.lease_years_left) : "",
@@ -114,6 +115,17 @@ function draftFrom(row?: AgentListingViewRow): Draft {
     photo: row.photo_url,
   };
 }
+
+/** Sizes are typed in m² and stored in sq ft; an unchanged size keeps its stored value. */
+function sqftOf(text: string, stored?: number | null) {
+  const m2 = toNum(text);
+  if (!m2) return null;
+  return stored && toM2(stored) === m2 ? stored : toSqft(m2);
+}
+const sqftHint = (text: string) => {
+  const m2 = toNum(text);
+  return m2 ? `= ${fmtSqft(toSqft(m2))}` : "";
+};
 
 export function AddListingDialog({
   open,
@@ -182,8 +194,8 @@ function ListingForm({
       lng: p?.lng ?? null,
       district: x.district,
       bedrooms: x.category === "Property" ? toNum(x.beds) : null,
-      built_sqft: x.category === "Land" ? null : toNum(x.built),
-      lot_sqft: toNum(x.lot),
+      built_sqft: x.category === "Land" ? null : sqftOf(x.built),
+      lot_sqft: sqftOf(x.lot),
       asking_price_usd: toNum(x.price) ?? 0,
       name: x.address.trim() || x.name,
     };
@@ -208,13 +220,13 @@ function ListingForm({
     e.preventDefault();
     setError(null);
     const price = toNum(d.price);
-    const built = toNum(d.built);
-    const lot = toNum(d.lot);
+    const built = sqftOf(d.built, editing?.built_sqft);
+    const lot = sqftOf(d.lot, editing?.lot_sqft);
     if (d.name.trim().length < 3) return setError("Give the listing a name (at least 3 characters).");
     if (!d.district) return setError("Choose the district.");
     if (!price || price < 1000) return setError("Add the asking price in US dollars.");
-    if (!isLand && !built) return setError("Add the built area in sq ft.");
-    if (isLand && !lot) return setError("Add the lot size in sq ft.");
+    if (!isLand && !built) return setError("Add the built area in m².");
+    if (isLand && !lot) return setError("Add the lot size in m².");
     if (isHome && !digits(d.beds)) return setError("Add the number of bedrooms.");
     if (isHome && !(Number(d.baths) >= 0 && d.baths.trim())) return setError("Add the number of bathrooms.");
     if (pinBad) return setError("We couldn't read a location in Aruba from the map pin. Paste a Google Maps link or coordinates like 12.5512, -70.0478, or leave it empty.");
@@ -404,13 +416,15 @@ function ListingForm({
         )}
         {!isLand && (
           <label>
-            <span className={labelCls}>Built (sq ft)</span>
-            <input className={fieldCls} inputMode="numeric" value={d.built} onChange={(e) => set("built", withCommas(e.target.value))} placeholder="3,200" />
+            <span className={labelCls}>Built (m²)</span>
+            <input className={fieldCls} inputMode="numeric" value={d.built} onChange={(e) => set("built", withCommas(e.target.value))} placeholder="300" />
+            <span className="mt-1 block h-4 text-[11px] tabular-nums text-zinc-500">{sqftHint(d.built)}</span>
           </label>
         )}
         <label>
-          <span className={labelCls}>Lot (sq ft){!isLand && <span className="font-normal text-zinc-400"> opt.</span>}</span>
-          <input className={fieldCls} inputMode="numeric" value={d.lot} onChange={(e) => set("lot", withCommas(e.target.value))} placeholder="9,000" />
+          <span className={labelCls}>Lot (m²){!isLand && <span className="font-normal text-zinc-400"> opt.</span>}</span>
+          <input className={fieldCls} inputMode="numeric" value={d.lot} onChange={(e) => set("lot", withCommas(e.target.value))} placeholder="850" />
+          <span className="mt-1 block h-4 text-[11px] tabular-nums text-zinc-500">{sqftHint(d.lot)}</span>
         </label>
       </div>
 
