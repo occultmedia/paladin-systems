@@ -10,11 +10,12 @@
  */
 
 import "leaflet/dist/leaflet.css";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import L, { type LatLngBoundsExpression, type LatLngExpression } from "leaflet";
-import { CircleMarker, MapContainer, Marker, TileLayer, Tooltip, useMap } from "react-leaflet";
+import { CircleMarker, MapContainer, Marker, Popup, TileLayer, Tooltip, useMap, useMapEvents } from "react-leaflet";
 import type { Listing, Signal } from "@/lib/aruba-data";
-import { HotFlame, HoverCard, PLATFORM_COLOR, RentalHoverCard, SIGNAL_COLOR, SIGNAL_LABEL, pinPrice, type ArubaMapProps } from "./map-shared";
+import { canSplit, clusterPoints, clusterSize, type Cluster } from "@/lib/cluster";
+import { ClusterList, HotFlame, HoverCard, PLATFORM_COLOR, RentalHoverCard, SIGNAL_COLOR, SIGNAL_LABEL, pinPrice, type ArubaMapProps } from "./map-shared";
 
 const ARUBA_CENTER: LatLngExpression = [12.53, -70.0];
 const ARUBA_BOUNDS: LatLngBoundsExpression = [
@@ -55,6 +56,106 @@ function FitTo({ points, whole }: { points: Array<[number, number]>; whole?: boo
   return null;
 }
 
+function clusterIcon(n: number) {
+  const size = clusterSize(n);
+  return L.divIcon({
+    className: "sd-pin-wrap",
+    html: `<span class="sd-cluster" style="width:${size}px;height:${size}px">${n}</span>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+  });
+}
+
+/** Listing pins; overlapping ones are grouped into numbered bubbles on interactive maps. */
+function ListingPins({
+  listings,
+  interactive,
+  selectedId,
+  hoveredId,
+  onSelect,
+  onHover,
+}: {
+  listings: Listing[];
+  interactive: boolean;
+  selectedId?: string | null;
+  hoveredId?: string | null;
+  onSelect?: (id: string) => void;
+  onHover?: (id: string | null) => void;
+}) {
+  const map = useMap();
+  const [zoom, setZoom] = useState(() => map.getZoom());
+  const [openCluster, setOpenCluster] = useState<Cluster<Listing> | null>(null);
+  useMapEvents({ zoomend: () => setZoom(map.getZoom()) });
+  // Leaflet zoom z = Mapbox zoom z - 1 (256 px tiles instead of 512)
+  const clusters = useMemo(
+    () => (interactive ? clusterPoints(listings, zoom - 1) : listings.map((l): Cluster<Listing> => ({ id: l.listing_id, lat: l.lat, lng: l.lng, items: [l] }))),
+    [listings, zoom, interactive],
+  );
+
+  const pin = (l: Listing) => {
+    const active = selectedId === l.listing_id || hoveredId === l.listing_id;
+    return (
+      <Marker
+        key={l.listing_id}
+        position={[l.lat, l.lng]}
+        icon={pinIcon(l, active)}
+        zIndexOffset={active ? 1000 : 0}
+        eventHandlers={{
+          click: () => onSelect?.(l.listing_id),
+          mouseover: () => onHover?.(l.listing_id),
+          mouseout: () => onHover?.(null),
+        }}
+      >
+        {interactive && (
+          <Tooltip direction="top" offset={[0, -12]} opacity={1} className="sd-tooltip">
+            <HoverCard l={l} />
+          </Tooltip>
+        )}
+      </Marker>
+    );
+  };
+
+  return (
+    <>
+      {clusters.map((c) =>
+        c.items.length === 1 ? (
+          pin(c.items[0])
+        ) : (
+          <Marker
+            key={`cluster-${c.id}`}
+            position={[c.lat, c.lng]}
+            icon={clusterIcon(c.items.length)}
+            zIndexOffset={500}
+            eventHandlers={{
+              click: () => {
+                if (map.getZoom() < map.getMaxZoom() && canSplit(c.items, zoom - 1)) {
+                  setOpenCluster(null);
+                  map.fitBounds(c.items.map((l) => [l.lat, l.lng] as [number, number]), { padding: [60, 60] });
+                } else setOpenCluster(c);
+              },
+            }}
+          />
+        ),
+      )}
+      {clusters
+        .filter((c) => c.items.length > 1)
+        .flatMap((c) => c.items.filter((l) => l.listing_id === selectedId || l.listing_id === hoveredId))
+        .map(pin)}
+      {openCluster && listings.includes(openCluster.items[0]) && (
+        <Popup position={[openCluster.lat, openCluster.lng]} offset={[0, -14]} closeButton={false} className="sd-popup" eventHandlers={{ remove: () => setOpenCluster(null) }}>
+          <ClusterList
+            items={openCluster.items}
+            onPick={(id) => {
+              setOpenCluster(null);
+              onSelect?.(id);
+            }}
+          />
+        </Popup>
+      )}
+    </>
+  );
+}
+
 /** Phones get a map that never fills more than ~70% of the screen. */
 const interactiveHeight = (h: number) => `min(${h}px, 70svh)`;
 
@@ -66,11 +167,12 @@ export default function ArubaMapLeaflet(props: ArubaMapProps) {
   const points: Array<[number, number]> = useMemo(() => source.map((x) => [x.lat, x.lng] as [number, number]), [source]);
 
   return (
-    <div className={`relative overflow-hidden ${interactive && !fill ? "rounded-2xl border border-zinc-200 [&_.leaflet-container]:rounded-2xl" : ""}`} style={{ height: fill ? "100%" : interactiveHeight(height) }}>
+    <div className={`relative isolate overflow-hidden ${interactive && !fill ? "rounded-2xl border border-zinc-200 [&_.leaflet-container]:rounded-2xl" : ""}`} style={{ height: fill ? "100%" : interactiveHeight(height) }}>
       <MapContainer
         center={ARUBA_CENTER}
         zoom={11}
         minZoom={10}
+        maxZoom={17}
         maxBounds={ARUBA_BOUNDS}
         maxBoundsViscosity={0.8}
         scrollWheelZoom={interactive}
@@ -87,37 +189,26 @@ export default function ArubaMapLeaflet(props: ArubaMapProps) {
         <TileLayer
           attribution="Tiles &copy; Esri &mdash; Esri, HERE, Garmin, &copy; OpenStreetMap contributors"
           url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"
-          maxZoom={16}
+          maxNativeZoom={16}
+          maxZoom={17}
         />
         <TileLayer
           url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}"
-          maxZoom={16}
+          maxNativeZoom={16}
+          maxZoom={17}
         />
         <FitTo points={points} whole={!interactive} />
 
-        {props.mode === "listings" &&
-          props.listings.map((l) => {
-            const active = props.selectedId === l.listing_id || props.hoveredId === l.listing_id;
-            return (
-              <Marker
-                key={l.listing_id}
-                position={[l.lat, l.lng]}
-                icon={pinIcon(l, active)}
-                zIndexOffset={active ? 1000 : 0}
-                eventHandlers={{
-                  click: () => props.onSelect?.(l.listing_id),
-                  mouseover: () => props.onHover?.(l.listing_id),
-                  mouseout: () => props.onHover?.(null),
-                }}
-              >
-                {interactive && (
-                  <Tooltip direction="top" offset={[0, -12]} opacity={1} className="sd-tooltip">
-                    <HoverCard l={l} />
-                  </Tooltip>
-                )}
-              </Marker>
-            );
-          })}
+        {props.mode === "listings" && (
+          <ListingPins
+            listings={props.listings}
+            interactive={interactive}
+            selectedId={props.selectedId}
+            hoveredId={props.hoveredId}
+            onSelect={props.onSelect}
+            onHover={props.onHover}
+          />
+        )}
 
         {props.mode === "rentals" &&
           props.rentals.map((r) => {

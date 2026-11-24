@@ -87,6 +87,32 @@ const STATUS_PILL: Record<Listing["status"], { color: string; bg: string }> = {
   "De-listed": { color: "#52525B", bg: "#EEEEF0" },
 };
 
+/** Listings that share one spot (units in a building): pick one from a short list. */
+export function ClusterList({ items, onPick }: { items: Listing[]; onPick: (id: string) => void }) {
+  return (
+    <div style={{ width: 250 }}>
+      <p className="border-b border-zinc-200 px-3 py-2 text-[11px] font-semibold text-zinc-500">{items.length} listings at this spot</p>
+      <ul data-lenis-prevent className="max-h-[230px] overflow-y-auto overscroll-contain p-1">
+        {items.map((l) => (
+          <li key={l.listing_id}>
+            <button
+              type="button"
+              onClick={() => onPick(l.listing_id)}
+              className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-zinc-100"
+            >
+              <span className="size-2 shrink-0 rounded-full" style={{ background: SIGNAL_COLOR[l.signal] }} />
+              <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-zinc-900">{l.asset_name}</span>
+              <span className="shrink-0 text-[12px] font-semibold tabular-nums text-zinc-950">
+                {l.asking_price_usd >= 1e6 ? `$${(l.asking_price_usd / 1e6).toFixed(2)}M` : `$${Math.round(l.asking_price_usd / 1000)}k`}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export function HoverCard({ l }: { l: Listing }) {
   const color = SIGNAL_COLOR[l.signal];
   const facts =

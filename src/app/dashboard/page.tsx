@@ -423,6 +423,9 @@ function scrollToRow(key: string, block: ScrollLogicalPosition = "center") {
 
 const PAGE_SIZE = 25;
 
+/** Listings of one company, whether indexed from its site or added by its agents. */
+const agencyKey = (l: Listing) => l.agency.name.trim().toLowerCase();
+
 /** Page numbers to show: first, last, and a window around the current page. */
 function pageList(page: number, count: number): Array<number | "gap"> {
   const out: Array<number | "gap"> = [];
@@ -2002,6 +2005,7 @@ function ActiveListings({
   const [category, setCategory] = useState<Category>("All");
   const [subtypes, setSubtypes] = useState<string[]>([]);
   const [district, setDistrict] = useState(initialDistrict ?? "All");
+  const [agency, setAgency] = useState("All");
   const [signal, setSignal] = useState<Signal | "ALL">("ALL");
   const [priceMin, setPriceMin] = useState(0);
   const [priceMax, setPriceMax] = useState(0);
@@ -2024,7 +2028,7 @@ function ActiveListings({
     const url = new URL(window.location.href);
     if (url.searchParams.has("map") || !url.searchParams.has("tab")) {
       url.searchParams.delete("map");
-      if (!url.searchParams.has("tab")) url.searchParams.set("tab", tab === "Listings" ? "listings" : tab.toLowerCase());
+      if (!url.searchParams.has("tab")) url.searchParams.set("tab", TAB_SLUG[tab]);
       window.history.replaceState(null, "", url);
     }
   }, [onExitTo, onFullClosed]);
@@ -2071,6 +2075,17 @@ function ActiveListings({
     [listings],
   );
 
+  const agencies = useMemo(() => {
+    const byKey = new Map<string, { key: string; name: string; count: number }>();
+    for (const l of listings ?? []) {
+      const key = agencyKey(l);
+      const a = byKey.get(key);
+      if (a) a.count++;
+      else byKey.set(key, { key, name: l.agency.name.trim(), count: 1 });
+    }
+    return [...byKey.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  }, [listings]);
+
   const deferredQuery = useDeferredValue(query);
   const rows = useMemo(() => {
     if (!listings) return [];
@@ -2081,6 +2096,7 @@ function ActiveListings({
         (category === "All" || l.category === category) &&
         (!subtypes.length || subtypes.includes(subtypeOf(l, category))) &&
         (district === "All" || l.district === district) &&
+        (agency === "All" || agencyKey(l) === agency) &&
         (signal === "ALL" || l.signal === signal) &&
         (tenure === "All" || l.tenure === tenure) &&
         (status === "All" || l.status === status) &&
@@ -2107,7 +2123,7 @@ function ActiveListings({
       if (y === null) return -1;
       return (typeof x === "string" ? x.localeCompare(y as string) : x - (y as number)) * dir;
     });
-  }, [listings, deferredQuery, category, subtypes, district, signal, priceMin, priceMax, bedsMin, sizeMin, newOnly, dropsOnly, reliableOnly, sort, tenure, newToday, offMarket, status, pool]);
+  }, [listings, deferredQuery, category, subtypes, district, agency, signal, priceMin, priceMax, bedsMin, sizeMin, newOnly, dropsOnly, reliableOnly, sort, tenure, newToday, offMarket, status, pool]);
 
   // 25 per page; back to page 1 whenever filters or sort change the result set
   const [page, setPage] = useState(0);
@@ -2166,7 +2182,7 @@ function ActiveListings({
 
   const moreCount =
     [priceMin, priceMax, bedsMin, sizeMin].filter(Boolean).length + (newOnly ? 1 : 0) + (dropsOnly ? 1 : 0) + (reliableOnly ? 1 : 0) + (pool !== "Any" ? 1 : 0);
-  const filtersActive = Boolean(query) || tenure !== "All" || status !== "All" || newToday || offMarket || category !== "All" || subtypes.length > 0 || district !== "All" || signal !== "ALL" || moreCount > 0;
+  const filtersActive = Boolean(query) || tenure !== "All" || status !== "All" || newToday || offMarket || category !== "All" || subtypes.length > 0 || district !== "All" || agency !== "All" || signal !== "ALL" || moreCount > 0;
   const clearAll = () => {
     setQuery("");
     setTenure("All");
@@ -2176,6 +2192,7 @@ function ActiveListings({
     setOffMarket(false);
     pickCategory("All");
     setDistrict("All");
+    setAgency("All");
     setSignal("ALL");
     setPriceMin(0);
     setPriceMax(0);
@@ -2288,6 +2305,13 @@ function ActiveListings({
           <select id="f-district" value={district} onChange={(e) => setDistrict(e.target.value)} className={selectCls}>
             {districts.map((d) => (
               <option key={d} value={d}>{d === "All" ? "All districts" : d}</option>
+            ))}
+          </select>
+          <label className="sr-only" htmlFor="f-agency">Agency</label>
+          <select id="f-agency" value={agency} onChange={(e) => setAgency(e.target.value)} className={`${selectCls} max-w-full`}>
+            <option value="All">All agencies</option>
+            {agencies.map((a) => (
+              <option key={a.key} value={a.key}>{`${a.name} (${a.count})`}</option>
             ))}
           </select>
           <div className="no-scrollbar flex max-w-full overflow-x-auto rounded-md border border-zinc-300" role="group" aria-label="Value">
@@ -2476,6 +2500,9 @@ function ActiveListings({
         onExit={closeFullMap}
         renderDetails={(l) => <ListingDetails l={l} />}
         onAddListing={actions?.add}
+        agency={agency}
+        agencies={agencies}
+        onAgency={setAgency}
       />
 
       {/* list */}
@@ -2725,10 +2752,16 @@ function ActiveListings({
                     </td>
                     <td className={num}>{l.price_per_sqft_usd > 0 ? fmtUsd(l.price_per_sqft_usd) : DASH}</td>
                     <td className={`${td} ${MONO} text-right`}>
-                      <p className="text-[13px]" style={{ color: deltaColor(-vsPct) }}>
-                        {fmtDelta(vsPct)}
-                      </p>
-                      <p className="mt-1 text-[11px] text-zinc-500">comps {fmtUsd(compsPsf)}/ft²</p>
+                      {l.price_per_sqft_usd > 0 && compsPsf > 0 ? (
+                        <>
+                          <p className="text-[13px]" style={{ color: deltaColor(-vsPct) }}>
+                            {fmtDelta(vsPct)}
+                          </p>
+                          <p className="mt-1 text-[11px] text-zinc-500">comps {fmtUsd(compsPsf)}/ft²</p>
+                        </>
+                      ) : (
+                        DASH
+                      )}
                     </td>
                     <td className={`${td} text-right`}>
                       <StatusBadge l={l} align="end" />

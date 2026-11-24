@@ -14,7 +14,7 @@ import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
-import { ArrowLeft, LayoutList, Map as MapIcon, Megaphone, Pin, Plus, Search, X } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, LayoutList, Map as MapIcon, Megaphone, Pin, Plus, Search, X } from "lucide-react";
 import { Wordmark } from "@/components/logo";
 import { GrainField } from "@/components/landing/grain-field";
 import { PostCard, SharedNotice } from "@/components/feed/feed-view";
@@ -40,6 +40,15 @@ const PANELS: Array<{ id: FullPanel; icon: typeof Pin }> = [
 ];
 
 const EASE = [0.22, 1, 0.36, 1] as const;
+
+/** Listings per page in the side panel. */
+const PANEL_PAGE = 20;
+
+export interface AgencyOption {
+  key: string;
+  name: string;
+  count: number;
+}
 
 /* ── rows ────────────────────────────────────────────────────────────── */
 
@@ -341,6 +350,9 @@ export function MapFullscreen({
   onExit,
   renderDetails,
   onAddListing,
+  agency,
+  agencies,
+  onAgency,
 }: {
   open: boolean;
   listings: Listing[];
@@ -355,10 +367,35 @@ export function MapFullscreen({
   renderDetails: (l: Listing) => React.ReactNode;
   /** Opens the Add listing form (agents adding a property by hand). */
   onAddListing?: () => void;
+  /** Agency filter, shared with the normal view ("All" or an AgencyOption key). */
+  agency: string;
+  agencies: AgencyOption[];
+  onAgency: (key: string) => void;
 }) {
   const [panel, setPanel] = useState<FullPanel>("Listings");
   const [mobileView, setMobileView] = useState<"Map" | FullPanel>("Map");
   const [detailsOpen, setDetailsOpen] = useState(false);
+
+  // Side panel pages: back to the first page when the filters change, and to
+  // the page that holds a listing when it is picked on the map.
+  const [page, setPage] = useState(0);
+  const [seen, setSeen] = useState({ listings, selectedId });
+  if (seen.listings !== listings || seen.selectedId !== selectedId) {
+    const i = selectedId ? listings.findIndex((l) => l.listing_id === selectedId) : -1;
+    if (i >= 0) setPage(Math.floor(i / PANEL_PAGE));
+    else if (seen.listings !== listings) setPage(0);
+    setSeen({ listings, selectedId });
+  }
+  const pageCount = Math.max(1, Math.ceil(listings.length / PANEL_PAGE));
+  const pageIdx = Math.min(page, pageCount - 1);
+  const pageRows = listings.slice(pageIdx * PANEL_PAGE, (pageIdx + 1) * PANEL_PAGE);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const mobilePanelRef = useRef<HTMLDivElement>(null);
+  const turnTo = (p: number) => {
+    setPage(p);
+    panelRef.current?.scrollTo({ top: 0 });
+    mobilePanelRef.current?.scrollTo({ top: 0 });
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -394,6 +431,49 @@ export function MapFullscreen({
   };
   if (!mounted) return null;
 
+  const agencySelect = (
+    <label className="block">
+      <span className="sr-only">Agency</span>
+      <select
+        value={agency}
+        onChange={(e) => onAgency(e.target.value)}
+        className={`w-full rounded-full border px-3.5 py-2 text-[12.5px] font-semibold outline-none transition-colors focus:border-zinc-950 ${
+          agency === "All" ? "border-zinc-300 bg-white text-zinc-700" : "border-zinc-950 bg-white text-zinc-950"
+        }`}
+      >
+        <option value="All">All agencies</option>
+        {agencies.map((a) => (
+          <option key={a.key} value={a.key}>
+            {a.name} ({a.count})
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+  const pageBtn =
+    "grid size-8 place-items-center rounded-full text-zinc-700 transition-colors hover:bg-zinc-100 disabled:pointer-events-none disabled:opacity-35";
+  const pager = pageCount > 1 && (
+    <nav aria-label="Listing pages" className="flex items-center justify-between gap-2 px-3 py-2">
+      <p className="text-[12px] tabular-nums text-zinc-500">
+        <span className="font-semibold text-zinc-950">
+          {pageIdx * PANEL_PAGE + 1}–{Math.min(listings.length, (pageIdx + 1) * PANEL_PAGE)}
+        </span>{" "}
+        of {listings.length}
+      </p>
+      <div className="flex items-center gap-1">
+        <button type="button" aria-label="Previous page" disabled={pageIdx === 0} onClick={() => turnTo(pageIdx - 1)} className={pageBtn}>
+          <ChevronLeft size={15} strokeWidth={2.2} />
+        </button>
+        <span className="text-[12px] font-semibold tabular-nums text-zinc-950">
+          {pageIdx + 1} / {pageCount}
+        </span>
+        <button type="button" aria-label="Next page" disabled={pageIdx >= pageCount - 1} onClick={() => turnTo(pageIdx + 1)} className={pageBtn}>
+          <ChevronRight size={15} strokeWidth={2.2} />
+        </button>
+      </div>
+    </nav>
+  );
+
   const list = (p: FullPanel) =>
     p === "Listings" ? (
       <>
@@ -413,7 +493,7 @@ export function MapFullscreen({
         </button>
       )}
       {listings.length ? (
-        listings.map((l) => (
+        pageRows.map((l) => (
           <Row
             key={l.listing_id}
             l={l}
@@ -478,13 +558,16 @@ export function MapFullscreen({
             <aside className={`glass absolute bottom-3 left-3 top-3 z-[4] hidden w-[380px] flex-col overflow-hidden rounded-2xl ${panel === "Market feed" ? "" : "lg:flex"}`}>
               <div className="border-b border-white/60 p-3">
                 <PanelTabs value={panel} onChange={setPanel} />
+                {panel === "Listings" && <div className="mt-2">{agencySelect}</div>}
               </div>
               <div
+                ref={panelRef}
                 data-lenis-prevent
                 className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain p-2"
               >
                 {panel !== "Market feed" && list(panel)}
               </div>
+              {panel === "Listings" && pager && <div className="shrink-0 border-t border-zinc-200 bg-white/80">{pager}</div>}
             </aside>
 
             {/* Market feed (desktop): the board takes the whole screen, no map */}
@@ -567,10 +650,13 @@ export function MapFullscreen({
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 16 }}
                   transition={{ duration: 0.25, ease: EASE }}
+                  ref={mobilePanelRef}
                   data-lenis-prevent
                   className="absolute inset-0 z-[4] space-y-1 overflow-y-auto overscroll-contain bg-white p-2 lg:hidden"
                 >
+                  {mobileView === "Listings" && <div className="pb-1">{agencySelect}</div>}
                   {list(mobileView)}
+                  {mobileView === "Listings" && pager}
                 </motion.div>
               )}
             </AnimatePresence>

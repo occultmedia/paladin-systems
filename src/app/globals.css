@@ -321,6 +321,42 @@ body {
   display: none;
 }
 
+/* Numbered bubble for listings that overlap at this zoom */
+.sd-cluster {
+  display: grid;
+  place-items: center;
+  border: 2px solid #ffffff;
+  border-radius: 9999px;
+  background: #0a0a0a;
+  color: #acfa68;
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 0 0 4px rgb(10 10 10 / 0.16), 0 2px 8px rgb(0 0 0 / 0.35);
+  transition: transform 120ms ease;
+  cursor: pointer;
+}
+.sd-cluster:hover {
+  transform: scale(1.08);
+}
+
+/* Cards always sit above every pin and bubble (markers carry a z-index, popups do not by default) */
+.mapboxgl-popup.sd-popup {
+  z-index: 20;
+}
+.leaflet-popup.sd-popup .leaflet-popup-content-wrapper {
+  padding: 0;
+  overflow: hidden;
+  border-radius: 14px;
+}
+.leaflet-popup.sd-popup .leaflet-popup-content {
+  margin: 0;
+}
+.leaflet-popup.sd-popup .leaflet-popup-tip-container {
+  display: none;
+}
+
 /* Mapbox popup (hover card) */
 .sd-popup .mapboxgl-popup-content {
   padding: 0;

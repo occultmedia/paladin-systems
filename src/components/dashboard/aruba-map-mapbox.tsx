@@ -11,8 +11,9 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Map, { Marker, NavigationControl, Popup, type MapRef } from "react-map-gl/mapbox";
 import type { Listing, Signal } from "@/lib/aruba-data";
-import { HotFlame, HoverCard, PLATFORM_COLOR, RentalHoverCard, SIGNAL_COLOR, SIGNAL_LABEL, pinPrice, type ArubaMapProps } from "./map-shared";
+import { ClusterList, HotFlame, HoverCard, PLATFORM_COLOR, RentalHoverCard, SIGNAL_COLOR, SIGNAL_LABEL, pinPrice, type ArubaMapProps } from "./map-shared";
 import { PLATFORM_LABEL, type RentalPlatform } from "@/lib/aruba-data";
+import { CLUSTER_MAX_ZOOM, canSplit, clusterPoints, clusterSize, type Cluster } from "@/lib/cluster";
 
 const TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 /** Mapbox Standard: 3D buildings, landmarks, trees and dynamic lighting. */
@@ -56,6 +57,14 @@ function boundsOf(points: Array<[number, number]>): [[number, number], [number, 
 
 const shapeOf = (l: Listing) => (l.category === "Land" ? "square" : l.category === "Commercial" ? "diamond" : "circle");
 
+/** Room to leave around the pins. In Dashboard view the side panel covers the left of the map on desktop. */
+const fitPadding = (fill: boolean, edge: number) => ({
+  top: edge,
+  right: edge,
+  bottom: edge,
+  left: fill && window.innerWidth >= 1024 ? 392 + edge : edge,
+});
+
 /** Phones get a map that never fills more than ~70% of the screen. */
 const interactiveHeight = (h: number) => `min(${h}px, 70svh)`;
 
@@ -68,12 +77,37 @@ export default function ArubaMapMapbox(props: ArubaMapProps) {
   const [localHover, setLocalHover] = useState<string | null>(null);
   const [is3d, setIs3d] = useState(false);
 
+  // Zoom (in half steps) and visible area: what the clusters are worked out for.
+  const [view, setView] = useState<{ zoom: number; box: [number, number, number, number] } | null>(null);
+  const [openCluster, setOpenCluster] = useState<Cluster<Listing> | null>(null);
+  const syncView = (map: ReturnType<MapRef["getMap"]>, moved: boolean) => {
+    const zoom = Math.round(map.getZoom() * 2) / 2;
+    const b = map.getBounds();
+    if (!b) return;
+    const [w, s, e, n] = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()];
+    const [px, py] = [(e - w) / 2, (n - s) / 2]; // half a screen of margin, so panning never shows gaps
+    setView((v) => (!moved && v?.zoom === zoom ? v : { zoom, box: [w - px, s - py, e + px, n + py] }));
+  };
+
   const source = props.mode === "listings" ? props.listings : props.mode === "rentals" ? props.rentals : props.districts;
   const points: Array<[number, number]> = useMemo(
     () => source.map((x) => [x.lat, x.lng] as [number, number]),
     [source],
   );
   const pointsKey = points.map((p) => p.join(",")).join("|");
+
+  const listings = props.mode === "listings" ? props.listings : null;
+  // Interactive maps group overlapping listings; the decorative homepage map shows every pin.
+  const clusters = useMemo(() => {
+    if (!listings) return [];
+    if (!interactive) return listings.map((l): Cluster<Listing> => ({ id: l.listing_id, lat: l.lat, lng: l.lng, items: [l] }));
+    return view ? clusterPoints(listings, view.zoom) : [];
+  }, [listings, interactive, view]);
+  const visibleClusters = useMemo(() => {
+    if (!view || !interactive) return clusters;
+    const [w, s, e, n] = view.box;
+    return clusters.filter((c) => c.lng >= w && c.lng <= e && c.lat >= s && c.lat <= n);
+  }, [clusters, view, interactive]);
 
   // Fit to whatever is visible whenever the set changes.
   useEffect(() => {
@@ -88,7 +122,7 @@ export default function ArubaMapMapbox(props: ArubaMapProps) {
     if (!b) return;
     const tilt = { pitch: 0, bearing: 0 };
     if (points.length === 1) map.flyTo({ center: [points[0][1], points[0][0]], zoom: 14, duration: 600, ...tilt });
-    else map.fitBounds(b, { padding: 50, maxZoom: 14, duration: 600, ...tilt });
+    else map.fitBounds(b, { padding: fitPadding(fill, 50), maxZoom: 14, duration: 600, ...tilt });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pointsKey, loaded]);
 
@@ -116,7 +150,7 @@ export default function ArubaMapMapbox(props: ArubaMapProps) {
     const map = mapRef.current;
     const b = boundsOf(points);
     if (!map || !b) return;
-    map.fitBounds(b, { padding: 50, maxZoom: 14, pitch: 0, bearing: 0, duration: 900 });
+    map.fitBounds(b, { padding: fitPadding(fill, 50), maxZoom: 14, pitch: 0, bearing: 0, duration: 900 });
   };
 
   const hoveredId = props.mode !== "districts" ? (props.hoveredId ?? localHover) : localHover;
@@ -128,10 +162,51 @@ export default function ArubaMapMapbox(props: ArubaMapProps) {
   const hoveredRental = props.mode === "rentals" ? props.rentals.find((r) => r.rental_id === hoveredId) : undefined;
   const hoveredDistrict = props.mode === "districts" ? props.districts.find((d) => d.district === localHover) : undefined;
 
+  const pickListing = (id: string) => {
+    setOpenCluster(null);
+    if (props.mode === "listings") props.onSelect?.(id);
+  };
+  const clickCluster = (c: Cluster<Listing>) => {
+    const map = mapRef.current;
+    if (!map) return;
+    setHover(null);
+    const b = boundsOf(c.items.map((l) => [l.lat, l.lng] as [number, number]));
+    if (b && canSplit(c.items, map.getZoom())) {
+      setOpenCluster(null);
+      map.fitBounds(b, { padding: fitPadding(fill, 70), maxZoom: CLUSTER_MAX_ZOOM + 0.4, duration: 700 });
+    } else setOpenCluster(c);
+  };
+  /** One listing: coloured by signal, shaped by category. */
+  const pin = (l: Listing) => {
+    const active = selectedId === l.listing_id || hoveredId === l.listing_id;
+    return (
+      <Marker
+        key={l.listing_id}
+        longitude={l.lng}
+        latitude={l.lat}
+        anchor="center"
+        style={{ zIndex: active ? 3 : 1 }}
+        onClick={(e) => {
+          e.originalEvent.stopPropagation();
+          pickListing(l.listing_id);
+        }}
+      >
+        <span
+          className="sd-pin-wrap relative block size-[22px]"
+          onMouseEnter={() => interactive && setHover(l.listing_id)}
+          onMouseLeave={() => interactive && setHover(null)}
+        >
+          <span className={`sd-pin sd-pin-${shapeOf(l)}${active ? " sd-pin-active" : ""}`} style={{ background: SIGNAL_COLOR[l.signal] }} />
+          {l.signal === "UNDERVALUED" && <HotFlame size={11} className="pointer-events-none absolute -right-1.5 -top-2 drop-shadow-[0_1px_1px_rgb(0_0_0/0.35)]" />}
+        </span>
+      </Marker>
+    );
+  };
+
   if (!TOKEN) return null;
 
   return (
-    <div data-lenis-prevent={interactive || undefined} className={`relative overflow-hidden ${interactive && !fill ? "rounded-2xl border border-zinc-200" : ""}`} style={{ height: fill ? "100%" : interactiveHeight(height) }}>
+    <div data-lenis-prevent={interactive || undefined} className={`relative isolate overflow-hidden ${interactive && !fill ? "rounded-2xl border border-zinc-200" : ""}`} style={{ height: fill ? "100%" : interactiveHeight(height) }}>
       <Map
         ref={mapRef}
         mapboxAccessToken={TOKEN}
@@ -150,47 +225,65 @@ export default function ArubaMapMapbox(props: ArubaMapProps) {
         style={{ width: "100%", height: "100%" }}
         onLoad={(e) => {
           configure(e.target);
+          syncView(e.target, true);
           setLoaded(true);
         }}
+        onZoom={(e) => syncView(e.target, false)}
+        onMoveEnd={(e) => syncView(e.target, true)}
         onPitchEnd={(e) => setIs3d(e.target.getPitch() > 10)}
       >
         {interactive && <NavigationControl position={fill ? "bottom-right" : "top-left"} visualizePitch />}
 
-        {props.mode === "listings" &&
-          props.listings.map((l) => {
-            const active = props.selectedId === l.listing_id || hoveredId === l.listing_id;
-            return (
-              <Marker
-                key={l.listing_id}
-                longitude={l.lng}
-                latitude={l.lat}
-                anchor="center"
-                style={{ zIndex: active ? 10 : 1 }}
-                onClick={(e) => {
-                  e.originalEvent.stopPropagation();
-                  props.onSelect?.(l.listing_id);
-                }}
+        {visibleClusters.map((c) =>
+          c.items.length === 1 ? (
+            pin(c.items[0])
+          ) : (
+            <Marker
+              key={`cluster-${c.id}`}
+              longitude={c.lng}
+              latitude={c.lat}
+              anchor="center"
+              style={{ zIndex: 2 }}
+              onClick={(e) => {
+                e.originalEvent.stopPropagation();
+                clickCluster(c);
+              }}
+            >
+              <button
+                type="button"
+                aria-label={`${c.items.length} listings here, zoom in`}
+                className="sd-cluster"
+                style={{ width: clusterSize(c.items.length), height: clusterSize(c.items.length) }}
               >
-                <span
-                  className="sd-pin-wrap relative block size-[22px]"
-                  onMouseEnter={() => interactive && setHover(l.listing_id)}
-                  onMouseLeave={() => interactive && setHover(null)}
-                >
-                  <span
-                    className={`sd-pin sd-pin-${shapeOf(l)}${active ? " sd-pin-active" : ""}`}
-                    style={{ background: SIGNAL_COLOR[l.signal] }}
-                  />
-                  {l.signal === "UNDERVALUED" && <HotFlame size={11} className="pointer-events-none absolute -right-1.5 -top-2 drop-shadow-[0_1px_1px_rgb(0_0_0/0.35)]" />}
-                </span>
-              </Marker>
-            );
-          })}
+                {c.items.length}
+              </button>
+            </Marker>
+          ),
+        )}
+        {/* the picked or hovered listing always shows its own pin, even inside a bubble */}
+        {visibleClusters
+          .filter((c) => c.items.length > 1)
+          .flatMap((c) => c.items.filter((l) => l.listing_id === selectedId || l.listing_id === hoveredId))
+          .map(pin)}
 
-        {interactive && hoveredListing && (
+        {openCluster && listings?.includes(openCluster.items[0]) && (
+          <Popup
+            longitude={openCluster.lng}
+            latitude={openCluster.lat}
+            offset={24}
+            closeButton={false}
+            maxWidth="none"
+            className="sd-popup"
+            onClose={() => setOpenCluster(null)}
+          >
+            <ClusterList items={openCluster.items} onPick={pickListing} />
+          </Popup>
+        )}
+
+        {interactive && hoveredListing && !openCluster && (
           <Popup
             longitude={hoveredListing.lng}
             latitude={hoveredListing.lat}
-            anchor="bottom"
             offset={16}
             closeButton={false}
             closeOnClick={false}

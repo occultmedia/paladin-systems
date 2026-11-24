@@ -49,7 +49,7 @@ export function ListingPopup({
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: 10, scale: 0.98 }}
       transition={{ duration: 0.32, ease: EASE }}
-      className={`glass z-[6] overflow-hidden rounded-2xl p-2 ${className}`}
+      className={`glass z-[6] overflow-hidden rounded-2xl bg-white! p-2 ${className}`}
     >
       <div className="relative">
         {l.photo_url ? (
