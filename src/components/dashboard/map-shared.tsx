@@ -2,6 +2,7 @@
 
 /* Shared pieces for the Aruba map (Mapbox and Leaflet versions). */
 
+import { ListingPhoto } from "@/components/listing-photo";
 import { PLATFORM_LABEL, type Agency, type DistrictStats, type Listing, type RentalPlatform, type Signal, type VacationRental } from "@/lib/aruba-data";
 
 export const SIGNAL_COLOR: Record<Signal, string> = {
@@ -129,12 +130,11 @@ export function HoverCard({ l }: { l: Listing }) {
   return (
     <div style={{ width: 250 }}>
       {l.photo_url && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={`${l.photo_url}?auto=format&fit=crop&w=500&h=270&q=60`}
+        <ListingPhoto
+          src={l.photo_url}
           alt=""
-          width={250}
-          height={135}
+          w={250}
+          h={135}
           style={{ display: "block", width: 250, height: 135, objectFit: "cover", background: "#F4F4F5" }}
         />
       )}

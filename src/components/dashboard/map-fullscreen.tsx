@@ -10,7 +10,7 @@
  */
 
 import dynamic from "next/dynamic";
-import Image from "next/image";
+import { ListingPhoto } from "@/components/listing-photo";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
@@ -82,12 +82,11 @@ function Row({
     >
       <span className="relative shrink-0">
         {l.photo_url ? (
-          <Image
-            src={`${l.photo_url}?auto=format&fit=crop&w=128&h=96&q=60`}
+          <ListingPhoto
+            src={l.photo_url}
             alt=""
-            width={64}
-            height={48}
-            unoptimized
+            w={64}
+            h={48}
             className="h-12 w-16 rounded-lg object-cover"
           />
         ) : (

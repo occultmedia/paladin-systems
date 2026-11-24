@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { PHOTO_HOSTS } from "./src/lib/photo-hosts";
 
 const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
@@ -13,7 +14,9 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   devIndicators: false,
   images: {
+    minimumCacheTTL: 2678400, // 31 days: agencies give a changed photo a new address
     remotePatterns: [
+      ...PHOTO_HOSTS.map((h) => ({ protocol: "https" as const, ...h })),
       { protocol: "https", hostname: "images.unsplash.com" },
       { protocol: "https", hostname: "*.supabase.co", pathname: "/storage/v1/object/public/**" },
     ],

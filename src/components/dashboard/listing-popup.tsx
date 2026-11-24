@@ -7,7 +7,7 @@
  * Dashboard view / Normal view switch.
  */
 
-import Image from "next/image";
+import { ListingPhoto } from "@/components/listing-photo";
 import { motion } from "framer-motion";
 import { ArrowUpRight, Pin, X } from "lucide-react";
 import { BAND_COLOR, confidenceBand } from "@/lib/confidence";
@@ -53,12 +53,11 @@ export function ListingPopup({
     >
       <div className="relative">
         {l.photo_url ? (
-          <Image
-            src={`${l.photo_url}?auto=format&fit=crop&w=720&h=360&q=70`}
+          <ListingPhoto
+            src={l.photo_url}
             alt={l.asset_name}
-            width={360}
-            height={180}
-            unoptimized
+            w={360}
+            h={180}
             className="aspect-[2/1] h-auto w-full rounded-xl object-cover"
           />
         ) : (

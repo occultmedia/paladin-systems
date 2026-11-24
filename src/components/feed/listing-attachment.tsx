@@ -6,7 +6,7 @@
  * (photo, price, AI Signal, price vs comps) and opens it in the Terminal.
  */
 
-import Image from "next/image";
+import { ListingPhoto } from "@/components/listing-photo";
 import { ArrowUpRight, Building2, Search, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { Listing } from "@/lib/aruba-data";
@@ -22,7 +22,7 @@ const vsComps = (l: Listing) => (l.category === "Property" ? l.price_vs_comps_pc
 function Thumb({ l, size = "md" }: { l: Listing; size?: "sm" | "md" }) {
   const cls = size === "sm" ? "h-10 w-14" : "h-16 w-[88px]";
   return l.photo_url ? (
-    <Image src={`${l.photo_url}?auto=format&fit=crop&w=200&h=140&q=60`} alt="" width={88} height={64} unoptimized className={`${cls} shrink-0 rounded-lg object-cover`} />
+    <ListingPhoto src={l.photo_url} alt="" w={88} h={64} className={`${cls} shrink-0 rounded-lg object-cover`} />
   ) : (
     <span className={`${cls} grid shrink-0 place-items-center rounded-lg bg-zinc-100 text-zinc-400`}>
       <Building2 size={16} />

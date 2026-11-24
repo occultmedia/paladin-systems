@@ -162,5 +162,6 @@ On land, a "Bedrooms 0" in the table is stored as null (not applicable).
    selectors. Use the `self.text / texts / attr / attrs / block_text` helpers:
    they return None instead of raising when an element is missing.
 3. Register the class in `terminal_spider/__init__.py` (`SPIDERS`).
-4. Check its robots.txt and terms first, then
+4. Add its photo host to `src/lib/photo-hosts.ts`, so its photos are resized.
+5. Check its robots.txt and terms first, then
    `python -m terminal_spider <agency> --dry-run --limit 3`.

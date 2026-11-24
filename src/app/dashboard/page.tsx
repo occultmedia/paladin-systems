@@ -15,7 +15,7 @@ import { RunLine } from "@/components/run-line";
 import { Fragment, Suspense, createContext, useCallback, useContext, useDeferredValue, useEffect, useId, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
-import Image from "next/image";
+import { ListingPhoto } from "@/components/listing-photo";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { ListingPopup, ViewToggle } from "@/components/dashboard/listing-popup";
@@ -690,12 +690,11 @@ function PlainHeader({ label, align = "right" }: { label: string; align?: "left"
 
 function Thumb({ src, alt, w = 64, h = 44 }: { src: string | null; alt: string; w?: number; h?: number }) {
   return src ? (
-    <Image
-      src={`${src}?auto=format&fit=crop&w=${w * 2}&h=${h * 2}&q=60`}
+    <ListingPhoto
+      src={src}
       alt={alt}
-      width={w}
-      height={h}
-      unoptimized
+      w={w}
+      h={h}
       className="shrink-0 rounded-md bg-zinc-100 object-cover"
       style={{ width: w, height: h }}
     />
@@ -1910,12 +1909,11 @@ function ListingDetails({ l }: { l: Listing }) {
       <div className="grid grid-cols-[minmax(0,1fr)] lg:grid-cols-[320px_minmax(0,1fr)]">
         <aside className="space-y-3 border-b border-zinc-200 bg-zinc-50/70 p-4 sm:p-5 lg:border-b-0 lg:border-r">
           {l.photo_url && (
-            <Image
-              src={`${l.photo_url}?auto=format&fit=crop&w=720&h=460&q=70`}
+            <ListingPhoto
+              src={l.photo_url}
               alt={l.asset_name}
-              width={320}
-              height={205}
-              unoptimized
+              w={360}
+              h={230}
               className="aspect-[16/10] h-auto w-full rounded-xl bg-zinc-100 object-cover"
             />
           )}
