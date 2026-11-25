@@ -38,6 +38,7 @@ const SIGNAL: Record<Signal, { label: string; color: string; bg: string }> = {
   UNDERVALUED: { label: "Below market", color: UP, bg: "#E8F1EB" },
   AT_MARKET: { label: "At Market", color: "#3F3F46", bg: "#F1F1F3" },
   OVERPRICED: { label: "Overpriced", color: DOWN, bg: "#F6ECEC" },
+  NO_SIGNAL: { label: "No signal", color: "#71717A", bg: "#F1F1F3" },
 };
 
 /* ── derived figures ─────────────────────────────────────────────────── */
@@ -293,7 +294,7 @@ const STATS: Array<[string, string]> = [
   [String(ALL_LISTINGS.length), "listings for sale, in one place"],
   [String(AGENCIES), "agency websites checked every morning"],
   [String(RUN.new_listings.length + RUN.price_changes.length + RUN.status_changes.length), "changes caught this morning"],
-  [String(ALL_LISTINGS.filter((l) => l.signal === "UNDERVALUED").length), "priced 10%+ below their comps"],
+  [String(ALL_LISTINGS.filter((l) => l.signal === "UNDERVALUED").length), "priced 20%+ below similar homes"],
 ];
 const AGENT_AM = agentMorning();
 
@@ -336,7 +337,7 @@ const AUDIENCES: Audience[] = [
     label: "Investors",
     title: "Find the deal before it makes the rounds.",
     points: [
-      "AI flags listings priced 10% or more below their comps every morning.",
+      "AI flags homes priced 20% or more below similar homes every morning.",
       "Full price history and a Confidence Score on every listing for quick diligence.",
       "Off-market deals and co-investment posts on the members-only Market feed.",
     ],
@@ -353,7 +354,7 @@ const HOW: Array<[string, string]> = [
 
 const FEATURES: Array<[typeof Rss, string, string]> = [
   [Rss, "Daily feed", "New listings, price changes and sales, every morning."],
-  [Scale, "Value signal", "Below market, At market or Overpriced against comps."],
+  [Scale, "Value signal", "Below market, At market or Overpriced against similar homes."],
   [LineChart, "Price history", "Every price change since the day it was listed."],
   [ShieldCheck, "Confidence Score", "Spots listings the agency forgot to take down."],
   [Sparkles, "AI Signal", "A morning briefing and a plain-English note per listing."],
@@ -435,7 +436,7 @@ const FAQ: FaqItem[] = [
   },
   {
     q: "What do Below market, At market and Overpriced mean?",
-    a: "Homes and condos are compared on price per square foot with similar listings: the same kind of property in the same district, or island-wide when a district has fewer than 3. Land and commercial property are compared with the district average. 10% or more below is marked Below market, 10% or more above is Overpriced, anything in between is At market.",
+    a: "Each home or condo for sale gets two separate checks: the nearest homes of similar size, and a price model that uses its size, plot, bedrooms, pool, land title and district. It is marked Below market or Overpriced only when both checks put it at least 20% away; otherwise it is At market. Asking prices are compared, not sale prices. Land, commercial property, fixer-uppers, homes sold with several apartments and homes with too few similar ones nearby get no signal.",
   },
   {
     q: "What is the Confidence Score?",

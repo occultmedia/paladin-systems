@@ -4,23 +4,25 @@
 
 import { ListingPhoto } from "@/components/listing-photo";
 import { pricePerM2, sizeLines } from "@/lib/units";
-import { PLATFORM_LABEL, TENURE_NOT_STATED, isClosed, type Agency, type DistrictStats, type Listing, type RentalPlatform, type Signal, type VacationRental } from "@/lib/aruba-data";
+import { PLATFORM_LABEL, TENURE_NOT_STATED, isClosed, isScored, type Agency, type DistrictStats, type Listing, type RentalPlatform, type Signal, type VacationRental } from "@/lib/aruba-data";
 
 export const SIGNAL_COLOR: Record<Signal, string> = {
   UNDERVALUED: "#3F7A55",
   AT_MARKET: "#52525B",
   OVERPRICED: "#A05A5D",
+  NO_SIGNAL: "#A1A1AA",
 };
 export const SIGNAL_LABEL: Record<Signal, string> = {
   UNDERVALUED: "Below market",
   AT_MARKET: "At Market",
   OVERPRICED: "Overpriced",
+  NO_SIGNAL: "No signal",
 };
 
 /** 🔥 next to Below market: the AI rates it a great deal. */
 export function HotFlame({ size = 12, className = "" }: { size?: number; className?: string }) {
   return (
-    <span role="img" aria-label="Great deal" title="Great deal: priced 10%+ below its comps" className={`hot-flame inline-block leading-none ${className}`} style={{ fontSize: size }}>
+    <span role="img" aria-label="Below market" title="Priced 20%+ below similar homes in both checks" className={`hot-flame inline-block leading-none ${className}`} style={{ fontSize: size }}>
       🔥
     </span>
   );
@@ -126,7 +128,7 @@ export function HoverCard({ l }: { l: Listing }) {
   const m2Price = pricePerM2(l);
   const closed = isClosed(l);
   const status = STATUS_PILL[l.status];
-  const vs = l.category === "Property" ? `${pct(l.price_vs_comps_pct)} vs comps` : `${pct(l.price_vs_district_pct)} vs district`;
+  const vs = isScored(l) && l.category === "Property" ? `${pct(l.price_vs_comps_pct)} vs similar homes` : "";
   return (
     <div style={{ width: 250 }}>
       {l.photo_url && (

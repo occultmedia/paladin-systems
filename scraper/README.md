@@ -16,6 +16,7 @@ scraper/
     all_property_aruba.py     AllPropertyArubaSpider: selectors for allpropertyaruba.com only
     remax_aruba.py            RemaxArubaSpider: selectors for remaxaruba.com only (crawled with RE/MAX's consent, see its header)
     normalise.py              raw_listings -> property_master (runs at the end of every crawl)
+    signals.py                Below market / At market / Overpriced (run by normalise.py)
     parsing.py                "USD 3.900.000" -> 3900000, "10 bedroom(s)" -> 10, currency, Cloudflare e-mails
     __init__.py               SPIDERS registry
     __main__.py               command line + the scrape_runs row
@@ -90,6 +91,14 @@ Options: `--limit N`, `--start-url URL` (only that index page),
 
 Listings that disappear from the site are not deleted: their
 `last_scraped_at` stops moving and the Confidence Score drops them.
+
+## Value signal
+
+`signals.py`, run at the end of every crawl. Two separate checks (nearest
+similar homes, price model); a home is Below market or Overpriced only when
+both put its asking price 20% or more away. Land, commercial, homes not for
+sale, fixer-uppers, several homes in one, homes without a size and homes with
+too few similar ones nearby get no signal (`comps_count` 0).
 
 ## Speed
 

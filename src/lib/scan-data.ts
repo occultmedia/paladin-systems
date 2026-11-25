@@ -16,11 +16,11 @@ function tagFor(l: Listing): Pick<ScanRow, "tag" | "tone"> {
   const last = l.last_price_change;
   if (last && last.event === "Price drop" && last.change_pct !== null) return { tag: `Cut ${Math.abs(last.change_pct).toFixed(1)}%`, tone: "down" };
   if (last && last.event === "Price increase" && last.change_pct !== null) return { tag: `Up ${last.change_pct.toFixed(1)}%`, tone: "up" };
-  const vs = listingFacts(l, ALL_LISTINGS).comps.vs_median_pct;
+  const vs = listingFacts(l, ALL_LISTINGS).comps.vs_estimate_pct;
   if (vs === null) return { tag: l.district, tone: "flat" };
-  if (vs <= -10) return { tag: `${Math.abs(vs).toFixed(0)}% under comps`, tone: "up" };
-  if (vs >= 15) return { tag: `${vs.toFixed(0)}% over comps`, tone: "down" };
-  return { tag: "In line with comps", tone: "flat" };
+  if (vs <= -20) return { tag: `${Math.abs(vs).toFixed(0)}% under similar`, tone: "up" };
+  if (vs >= 20) return { tag: `${vs.toFixed(0)}% over similar`, tone: "down" };
+  return { tag: "In the normal range", tone: "flat" };
 }
 
 export function scanRows(count = 12): ScanRow[] {

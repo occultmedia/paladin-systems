@@ -48,7 +48,8 @@ Rules:
 - Sizes: Aruba's agents work in square metres. Give sizes and prices per m² first; sq ft may follow in brackets. A size or price per m² of null means the agency does not state it: say so, never call it cheap or expensive, and never compare it.
 - days_on_market counts from the day Terminal first indexed the listing, not from when the agency first listed it. Never say a property sold after that many days.
 - Wording: say "below market" (the facts call it UNDERVALUED), never "undervalued". Call the daily data collection "the Index", never "scrape" or "scraping".
-- Prefer concrete comparisons ("12% under the district median per m²") over adjectives.
+- Value: compare the price only with estimate_per_m2_usd / vs_estimate_pct. They come from asking prices of similar homes, not sales. Call it below market only when scoring.signal is UNDERVALUED and overpriced only when it is OVERPRICED; AT_MARKET means within the normal range, whatever the percentage. When scoring says "not scored", say there is no value signal and why; never judge the price and never use the verdicts Opportunity or Overpriced.
+- Prefer concrete comparisons ("24% under similar homes nearby") over adjectives.
 - Do not give legal, tax or financial advice; frame it as market observations and next steps for an agent.
 - Keep headline under 110 characters, analysis 2-3 sentences, each point one short sentence.`;
 
@@ -100,7 +101,7 @@ async function marketFor(req: Request): Promise<{ uid: string; visible: Listing[
       return (data ?? []) as AgentListingViewRow[];
     }),
   ]);
-  const mine = members.map((r) => agentRowToListing(r, indexed, auth.user.id));
+  const mine = members.map((r) => agentRowToListing(r, auth.user.id));
   const visible = [...mine, ...indexed];
   // Comps and the brief only use what every member can see, so shared cache entries never carry anyone's private listings.
   const shared = [...mine.filter((l) => l.member?.visibility === "members"), ...indexed];

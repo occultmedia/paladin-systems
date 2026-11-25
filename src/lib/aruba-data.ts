@@ -45,7 +45,8 @@ export interface MonthlyPerformance {
 }
 
 /** view: v_active_listing_signals (scraped_listings joined with yield model) */
-export type Signal = "UNDERVALUED" | "AT_MARKET" | "OVERPRICED";
+/** NO_SIGNAL: not scored (land, commercial, not for sale, or too few similar homes; see scraper/terminal_spider/signals.py). */
+export type Signal = "UNDERVALUED" | "AT_MARKET" | "OVERPRICED" | "NO_SIGNAL";
 /** Residential types (scored on short-term-rental yield). */
 export type PropertyType = "Villa" | "Estate" | "Penthouse" | "Beach House" | "Condo" | "Apartment" | "Townhouse";
 export const RESIDENTIAL_TYPES: PropertyType[] = ["Villa", "Estate", "Penthouse", "Beach House", "Condo", "Apartment", "Townhouse"];
@@ -79,6 +80,9 @@ export const STATUS_TAB: Record<ListingStatus, string> = {
   Sold: "Sold",
   "De-listed": "De-listed",
 };
+/** The listing has a value signal and an estimate to compare it with. */
+export const isScored = (l: Pick<Listing, "signal">) => l.signal !== "NO_SIGNAL";
+
 /** Off the market: no value signal or confidence, and the price is the last one asked. */
 export const isClosed = (l: { status: ListingStatus }) => l.status === "Sold" || l.status === "De-listed";
 
@@ -252,9 +256,9 @@ export interface ListingSignal extends ListingBase {
   bathrooms: number;
   built_sqft: number;
   lot_sqft: number | null; // null for penthouses
-  comps_psf_usd: number; // median asking $/sq ft of comparable listings (same kind, same district when there are 3+)
+  comps_psf_usd: number; // estimated asking $/sq ft from similar homes nearby (0 = not scored)
   comps_count: number;
-  price_vs_comps_pct: number; // negative = cheaper per sq ft than its comps
+  price_vs_comps_pct: number; // asking price against that estimate; negative = cheaper
 }
 
 /** A land parcel: scored on price per sq ft vs. the district's land average. */
@@ -597,7 +601,7 @@ export function deriveSignal(r: RawRow): ListingSignal {
   const [id, name, type, district, beds, baths, built, lot, price, , , dom, chg, source] = r;
   const comps = propertyComps(type, district);
   const vsComps = Math.round(((price / built - comps.psf) / comps.psf) * 1000) / 10;
-  const signal: Signal = vsComps <= -10 ? "UNDERVALUED" : vsComps >= 10 ? "OVERPRICED" : "AT_MARKET";
+  const signal: Signal = id in STATUS_CHANGES ? "NO_SIGNAL" : vsComps <= -20 ? "UNDERVALUED" : vsComps >= 20 ? "OVERPRICED" : "AT_MARKET";
   const firstSeen = new Date(Date.parse(INDEXED_AT) - dom * 86_400_000).toISOString().slice(0, 10);
   return {
     category: "Property",
@@ -658,13 +662,13 @@ export const DISTRICT_LAND_PSF: Record<string, number> = {
   "Santa Cruz": 11,
 };
 
-/** Land signal: ≥10% below district average = Below market, ≥10% above = Overpriced. */
+/** Land has no value signal. */
 export function deriveLand(r: RawLandRow): LandListing {
   const [id, name, district, lot, price, zoning, dom, chg, source] = r;
   const psf = Math.round(price / lot);
   const bench = DISTRICT_LAND_PSF[district];
   const diff = Math.round(((price / lot - bench) / bench) * 1000) / 10;
-  const signal: Signal = diff <= -10 ? "UNDERVALUED" : diff >= 10 ? "OVERPRICED" : "AT_MARKET";
+  const signal: Signal = "NO_SIGNAL";
   return {
     category: "Land",
     ...indexMeta(id, "Land", price, chg, dom, "Land"),
@@ -715,12 +719,12 @@ export const DISTRICT_COMMERCIAL_PSF: Record<string, number> = {
   Malmok: 690,
 };
 
-/** Commercial signal: ≥10% below district average = Below market, ≥10% above = Overpriced. */
+/** Commercial property has no value signal. */
 export function deriveCommercial(r: RawCommercialRow): CommercialListing {
   const [id, name, district, use, built, lot, price, dom, chg, source] = r;
   const bench = DISTRICT_COMMERCIAL_PSF[district];
   const diff = Math.round(((price / built - bench) / bench) * 1000) / 10;
-  const signal: Signal = diff <= -10 ? "UNDERVALUED" : diff >= 10 ? "OVERPRICED" : "AT_MARKET";
+  const signal: Signal = "NO_SIGNAL";
   const photos = COMMERCIAL_PHOTOS[use];
   return {
     category: "Commercial",

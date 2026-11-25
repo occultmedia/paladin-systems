@@ -29,15 +29,8 @@ For each raw row that is new or changed (the `raw_listing_deltas` queue):
      "found" (the database trigger bumps last_scraped_at).
   4. mark_raw_processed(): the raw row leaves the queue, or keeps the error.
 
-Then the comps pass recomputes the value signal for every active listing:
-  homes      median $/sq ft of similar homes (villas and estates vs condos,
-             apartments and townhouses), same district when it has 3+, else
-             island-wide;
-  land, commercial
-             average $/sq ft of the same class, same district when it has 3+,
-             else island-wide.
-  10%+ below = Below market (stored as UNDERVALUED), 10%+ above = Overpriced,
-  else At market. At least 2 comparables are needed; otherwise At market.
+Then the comps pass recomputes the value signal of every active listing; the
+rules are in signals.py.
 
 The database does the rest itself: listing_events (Listed, Price drop,
 Status change) and price history come from triggers on property_master.
@@ -50,8 +43,8 @@ import hashlib
 import logging
 import math
 import re
-import statistics
 import sys
+from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
@@ -202,7 +195,8 @@ def classify(raw_type: str | None, title: str, desc: str, beds: float | None = N
         (r"penthouse", "Penthouse"),
         (r"beach ?house", "Beach House"),
         (r"town ?house|duplex", "Townhouse"),
-        (r"\bvillas?\b" if unit or project else r"$^", "Villa"),
+        # "Gold Coast Villas | Diamante 194A" is a condo when its own text says so
+        (r"\bvillas?\b" if (unit or project) and not re.search(r"\bcondo", desc[:300], re.I) else r"$^", "Villa"),
         (r"apartment|studio|\bapt\b", "Apartment"),
         (r"condo", "Condo"),
         (r"estate\b", "Estate"),
@@ -611,41 +605,21 @@ class Normaliser:
                 self._mark(raw["id"], None, str(exc)[:500])
 
     def comps_pass(self) -> None:
-        """Recompute signals for every active listing (see module docstring)."""
+        """Recompute the signals of every active listing (see signals.py)."""
+        from .signals import score
+
         rows = _all(lambda: self.db.table("property_master").select(
-            "id,listing_id,asset_class,property_type,district,listing_status,price_per_sqft_usd,signal,comps_psf_usd,"
-            "comps_count,price_vs_comps_pct,district_psf_usd,price_vs_district_pct"
-        ).eq("status", "active"))
-        live = [r for r in rows if r["listing_status"] not in ("Sold", "De-listed") and r["price_per_sqft_usd"]]
+            "id,listing_id,asset_name,asset_class,property_type,district,listing_status,source_url,asking_price_usd,built_sqft,lot_sqft,"
+            "bedrooms,pool,tenure,lat,lng,signal,comps_psf_usd,comps_count,price_vs_comps_pct,district_psf_usd,price_vs_district_pct"
+        ).eq("status", "active").order("id"))
+        texts = {r["source_url"]: r["raw_description"] or "" for r in _all(lambda: self.db.table("raw_listings").select("source_url,raw_description").order("id"))}
+        new, why = score(rows, texts)
         now = datetime.now(timezone.utc).isoformat()
-
-        def pool_for(r: dict[str, Any]) -> list[float]:
-            same = [x for x in live if x["id"] != r["id"] and x["asset_class"] == r["asset_class"]]
-            if r["asset_class"] == "Property":
-                unit = r["property_type"] in UNIT_TYPES
-                same = [x for x in same if (x["property_type"] in UNIT_TYPES) == unit]
-            local = [x for x in same if x["district"] == r["district"]]
-            return [float(x["price_per_sqft_usd"]) for x in (local if len(local) >= 3 else same)]
-
+        self.signal_counts = Counter(new[r["id"]]["signal"] if r["id"] not in why else f"none: {why[r['id']]}" for r in rows)
+        log.info("signals: %s", ", ".join(f"{k} {v}" for k, v in self.signal_counts.most_common()))
         for r in rows:
-            psf = float(r["price_per_sqft_usd"]) if r["price_per_sqft_usd"] else None
-            comps = pool_for(r)
-            ref = None
-            if comps:
-                ref = statistics.median(comps) if r["asset_class"] == "Property" else statistics.fmean(comps)
-            vs = round((psf - ref) / ref * 100, 2) if psf and ref else None
-            signal = "AT_MARKET" if vs is None or len(comps) < 2 else "UNDERVALUED" if vs <= -10 else "OVERPRICED" if vs >= 10 else "AT_MARKET"
-            if r["listing_status"] in ("Sold", "De-listed"):
-                signal = "AT_MARKET"  # no longer buyable: keep the numbers, never flag it Below market or Overpriced
-            if r["asset_class"] == "Property":
-                upd = {"comps_psf_usd": round(ref, 2) if ref else None, "comps_count": len(comps), "price_vs_comps_pct": vs,
-                       "district_psf_usd": None, "price_vs_district_pct": None}
-            else:
-                upd = {"comps_psf_usd": None, "comps_count": len(comps), "price_vs_comps_pct": None,
-                       "district_psf_usd": round(ref, 2) if ref else None, "price_vs_district_pct": vs}
-            upd["signal"] = signal
-            changed = any(not _same(r.get(k), v) for k, v in upd.items())
-            if changed:
+            upd = new[r["id"]]
+            if any(not _same(r.get(k), v) for k, v in upd.items()):
                 self.stats["signals"] += 1
                 if not self.dry_run:
                     self.db.table("property_master").update({**upd, "signal_updated_at": now}).eq("id", r["id"]).execute()

@@ -9,7 +9,7 @@
 import { ListingPhoto } from "@/components/listing-photo";
 import { ArrowUpRight, Building2, Search, X } from "lucide-react";
 import { useMemo, useState } from "react";
-import { isClosed, type Listing } from "@/lib/aruba-data";
+import { isClosed, isScored, type Listing } from "@/lib/aruba-data";
 import { shortSize } from "@/lib/units";
 import { useListingById, useMarketListings } from "@/lib/live-market";
 import { HotFlame, SIGNAL_COLOR, SIGNAL_LABEL, STATUS_PILL } from "@/components/dashboard/map-shared";
@@ -59,10 +59,10 @@ export function AttachedListing({ id, onOpen, compact = false }: { id: string | 
               {SIGNAL_LABEL[l.signal]}
               {l.signal === "UNDERVALUED" && <HotFlame size={12} />}
             </span>
-            {l.price_per_sqft_usd > 0 && (
+            {isScored(l) && (
               <span className="tabular-nums text-zinc-500">
                 {pct > 0 ? "+" : ""}
-                {pct.toFixed(0)}% vs comps
+                {pct.toFixed(0)}% vs similar homes
               </span>
             )}
             <span className="tabular-nums text-zinc-500">{l.confidence_score}% confidence</span>

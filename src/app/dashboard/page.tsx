@@ -45,6 +45,7 @@ import {
   LISTING_STATUSES,
   STATUS_TAB,
   isClosed,
+  isScored,
   STATUS_HINT,
   TENURES,
   TENURE_HINT,
@@ -489,12 +490,16 @@ const SIGNAL_STYLE: Record<Signal, { label: string; color: string }> = {
   UNDERVALUED: { label: "Below market", color: C.up },
   AT_MARKET: { label: "At Market", color: C.slate300 },
   OVERPRICED: { label: "Overpriced", color: C.down },
+  NO_SIGNAL: { label: "No signal", color: C.slate300 },
 };
+
+const NO_SIGNAL_WHY =
+  "Not scored: land, commercial, not for sale, size not stated, a fixer-upper, several homes in one, or too few similar homes nearby.";
 
 function SignalBadge({ signal }: { signal: Signal }) {
   const s = SIGNAL_STYLE[signal];
   return (
-    <span className={`${MONO} inline-flex items-center gap-2 text-[11px] uppercase tracking-wider`} style={{ color: s.color }}>
+    <span className={`${MONO} inline-flex items-center gap-2 text-[11px] uppercase tracking-wider`} style={{ color: s.color }} title={signal === "NO_SIGNAL" ? NO_SIGNAL_WHY : undefined}>
       <span className="h-1.5 w-1.5" style={{ background: s.color }} />
       {s.label}
       {signal === "UNDERVALUED" && <HotFlame size={13} className="-ml-0.5" />}
@@ -514,7 +519,7 @@ const MOBILE_SORTS: Array<[SortKey, "asc" | "desc", string]> = [
   ["listed", "asc", "Newest"],
   ["asking", "desc", "Price: high to low"],
   ["asking", "asc", "Price: low to high"],
-  ["vsDistrict", "asc", "Cheapest vs comps"],
+  ["vsDistrict", "asc", "Cheapest vs similar"],
   ["psf", "asc", "Lowest $ / m²"],
   ["beds", "desc", "Most bedrooms"],
   ["built", "desc", "Largest built-up"],
@@ -533,7 +538,7 @@ const SORT_VALUE: Record<SortKey, (l: Listing) => number | string | null> = {
   confidence: (l) => l.confidence_score,
   asking: (l) => l.asking_price_usd,
   psf: (l) => l.price_per_sqft_usd,
-  vsDistrict: (l) => (l.category === "Property" ? l.price_vs_comps_pct : l.price_vs_district_pct),
+  vsDistrict: (l) => (isScored(l) && l.category === "Property" ? l.price_vs_comps_pct : null),
   listed: (l) => l.days_on_market,
 };
 
@@ -637,10 +642,8 @@ function downloadCsv(rows: Listing[]) {
     ["Price per m2 USD", (l) => pricePerM2(l) || null],
     ["Price per sq ft USD", (l) => l.price_per_sqft_usd || null],
     ["Price change %", (l) => l.price_change_pct],
-    ["District avg per sq ft USD", (l) => d(l)?.district_land_psf_usd ?? c(l)?.district_commercial_psf_usd],
-    ["Price vs district %", (l) => (l.category === "Property" ? null : l.price_vs_district_pct)],
-    ["Comparable listings median per sq ft USD", (l) => p(l)?.comps_psf_usd],
-    ["Price vs comparable listings %", (l) => p(l)?.price_vs_comps_pct],
+    ["Similar homes estimate per sq ft USD", (l) => (isScored(l) ? p(l)?.comps_psf_usd : null)],
+    ["Price vs similar homes %", (l) => (isScored(l) ? p(l)?.price_vs_comps_pct : null)],
     ["Value", (l) => (isClosed(l) ? null : SIGNAL_STYLE[l.signal].label)],
     ["Days on market", (l) => l.days_on_market],
     ["First seen", (l) => l.first_seen],
@@ -1290,13 +1293,10 @@ const MONTHLY_GROWTH: Record<Listing["category"], number> = { Property: 0.006, L
 
 /**
  * What the listing should be worth today:
- * homes = median price per sq ft of comparable listings × built size,
- * land / commercial = district average price per sq ft × size.
+ * the estimate from similar homes. 0 = not scored, so no estimate.
  */
 function estMarketValue(l: Listing) {
-  if (l.category === "Property") return l.comps_psf_usd * l.built_sqft;
-  if (l.category === "Land") return l.district_land_psf_usd * l.lot_sqft;
-  return l.district_commercial_psf_usd * l.built_sqft;
+  return isScored(l) && l.category === "Property" ? l.comps_psf_usd * l.built_sqft : 0;
 }
 
 /** Asking price (step line, from the day we found it) and estimated market value over time. */
@@ -1425,13 +1425,13 @@ function PriceHistory({ l }: { l: Listing }) {
                 {" · "}
                 <span className="font-semibold" style={{ color: SIGNAL_STYLE[l.signal].color }}>
                   {l.signal === "AT_MARKET"
-                    ? `priced about right (${gap < 0 ? "−" : "+"}${Math.abs(gap).toFixed(0)}%)`
+                    ? `within the normal range (${gap < 0 ? "−" : "+"}${Math.abs(gap).toFixed(0)}%)`
                     : `${Math.abs(gap).toFixed(0)}% ${gap < 0 ? "below" : "above"} market`}
                 </span>
               </>
             ) : (
               <span className="text-zinc-500">
-                {" "}· no market value estimate: the agency does not state the {l.category === "Land" ? "lot" : "built"} size
+                {" "}· no market value estimate for this listing
               </span>
             )}
           </p>
@@ -1886,12 +1886,6 @@ function ListingDetails({ l }: { l: Listing }) {
         <DetailItem label="Lot size (land)" value={fmtArea(l.lot_sqft)} />
         <DetailItem label="Built-up size" value="None (vacant land)" />
         <DetailItem label="Price / m²" value={fmtPerArea(l.price_per_sqft_usd)} />
-        <DetailItem label="District land avg" value={fmtPerArea(l.district_land_psf_usd)} />
-        <DetailItem
-          label="Vs. district avg"
-          value={l.price_per_sqft_usd > 0 ? `${fmtDelta(l.price_vs_district_pct)} ${l.price_vs_district_pct < 0 ? "cheaper" : "pricier"}` : "—"}
-          color={l.price_per_sqft_usd > 0 ? deltaColor(-l.price_vs_district_pct) : undefined}
-        />
       </>
     );
   } else if (l.category === "Commercial") {
@@ -1902,12 +1896,6 @@ function ListingDetails({ l }: { l: Listing }) {
         <DetailItem label="Lot size (land)" value={l.lot_sqft ? fmtArea(l.lot_sqft) : "No land (unit in building)"} />
         <DetailItem label="Pool" value={l.pool ?? "—"} />
         <DetailItem label="Price / m²" value={fmtPerArea(l.price_per_sqft_usd)} />
-        <DetailItem label="District commercial avg" value={fmtPerArea(l.district_commercial_psf_usd)} />
-        <DetailItem
-          label="Vs. district avg"
-          value={l.price_per_sqft_usd > 0 ? `${fmtDelta(l.price_vs_district_pct)} ${l.price_vs_district_pct < 0 ? "cheaper" : "pricier"}` : "—"}
-          color={l.price_per_sqft_usd > 0 ? deltaColor(-l.price_vs_district_pct) : undefined}
-        />
       </>
     );
   } else {
@@ -1928,11 +1916,11 @@ function ListingDetails({ l }: { l: Listing }) {
           }
         />
         <DetailItem label="Price / m²" value={fmtPerArea(l.price_per_sqft_usd)} />
-        <DetailItem label={`Comparable $ / m² · ${l.comps_count} listings`} value={fmtPerArea(l.comps_psf_usd)} />
+        <DetailItem label="Similar homes / m² (estimate)" value={isScored(l) ? fmtPerArea(l.comps_psf_usd) : "—"} />
         <DetailItem
-          label="Vs. comps"
-          value={l.price_per_sqft_usd > 0 ? `${fmtDelta(l.price_vs_comps_pct)} ${l.price_vs_comps_pct < 0 ? "cheaper" : "pricier"}` : "—"}
-          color={l.price_per_sqft_usd > 0 ? deltaColor(-l.price_vs_comps_pct) : undefined}
+          label="Vs. similar homes"
+          value={isScored(l) ? `${fmtDelta(l.price_vs_comps_pct)} ${l.price_vs_comps_pct < 0 ? "cheaper" : "pricier"}` : "No signal"}
+          color={isScored(l) && l.signal !== "AT_MARKET" ? deltaColor(-l.price_vs_comps_pct) : undefined}
         />
       </>
     );
@@ -2717,7 +2705,7 @@ function ActiveListings({
               <SortHeader label="Lot m²" k="lot" sort={sort} onSort={onSort} />
               <SortHeader label={isClosed({ status }) ? "Last asking" : "Asking"} k="asking" sort={sort} onSort={onSort} />
               <SortHeader label="$ / m²" k="psf" sort={sort} onSort={onSort} />
-              <SortHeader label="Vs. comps" k="vsDistrict" sort={sort} onSort={onSort} />
+              <SortHeader label="Vs. similar" k="vsDistrict" sort={sort} onSort={onSort} />
               <SortHeader label="Status" k="status" sort={sort} onSort={onSort} />
               <SortHeader
                 label="Confidence"
@@ -2765,8 +2753,8 @@ function ActiveListings({
             {pageRows.map((l) => {
               const open = openId === l.listing_id;
               const hot = hoverId === l.listing_id;
-              const vsPct = l.category === "Property" ? l.price_vs_comps_pct : l.price_vs_district_pct;
-              const compsPsf = l.category === "Property" ? l.comps_psf_usd : l.category === "Land" ? l.district_land_psf_usd : l.district_commercial_psf_usd;
+              const vsPct = l.category === "Property" ? l.price_vs_comps_pct : 0;
+              const compsPsf = isScored(l) && l.category === "Property" ? l.comps_psf_usd : 0;
               return (
                 <Fragment key={l.listing_id}>
                   <tr
@@ -2844,10 +2832,10 @@ function ActiveListings({
                     <td className={`${td} ${MONO} text-right`}>
                       {l.price_per_sqft_usd > 0 && compsPsf > 0 ? (
                         <>
-                          <p className="text-[13px]" style={{ color: deltaColor(-vsPct) }}>
+                          <p className="text-[13px]" style={{ color: l.signal === "AT_MARKET" ? C.slate300 : deltaColor(-vsPct) }} title="Average of the two price checks. Coloured only when both agree.">
                             {fmtDelta(vsPct)}
                           </p>
-                          <p className="mt-1 text-[11px] text-zinc-500">comps {fmtUsd(perM2(compsPsf))}/m²</p>
+                          <p className="mt-1 text-[11px] text-zinc-500">similar {fmtUsd(perM2(compsPsf))}/m²</p>
                         </>
                       ) : (
                         DASH
@@ -2885,14 +2873,13 @@ function ActiveListings({
       </div>
       <div className="mt-4 space-y-1 text-[11px] leading-relaxed text-zinc-500">
         <p>
-          <span className="text-zinc-700">Homes and condos</span> are scored on price per m² against comparable listings: the
-          same kind of property (villas and estates, or condos and apartments) in the same district, or island-wide when the
-          district has fewer than 3. 10% or more below is marked Below market, 10% or more above is Overpriced.
+          <span className="text-zinc-700">Homes and condos for sale</span> get two separate checks: the nearest homes of similar
+          size, and a price model (size, plot, bedrooms, pool, land title, district). Below market or Overpriced means both
+          put the price at least 20% away. The percentage shown is the average of the two. Asking prices, not sale prices.
         </p>
         <p>
-          <span className="text-zinc-700">Land</span> and <span className="text-zinc-700">commercial</span> listings are
-          scored on price per m² against the district average: 10% or more below is marked Below market, 10% or more above is
-          Overpriced.
+          <span className="text-zinc-700">No signal:</span> land, commercial, homes not for sale, sizes not stated, fixer-uppers,
+          homes sold with several apartments, and homes with too few similar ones nearby.
         </p>
       </div>
     </>
@@ -3515,7 +3502,7 @@ function Dashboard() {
   // Listings agents added by hand: Off-market ones for every member, Only me ones for their agent.
   const agentListings = useAgentListings(me.profile);
   const memberListings = useMemo(
-    () => (indexed ? agentListings.rows.map((r) => agentRowToListing(r, indexed, agentListings.myId)) : []),
+    () => (indexed ? agentListings.rows.map((r) => agentRowToListing(r, agentListings.myId)) : []),
     [indexed, agentListings.rows, agentListings.myId],
   );
   const market = useMemo(

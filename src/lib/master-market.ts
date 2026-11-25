@@ -59,7 +59,8 @@ export function rowToListing(r: MasterMarketRow): Listing {
     source_url: r.source_url,
     agency,
     agent,
-    signal: r.signal,
+    // no comparables = not scored (the database column cannot be empty)
+    signal: r.category === "Property" && r.comps_count ? r.signal : "NO_SIGNAL",
     photo_url: r.photo_url,
   };
 
