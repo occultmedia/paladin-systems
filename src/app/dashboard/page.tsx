@@ -483,13 +483,13 @@ function Skeleton({ className = "" }: { className?: string }) {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
- * Signal badge (below market / at market / overpriced)
+ * Signal badge (below market / at market / above market)
  * ──────────────────────────────────────────────────────────────────────── */
 
 const SIGNAL_STYLE: Record<Signal, { label: string; color: string }> = {
   UNDERVALUED: { label: "Below market", color: C.up },
   AT_MARKET: { label: "At Market", color: C.slate300 },
-  OVERPRICED: { label: "Overpriced", color: C.down },
+  OVERPRICED: { label: "Above market", color: C.down },
   NO_SIGNAL: { label: "No signal", color: C.slate300 },
 };
 
@@ -552,7 +552,7 @@ const SIGNAL_FILTERS: Array<{ value: Signal | "ALL"; label: string }> = [
   { value: "ALL", label: "All" },
   { value: "UNDERVALUED", label: "Below market" },
   { value: "AT_MARKET", label: "At Market" },
-  { value: "OVERPRICED", label: "Overpriced" },
+  { value: "OVERPRICED", label: "Above market" },
 ];
 /** Type chips shown for each category. In "All" the chips are the listing types themselves. */
 const TYPE_OPTIONS: Record<Category, string[]> = {
@@ -1288,9 +1288,6 @@ const relDay = (iso: string) => {
 const DAY_MS = 86_400_000;
 const dayTs = (iso: string) => Date.parse(`${iso}T00:00:00Z`);
 
-/** Monthly appreciation used to walk the market estimate back in time (mock; prod reads district_value_index). */
-const MONTHLY_GROWTH: Record<Listing["category"], number> = { Property: 0.006, Land: 0.005, Commercial: 0.003 };
-
 /**
  * What the listing should be worth today:
  * the estimate from similar homes. 0 = not scored, so no estimate.
@@ -1299,37 +1296,26 @@ function estMarketValue(l: Listing) {
   return isScored(l) && l.category === "Property" ? l.comps_psf_usd * l.built_sqft : 0;
 }
 
-/** Asking price (step line, from the day we found it) and estimated market value over time. */
-function valueSeries(l: Listing) {
+/** The recorded asking price (step line) and today's estimate, which has no history: one dot on the last day. */
+function priceSeries(l: Listing) {
   const today = dayTs(arubaToday());
-  const listed = dayTs(l.price_history[0].date);
-  const start = Math.min(listed - 45 * DAY_MS, today - 270 * DAY_MS);
+  const start = Math.min(dayTs(l.price_history[0].date), today - 30 * DAY_MS);
   const fair = estMarketValue(l);
-  const g = MONTHLY_GROWTH[l.category];
-  let h = 0;
-  for (const c of l.listing_id) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-  const stamps = new Set<number>([today]);
-  for (let t = start; t < today; t += 14 * DAY_MS) stamps.add(t);
-  for (const e of l.price_history) stamps.add(dayTs(e.date));
+  const stamps = new Set<number>([start, today, ...l.price_history.map((e) => dayTs(e.date))]);
   return [...stamps]
     .sort((a, b) => a - b)
-    .map((t) => {
-      const monthsBack = (today - t) / (30.4 * DAY_MS);
-      const wiggle = 1 + Math.sin(t / (40 * DAY_MS) + (h % 7)) * 0.006;
-      const ask = [...l.price_history].reverse().find((e) => dayTs(e.date) <= t);
-      return {
-        t,
-        asking: ask ? ask.price_usd : null,
-        market: fair > 0 ? Math.round((fair / Math.pow(1 + g, monthsBack)) * (t === today ? 1 : wiggle)) : null,
-      };
-    });
+    .map((t) => ({
+      t,
+      asking: [...l.price_history].reverse().find((e) => dayTs(e.date) <= t)?.price_usd ?? null,
+      estimate: t === today && fair > 0 ? Math.round(fair) : null,
+    }));
 }
 
 function ValueChartTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ dataKey?: string | number; value?: number | null }>; label?: number }) {
   if (!active || !payload?.length || label === undefined) return null;
   const get = (k: string) => payload.find((p) => p.dataKey === k)?.value;
   const asking = get("asking");
-  const market = get("market");
+  const estimate = get("estimate");
   return (
     <div className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-[11px] shadow-md">
       <p className="text-zinc-500">{fmtDate(new Date(label).toISOString().slice(0, 10))}</p>
@@ -1338,20 +1324,20 @@ function ValueChartTooltip({ active, payload, label }: { active?: boolean; paylo
           Asking <b>{fmtUsdCompact(asking)}</b>
         </p>
       )}
-      {market != null && (
-        <p className={`${MONO} mt-0.5`} style={{ color: MARKET_LINE }}>
-          Est. market <b>{fmtUsdCompact(market)}</b>
+      {estimate != null && (
+        <p className={`${MONO} mt-0.5`} style={{ color: ESTIMATE_COLOR }}>
+          Estimate today <b>{fmtUsdCompact(estimate)}</b>
         </p>
       )}
     </div>
   );
 }
 
-const MARKET_LINE = "#2E9E5B";
+const ESTIMATE_COLOR = "#2E9E5B";
 
 function PriceHistory({ l }: { l: Listing }) {
   const history = l.price_history;
-  const series = valueSeries(l);
+  const series = priceSeries(l);
   const fair = estMarketValue(l);
   const hasFair = fair > 0; // no estimate without a size and comparables
   const gap = hasFair ? ((l.asking_price_usd - fair) / fair) * 100 : 0;
@@ -1359,14 +1345,16 @@ function PriceHistory({ l }: { l: Listing }) {
   return (
     <div className="mt-8 border-t border-zinc-300/70 pt-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500">Price history vs. est. market value</p>
+        <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500">Price history</p>
         <p className="flex flex-wrap items-center gap-4 text-[11px] text-zinc-500">
           <span className="inline-flex items-center gap-1.5">
             <span className="h-0.5 w-4 bg-zinc-950" /> Asking price
           </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="h-0 w-4 border-t-2 border-dashed" style={{ borderColor: MARKET_LINE }} /> Est. market value
-          </span>
+          {hasFair && (
+            <span className="inline-flex items-center gap-1.5">
+              <span className="size-2 rounded-full" style={{ background: ESTIMATE_COLOR }} /> Est. market value today
+            </span>
+          )}
         </p>
       </div>
       <div className="mt-3 grid gap-6 xl:grid-cols-[1fr_400px]">
@@ -1380,7 +1368,8 @@ function PriceHistory({ l }: { l: Listing }) {
                   type="number"
                   scale="time"
                   domain={["dataMin", "dataMax"]}
-                  tickFormatter={(t: number) => new Date(t).toLocaleDateString("en-US", { month: "short", year: "2-digit", timeZone: "UTC" })}
+                  padding={{ right: 8 }}
+                  tickFormatter={(t: number) => new Date(t).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}
                   tick={{ fontSize: 10, fill: "#71717A" }}
                   axisLine={false}
                   tickLine={false}
@@ -1395,7 +1384,7 @@ function PriceHistory({ l }: { l: Listing }) {
                   width={62}
                 />
                 <Tooltip content={<ValueChartTooltip />} />
-                <Line type="monotone" dataKey="market" stroke={MARKET_LINE} strokeWidth={1.75} strokeDasharray="5 4" dot={false} isAnimationActive={false} />
+                <Line dataKey="estimate" stroke="none" dot={{ r: 4, fill: ESTIMATE_COLOR, stroke: "#fff", strokeWidth: 1.5 }} activeDot={{ r: 5, fill: ESTIMATE_COLOR }} isAnimationActive={false} />
                 <Line
                   type="stepAfter"
                   dataKey="asking"
@@ -1418,8 +1407,8 @@ function PriceHistory({ l }: { l: Listing }) {
             Asking <b className={`${MONO} text-zinc-950`}>{fmtUsdCompact(l.asking_price_usd)}</b>
             {hasFair ? (
               <>
-                {" "}vs est. market value{" "}
-                <b className={MONO} style={{ color: MARKET_LINE }}>
+                {" "}vs est. market value today{" "}
+                <b className={MONO} style={{ color: ESTIMATE_COLOR }}>
                   {fmtUsdCompact(fair)}
                 </b>
                 {" · "}
@@ -1757,7 +1746,7 @@ function WatchButton({ l, variant = "full" }: { l: Listing; variant?: "full" | "
 const VERDICT_STYLE: Record<Verdict, { color: string; bg: string }> = {
   Opportunity: { color: "#1F7A45", bg: "#E3F3E8" },
   "Fair value": { color: "#3F3F46", bg: "#F1F1F2" },
-  Overpriced: { color: "#B23A3A", bg: "#FBE9E9" },
+  "Above market": { color: "#B23A3A", bg: "#FBE9E9" },
   Watch: { color: "#B5650B", bg: "#FDF0DF" },
 };
 
@@ -2874,7 +2863,7 @@ function ActiveListings({
       <div className="mt-4 space-y-1 text-[11px] leading-relaxed text-zinc-500">
         <p>
           <span className="text-zinc-700">Homes and condos for sale</span> get two separate checks: the nearest homes of similar
-          size, and a price model (size, plot, bedrooms, pool, land title, district). Below market or Overpriced means both
+          size, and a price model (size, plot, bedrooms, pool, land title, district). Below market or Above market means both
           put the price at least 20% away. The percentage shown is the average of the two. Asking prices, not sale prices.
         </p>
         <p>

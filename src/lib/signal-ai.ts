@@ -16,8 +16,8 @@ import { perM2, pricePerM2, toM2 } from "./units";
 
 /* ── Shapes returned to the UI ─────────────────────────────────────────── */
 
-export type Verdict = "Opportunity" | "Fair value" | "Overpriced" | "Watch";
-export const VERDICTS: Verdict[] = ["Opportunity", "Fair value", "Overpriced", "Watch"];
+export type Verdict = "Opportunity" | "Fair value" | "Above market" | "Watch";
+export const VERDICTS: Verdict[] = ["Opportunity", "Fair value", "Above market", "Watch"];
 
 export interface ListingNote {
   verdict: Verdict;
@@ -158,7 +158,7 @@ export function computedListingNote(f: ListingFacts): ListingNote {
       : cheap && !rich
         ? "Opportunity"
         : rich
-          ? "Overpriced"
+          ? "Above market"
           : stale || cut || c.vs_estimate_pct === null
             ? "Watch"
             : "Fair value";
@@ -174,7 +174,7 @@ export function computedListingNote(f: ListingFacts): ListingNote {
         : `${f.status}; last asked ${usd(f.asking_price_usd)}. Useful as a pricing comp for ${f.district}.`
       : verdict === "Opportunity"
         ? `${Math.abs(vs).toFixed(0)}% under ${c.basis}${cut ? " after a price cut" : ""}: worth a call today.`
-        : verdict === "Overpriced"
+        : verdict === "Above market"
           ? `${vs.toFixed(0)}% above ${c.basis}; expect room to negotiate.`
           : verdict === "Watch"
             ? c.vs_estimate_pct === null && !stale && !cut
@@ -205,7 +205,7 @@ export function computedListingNote(f: ListingFacts): ListingNote {
       ? "Use the final ask as a comp when pricing similar listings."
       : verdict === "Opportunity"
         ? "Match it with interested clients and book a viewing before it moves."
-        : verdict === "Overpriced"
+        : verdict === "Above market"
           ? "Ask the agent what sets it apart (view, beachfront, finish), then pin it and wait for a cut."
           : c.vs_estimate_pct === null
             ? "Ask the listing agent for recent sale prices nearby before judging the price."

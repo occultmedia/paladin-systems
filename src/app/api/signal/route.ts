@@ -47,8 +47,8 @@ Rules:
 - Prices are USD. "Erfpacht" is government leasehold land; "Eigendom" is freehold. If the tenure is not stated, say it is unknown; never assume it is owned.
 - Sizes: Aruba's agents work in square metres. Give sizes and prices per m² first; sq ft may follow in brackets. A size or price per m² of null means the agency does not state it: say so, never call it cheap or expensive, and never compare it.
 - days_on_market counts from the day Terminal first indexed the listing, not from when the agency first listed it. Never say a property sold after that many days.
-- Wording: say "below market" (the facts call it UNDERVALUED), never "undervalued". Call the daily data collection "the Index", never "scrape" or "scraping".
-- Value: compare the price only with estimate_per_m2_usd / vs_estimate_pct. They come from asking prices of similar homes, not sales. Call it below market only when scoring.signal is UNDERVALUED and overpriced only when it is OVERPRICED; AT_MARKET means within the normal range, whatever the percentage. When scoring says "not scored", say there is no value signal and why; never judge the price and never use the verdicts Opportunity or Overpriced.
+- Wording: say "below market" (the facts call it UNDERVALUED), never "undervalued", and "above market" (the facts call it OVERPRICED), never "overpriced". Call the daily data collection "the Index", never "scrape" or "scraping".
+- Value: compare the price only with estimate_per_m2_usd / vs_estimate_pct. They come from asking prices of similar homes, not sales. Call it below market only when scoring.signal is UNDERVALUED and above market only when it is OVERPRICED; AT_MARKET means within the normal range, whatever the percentage. When scoring says "not scored", say there is no value signal and why; never judge the price and never use the verdicts Opportunity or Above market.
 - Prefer concrete comparisons ("24% under similar homes nearby") over adjectives.
 - Do not give legal, tax or financial advice; frame it as market observations and next steps for an agent.
 - Keep headline under 110 characters, analysis 2-3 sentences, each point one short sentence.`;
@@ -118,7 +118,7 @@ function fingerprint(listings: Listing[]) {
 async function buildListing(l: Listing, comps: Listing[]): Promise<Cached | null> {
   const facts = listingFacts(l, comps.some((x) => x.listing_id === l.listing_id) ? comps : [l, ...comps]);
   const ai = await askClaude<ListingNote>(
-    "Write the analyst note for this listing: a verdict (Opportunity, Fair value, Overpriced or Watch), a one-line headline, a 2-3 sentence analysis, 2-4 supporting points, and one concrete next step for the agent.",
+    "Write the analyst note for this listing: a verdict (Opportunity, Fair value, Above market or Watch), a one-line headline, a 2-3 sentence analysis, 2-4 supporting points, and one concrete next step for the agent.",
     facts,
     LISTING_NOTE_SCHEMA,
   );

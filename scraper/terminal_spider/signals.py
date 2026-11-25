@@ -1,5 +1,5 @@
 """
-The value signal: Below market, At market or Overpriced.
+The value signal: Below market, At market or Above market.
 
 Two separate checks estimate what a home would normally ask:
 

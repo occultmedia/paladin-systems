@@ -37,7 +37,7 @@ const DOWN = "#A05A5D";
 const SIGNAL: Record<Signal, { label: string; color: string; bg: string }> = {
   UNDERVALUED: { label: "Below market", color: UP, bg: "#E8F1EB" },
   AT_MARKET: { label: "At Market", color: "#3F3F46", bg: "#F1F1F3" },
-  OVERPRICED: { label: "Overpriced", color: DOWN, bg: "#F6ECEC" },
+  OVERPRICED: { label: "Above market", color: DOWN, bg: "#F6ECEC" },
   NO_SIGNAL: { label: "No signal", color: "#71717A", bg: "#F1F1F3" },
 };
 
@@ -132,13 +132,7 @@ function previewData(): PreviewData {
   const start = first - 4 * DAYMS;
   const span = today - start;
   const events = f.price_history.map((e) => ({ t: Date.parse(e.date), p: e.price_usd }));
-  const steps = 10;
-  const market = Array.from({ length: steps + 1 }, (_, i) => {
-    const t = start + (span * i) / steps;
-    const monthsBack = (today - t) / (30 * DAYMS);
-    return { t, p: marketNow / Math.pow(1.004, monthsBack) };
-  });
-  const all = [...events.map((e) => e.p), ...market.map((m) => m.p)];
+  const all = [...events.map((e) => e.p), marketNow];
   const pad = (Math.max(...all) - Math.min(...all)) * 0.25;
   const lo = Math.min(...all) - pad;
   const hi = Math.max(...all) + pad;
@@ -150,7 +144,7 @@ function previewData(): PreviewData {
   ];
   const gap = (f.asking_price_usd - marketNow) / marketNow;
   const verdict =
-    gap <= -0.03 ? `${Math.abs(gap * 100).toFixed(0)}% below market` : gap >= 0.03 ? `${(gap * 100).toFixed(0)}% above market` : "In line with market";
+    f.signal === "UNDERVALUED" ? `${Math.abs(gap * 100).toFixed(0)}% below market` : f.signal === "OVERPRICED" ? `${(gap * 100).toFixed(0)}% above market` : "Within the normal range";
 
   return {
     run: {
@@ -172,11 +166,11 @@ function previewData(): PreviewData {
       agency: { name: f.agency.name, color: f.agency.color },
       agent: f.agent ? { name: f.agent.name, title: f.agent.title } : null,
       asking,
-      market: market.map((m) => [nx(m.t), ny(m.p)] as [number, number]),
+      estimate: [1, ny(marketNow)] as [number, number],
       askingLabel: usdShort(f.asking_price_usd),
       marketLabel: usdShort(marketNow),
       verdict,
-      verdictColor: gap <= -0.03 ? "#2E9E5B" : gap >= 0.03 ? "#D64545" : "#E08A1E",
+      verdictColor: f.signal === "UNDERVALUED" ? "#2E9E5B" : f.signal === "OVERPRICED" ? "#D64545" : "#E08A1E",
       events: [...f.price_history]
         .reverse()
         .slice(0, 3)
@@ -348,13 +342,13 @@ const AUDIENCES: Audience[] = [
 
 const HOW: Array<[string, string]> = [
   ["We collect", "Listings from agency, broker and developer websites across Aruba, checked each morning and gathered in one place."],
-  ["AI analyzes", "Each price against comparable listings. Below market, overpriced and ghost listings flagged."],
+  ["AI analyzes", "Each price against comparable listings. Below market, above market and ghost listings flagged."],
   ["You act first", "Read the morning brief, watch your pins and call the listing agent in one tap."],
 ];
 
 const FEATURES: Array<[typeof Rss, string, string]> = [
   [Rss, "Daily feed", "New listings, price changes and sales, every morning."],
-  [Scale, "Value signal", "Below market, At market or Overpriced against similar homes."],
+  [Scale, "Value signal", "Below market, At market or Above market against similar homes."],
   [LineChart, "Price history", "Every price change since the day it was listed."],
   [ShieldCheck, "Confidence Score", "Spots listings the agency forgot to take down."],
   [Sparkles, "AI Signal", "A morning briefing and a plain-English note per listing."],
@@ -435,8 +429,8 @@ const FAQ: FaqItem[] = [
     a: "Once a day, early in the morning, Aruba time. Each run picks up new listings, price changes and properties that went under contract, sold or came off the market, and adds them to the daily feed and to the price history of every listing.",
   },
   {
-    q: "What do Below market, At market and Overpriced mean?",
-    a: "Each home or condo for sale gets two separate checks: the nearest homes of similar size, and a price model that uses its size, plot, bedrooms, pool, land title and district. It is marked Below market or Overpriced only when both checks put it at least 20% away; otherwise it is At market. Asking prices are compared, not sale prices. Land, commercial property, fixer-uppers, homes sold with several apartments and homes with too few similar ones nearby get no signal.",
+    q: "What do Below market, At market and Above market mean?",
+    a: "Each home or condo for sale gets two separate checks: the nearest homes of similar size, and a price model that uses its size, plot, bedrooms, pool, land title and district. It is marked Below market or Above market only when both checks put it at least 20% away; otherwise it is At market. Asking prices are compared, not sale prices. Land, commercial property, fixer-uppers, homes sold with several apartments and homes with too few similar ones nearby get no signal.",
   },
   {
     q: "What is the Confidence Score?",

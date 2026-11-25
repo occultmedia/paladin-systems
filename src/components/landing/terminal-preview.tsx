@@ -45,7 +45,8 @@ export interface PreviewData {
     agent: { name: string; title: string } | null;
     /** [x 0–1, y 0–1] points, y up */
     asking: Array<[number, number]>;
-    market: Array<[number, number]>;
+    /** today's estimate */
+    estimate: [number, number];
     askingLabel: string;
     marketLabel: string;
     verdict: string;
@@ -69,7 +70,7 @@ const FLAT = "#E08A1E";
 
 const FEATURES = [
   { key: "index", label: "Daily Index", sub: "New listings & price moves" },
-  { key: "history", label: "Price history", sub: "Asking vs. market value" },
+  { key: "history", label: "Price history", sub: "Every asking price change" },
   { key: "watchlist", label: "Watchlist", sub: "Pin and track properties" },
   { key: "clients", label: "Client leads", sub: "Who asked about what" },
 ] as const;
@@ -241,24 +242,13 @@ export function HistoryPane({ data }: { data: PreviewData }) {
             <span className="h-0.5 w-3 bg-zinc-950" /> Asking
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <span className="w-3 border-t-2 border-dashed" style={{ borderColor: UP }} /> Est. market value
+            <span className="size-2 rounded-full" style={{ background: UP }} /> Est. market value today
           </span>
         </div>
-        <svg viewBox={`0 0 ${W} ${H}`} className="mt-2 w-full flex-1" preserveAspectRatio="none" aria-label="Asking price and estimated market value over time">
+        <svg viewBox={`0 0 ${W} ${H}`} className="mt-2 w-full flex-1" preserveAspectRatio="none" aria-label="Asking price over time and today's estimated market value">
           {[0.25, 0.5, 0.75].map((g) => (
             <line key={g} x1={0} x2={W} y1={g * H} y2={g * H} stroke="#F4F4F5" />
           ))}
-          <motion.path
-            d={linePath(f.market, W, H, false)}
-            fill="none"
-            stroke={UP}
-            strokeWidth={2}
-            strokeDasharray="5 4"
-            vectorEffect="non-scaling-stroke"
-            initial={{ pathLength: 0 }}
-            animate={{ pathLength: 1 }}
-            transition={{ duration: 1.2, ease: "easeOut" }}
-          />
           <motion.path
             d={linePath(f.asking, W, H, true)}
             fill="none"
@@ -269,10 +259,12 @@ export function HistoryPane({ data }: { data: PreviewData }) {
             animate={{ pathLength: 1 }}
             transition={{ duration: 1.2, ease: "easeOut", delay: 0.15 }}
           />
+          {/* a zero-length round stroke stays a circle however the chart is stretched */}
+          <path d={`${linePath([f.estimate], W, H, false)}h0.01`} fill="none" stroke={UP} strokeWidth={9} strokeLinecap="round" vectorEffect="non-scaling-stroke" />
         </svg>
         <p className="mt-2 text-[11px]">
           <span className="font-semibold tabular-nums text-zinc-950">{f.askingLabel}</span>
-          <span className="text-zinc-500"> vs est. </span>
+          <span className="text-zinc-500"> vs est. today </span>
           <span className="font-semibold tabular-nums" style={{ color: UP }}>{f.marketLabel}</span>
           <span className="text-zinc-500"> · </span>
           <span className="font-semibold" style={{ color: f.verdictColor }}>{f.verdict}</span>

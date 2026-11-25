@@ -15,7 +15,7 @@ export const SIGNAL_COLOR: Record<Signal, string> = {
 export const SIGNAL_LABEL: Record<Signal, string> = {
   UNDERVALUED: "Below market",
   AT_MARKET: "At Market",
-  OVERPRICED: "Overpriced",
+  OVERPRICED: "Above market",
   NO_SIGNAL: "No signal",
 };
 
