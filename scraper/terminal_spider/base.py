@@ -428,6 +428,11 @@ class BaseSpider(abc.ABC):
                     self.stats.index_failures += 1
                     break
                 found = self.parse_index(page)
+                if len(visited) > 1 and found and all(c["source_url"] in cards for c in found):
+                    # "page 2" that repeats page 1: part of the inventory would be missed without a word
+                    log.warning("[%s] %s repeats listings already seen; paging may be broken", self.agency_id, url)
+                    self.stats.index_failures += 1
+                    break
                 for card in found:
                     known = cards.setdefault(card["source_url"], card)
                     # the same listing can be on two index pages (e.g. Condo and New development)

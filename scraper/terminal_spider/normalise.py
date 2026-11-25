@@ -20,8 +20,9 @@ For each raw row that is new or changed (the `raw_listing_deltas` queue):
        - the one it was merged into before (raw.property_id), else
        - the same property already listed by ANOTHER agency (same match score
          as the duplicate watch in the app: 70+ = same property). Only pins
-         printed on the page count as a location, and two different unit
-         numbers (Waykiri C12, Waykiri C-09) are never the same property, else
+         printed on the page count as a location; flats must name the same
+         unit (Waykiri C12 is not Waykiri C-09, nor "Waykiri"); and each
+         agency can have one listing in it, else
        - a new property_master row with a fresh public ref (AW-XXXXX).
   3. Write it. Only the agency that first listed a property (its primary
      source) updates the details; other agencies' copies just keep it
@@ -94,6 +95,8 @@ DISTRICT_ALIASES = {
     "rodgers beach": "San Nicolas", "rodger's beach": "San Nicolas", "baby beach": "San Nicolas",
 }
 ISLAND_CENTER = (12.52, -70.0)
+# Where the map in KW's and RE/MAX's sites stands until someone sets the pin.
+DEFAULT_PIN = (12.5092044, -70.0086306)
 ARUBA_BOUNDS = ((12.3, 12.7), (-70.2, -69.8))
 
 STATUS_MAP = {
@@ -165,6 +168,11 @@ def in_aruba(lat: Any, lng: Any) -> bool:
         return ARUBA_BOUNDS[0][0] <= float(lat) <= ARUBA_BOUNDS[0][1] and ARUBA_BOUNDS[1][0] <= float(lng) <= ARUBA_BOUNDS[1][1]
     except (TypeError, ValueError):
         return False
+
+
+def printed_pin(lat: Any, lng: Any) -> bool:
+    """A pin someone placed: on the island, and not the map's default spot."""
+    return in_aruba(lat, lng) and distance_m(float(lat), float(lng), *DEFAULT_PIN) > 60
 
 
 def classify(raw_type: str | None, title: str, desc: str, beds: float | None = None) -> tuple[str, str, str | None]:
@@ -294,7 +302,8 @@ def read_raw(raw: dict[str, Any]) -> Fields:
     baths = parse_number(raw.get("raw_baths"))
     # Sizes below these are typos on the source page ("3 m²"): treat them as unknown.
     built = to_sqft(raw.get("raw_built_area"))
-    built = built if built and built >= 150 else None
+    # (a home with a bedroom is never under 25 m²)
+    built = built if built and built >= (269 if asset_class == "Property" and beds else 150) else None
     lot = to_sqft(raw.get("raw_lot_area"))
     lot = lot if lot and lot >= 300 else None
     if asset_class == "Property" and beds is None:
@@ -304,7 +313,7 @@ def read_raw(raw: dict[str, Any]) -> Fields:
 
     lat, lng = raw.get("raw_lat"), raw.get("raw_lng")
     district = district_of(raw.get("raw_district"), lat, lng, desc)
-    pin_exact = in_aruba(lat, lng)
+    pin_exact = printed_pin(lat, lng)
     if not pin_exact:
         lat, lng = approx_pin(district, raw["source_url"])
 
@@ -384,7 +393,8 @@ def distance_m(a_lat: float, a_lng: float, b_lat: float, b_lng: float) -> float:
 def unit_tokens(name: str) -> set[str]:
     """Unit and house numbers in a name: "Waykiri C-08" -> {"c8"}, "Harbour House 613S" -> {"613s"}."""
     found = re.findall(r"(?<![a-z0-9])([a-z]{0,2})-?0*(\d{1,4})([a-z]{0,2})(?![a-z0-9])", name.lower())
-    return {f"{a}{n}{b}" for a, n, b in found}
+    # "2BR 1BA" is what the flat has, not which flat it is
+    return {f"{a}{n}{b}" for a, n, b in found if not (b in ("br", "ba", "bd") and not a)}
 
 
 # Words in a project's name that say nothing about which project it is.
@@ -415,6 +425,8 @@ def match_score(a: dict[str, Any], b: dict[str, Any]) -> int:
     ua, ub = unit_tokens(a["asset_name"]), unit_tokens(b["asset_name"])
     if ua and ub and not ua & ub:
         return 0  # both name a unit, and not the same one
+    if a.get("property_type") in UNIT_TYPES and (not ua or ua != ub):
+        return 0  # flats in one building look alike: only the same unit number makes them the same flat
     s = 0
     if None not in (a["lat"], a["lng"], b["lat"], b["lng"]):
         d = distance_m(a["lat"], a["lng"], b["lat"], b["lng"])
@@ -512,7 +524,13 @@ class Normaliser:
         by_id = {m["id"]: m for m in masters}
         # Listings whose own page prints a map pin. The others sit near their
         # district centre, which must not count as "the same spot".
-        pinned_urls = {r["source_url"] for r in _all(lambda: self.db.table("raw_listings").select("source_url").not_.is_("raw_lat", "null").order("id"))}
+        pinned_urls = {
+            r["source_url"]
+            for r in _all(lambda: self.db.table("raw_listings").select("source_url,raw_lat,raw_lng").not_.is_("raw_lat", "null").order("id"))
+            if printed_pin(r["raw_lat"], r["raw_lng"])
+        }
+        # a property holds one listing per agency: two flats of the same agency are two flats
+        held = {(r["property_id"], r["agency_id"]) for r in _all(lambda: self.db.table("raw_listings").select("property_id,agency_id").not_.is_("property_id", "null").order("id"))}
         exact = {m["id"] for m in masters if m["source_url"] in pinned_urls}
 
         def located(m: dict[str, Any], is_exact: bool) -> dict[str, Any]:
@@ -546,7 +564,7 @@ class Normaliser:
                     # Same property already listed by another agency?
                     cand = located({**f.row, "id": None}, f.pin_exact)
                     best = max(
-                        ((match_score(cand, located(m, m["id"] in exact)), m) for m in masters if m["agency_id"] != raw["agency_id"]),
+                        ((match_score(cand, located(m, m["id"] in exact)), m) for m in masters if (m["id"], raw["agency_id"]) not in held and m["agency_id"] != raw["agency_id"]),
                         key=lambda x: x[0],
                         default=(0, None),
                     )
@@ -555,6 +573,7 @@ class Normaliser:
                         self.stats["merged"] += 1
                         log.info("merge %s into %s (score %s)", raw["source_url"], master["listing_id"], best[0])
                         self.planned.append({"action": "merge", "into": master["listing_id"], **f.row})
+                        held.add((master["id"], raw["agency_id"]))
                         self._mark(raw["id"], master["id"])
                         continue
 

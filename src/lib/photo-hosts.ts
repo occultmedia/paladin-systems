@@ -5,4 +5,5 @@
  */
 export const PHOTO_HOSTS = [
   { hostname: "kw-aruba.com", pathname: "/storage/app/uploads/public/**" },
+  { hostname: "remaxaruba.com", pathname: "/storage/app/uploads/public/**" },
 ] as const;

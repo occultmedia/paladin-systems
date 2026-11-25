@@ -14,6 +14,7 @@ scraper/
     doc.py                    Doc: a parsed page; a missing element is None, never an error
     kw_aruba.py               KWArubaSpider: selectors for kw-aruba.com only
     all_property_aruba.py     AllPropertyArubaSpider: selectors for allpropertyaruba.com only
+    remax_aruba.py            RemaxArubaSpider: selectors for remaxaruba.com only (crawled with RE/MAX's consent, see its header)
     normalise.py              raw_listings -> property_master (runs at the end of every crawl)
     parsing.py                "USD 3.900.000" -> 3900000, "10 bedroom(s)" -> 10, currency, Cloudflare e-mails
     __init__.py               SPIDERS registry
@@ -109,6 +110,9 @@ plus the pages opened. On the nights re-reads are due, add about 7 minutes.
 
 ## Politeness and blocking
 
+- Before adding an agency, read its terms and privacy pages as well as
+  robots.txt. If they ask for written permission, get it first and note it at
+  the top of the spider.
 - robots.txt is read every run; Disallow rules and `Crawl-delay` are honoured.
   Do not lower a site's delay to go faster.
 - HTTP 403/429/503 → backs off (60 s, 120 s, 180 s). A Cloudflare/CAPTCHA
