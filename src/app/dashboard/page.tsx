@@ -1993,20 +1993,15 @@ function ActiveListings({
   initialQuery,
   initialOpenId,
   initialNewToday,
-  initialFullMap,
   onExitTo,
-  onFullClosed,
 }: {
   listings?: Listing[];
   initialDistrict?: string;
   initialQuery?: string;
   initialOpenId?: string;
   initialNewToday?: boolean;
-  initialFullMap?: boolean;
   /** Leaving full-screen mode from the Watchlist or Market feed panel opens that tab. */
   onExitTo?: (tab: FullPanel) => void;
-  /** Full-screen mode was left; do not open it again on the next visit to this tab. */
-  onFullClosed?: () => void;
 }) {
   const [query, setQuery] = useState(initialQuery ?? "");
   const [tenure, setTenure] = useState<Tenure | "All" | "None">("All");
@@ -2040,19 +2035,12 @@ function ActiveListings({
   const [openId, setOpenId] = useState<string | null>(initialOpenId ?? null);
   const [hoverId, setHoverId] = useState<string | null>(null);
   const [popupId, setPopupId] = useState<string | null>(null);
-  const [fullMap, setFullMap] = useState(Boolean(initialFullMap));
+  // The Terminal opens in Normal view; the switch on the map opens Dashboard view (full screen).
+  const [fullMap, setFullMap] = useState(false);
   const closeFullMap = useCallback((tab: FullPanel = "Listings") => {
     setFullMap(false);
-    onFullClosed?.();
     if (tab !== "Listings") onExitTo?.(tab);
-    // Opened from a "?map=full" link: drop the flag so it does not reopen.
-    const url = new URL(window.location.href);
-    if (url.searchParams.has("map") || !url.searchParams.has("tab")) {
-      url.searchParams.delete("map");
-      if (!url.searchParams.has("tab")) url.searchParams.set("tab", TAB_SLUG[tab]);
-      window.history.replaceState(null, "", url);
-    }
-  }, [onExitTo, onFullClosed]);
+  }, [onExitTo]);
 
   // The table scrolls sideways on narrower screens. An open listing's details
   // are pinned to the visible width so nothing is cut off on the right.
@@ -2515,7 +2503,7 @@ function ActiveListings({
           onHover={setHoverId}
           height={560}
         />
-        <ViewToggle value="normal" onChange={() => setFullMap(true)} className="absolute bottom-3 right-3 z-[5] max-sm:bottom-auto max-sm:top-3" />
+        <ViewToggle value="normal" onChange={() => setFullMap(true)} className="absolute bottom-3 right-3 z-[5] max-sm:bottom-auto max-sm:top-[50px]" />
         <AnimatePresence>
           {popupListing && (
             <ListingPopup
@@ -3459,8 +3447,6 @@ const SLUG_TAB = {
 
 function Dashboard() {
   const params = useSearchParams();
-  // Coming into the Terminal from outside (plain /dashboard, or a "?map=full" link) opens full-screen mode.
-  const [enterFull, setEnterFull] = useState(() => params.get("map") === "full" || params.toString() === "");
   const router = useRouter();
   const { user, ready } = useUser();
   // The Terminal is for members: once accounts are live, signed-out visitors go to log in.
@@ -3567,8 +3553,6 @@ function Dashboard() {
               initialQuery={listingsView.query}
               initialOpenId={listingsView.openId}
               initialNewToday={listingsView.newToday}
-              initialFullMap={enterFull && listingsView.key === 0}
-              onFullClosed={() => setEnterFull(false)}
               onExitTo={(t) => setTab(t)}
             />
           </>

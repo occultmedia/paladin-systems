@@ -238,7 +238,7 @@ export function LoginForm() {
     setResult(null);
     const r = await logIn(email, password);
     setBusy(false);
-    if (r.ok) return router.push("/dashboard?tab=listings&map=full");
+    if (r.ok) return router.push("/dashboard?tab=listings");
     setResult(r);
   };
 
@@ -392,7 +392,7 @@ export function ResetPasswordForm() {
     if (!r.ok) return setResult(r);
     setState("done");
     window.history.replaceState(null, "", "/reset-password");
-    window.setTimeout(() => router.push("/dashboard?tab=listings&map=full"), 2500);
+    window.setTimeout(() => router.push("/dashboard?tab=listings"), 2500);
   };
 
   if (state === "checking")
@@ -521,7 +521,7 @@ export function SignupForm({ initialPlan = "monthly" }: { initialPlan?: Billing 
     }
     const r = await signUp({ name, email, password, role, plan, company, title, whatsapp });
     setBusy(false);
-    if (r.ok) return r.message === "confirm-email" ? setSent(true) : router.push("/dashboard?tab=listings&map=full");
+    if (r.ok) return r.message === "confirm-email" ? setSent(true) : router.push("/dashboard?tab=listings");
     setResult(r);
   };
 
