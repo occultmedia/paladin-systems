@@ -62,6 +62,7 @@ export const ZONINGS: Zoning[] = ["Residential", "Tourism", "Commercial", "Agric
  */
 export type Tenure = "Eigendom" | "Erfpacht";
 export const TENURES: Tenure[] = ["Eigendom", "Erfpacht"];
+export const TENURE_NOT_STATED = "Title not stated";
 export const TENURE_HINT: Record<Tenure, string> = {
   Eigendom: "Freehold: land and building owned outright",
   Erfpacht: "Leasehold: land leased from the government, building owned",
@@ -194,7 +195,7 @@ export interface PriceEvent {
 
 /** Columns shared by every indexed listing. */
 export interface ListingBase {
-  tenure: Tenure;
+  tenure: Tenure | null; // null = the agency does not state the land title
   lease_years_left: number | null; // erfpacht only
   is_new: boolean; // first found in the latest Index run
   price_history: PriceEvent[]; // oldest first; last entry = current price

@@ -4,7 +4,7 @@
 
 import { ListingPhoto } from "@/components/listing-photo";
 import { pricePerM2, sizeLines } from "@/lib/units";
-import { PLATFORM_LABEL, isClosed, type Agency, type DistrictStats, type Listing, type RentalPlatform, type Signal, type VacationRental } from "@/lib/aruba-data";
+import { PLATFORM_LABEL, TENURE_NOT_STATED, isClosed, type Agency, type DistrictStats, type Listing, type RentalPlatform, type Signal, type VacationRental } from "@/lib/aruba-data";
 
 export const SIGNAL_COLOR: Record<Signal, string> = {
   UNDERVALUED: "#3F7A55",
@@ -146,7 +146,7 @@ export function HoverCard({ l }: { l: Listing }) {
           )}
         </div>
         <div style={{ color: "#71717A", fontSize: 11, marginTop: 2 }}>
-          {l.category === "Commercial" ? "Commercial" : l.property_type} · {l.district} · {l.tenure}
+          {l.category === "Commercial" ? "Commercial" : l.property_type} · {l.district} · {l.tenure ?? TENURE_NOT_STATED}
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, marginTop: 8 }}>
           <span style={{ fontWeight: 700, fontSize: 16, color: "#09090B", fontVariantNumeric: "tabular-nums" }}>{usd(l.asking_price_usd)}</span>

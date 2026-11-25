@@ -219,16 +219,21 @@ def classify(raw_type: str | None, title: str, desc: str, beds: float | None = N
     return "Property", "Villa", None
 
 
-def tenure_of(features: dict[str, str], desc: str) -> tuple[str, int | None]:
-    """('Erfpacht' | 'Eigendom', lease years left). Eigendom is the default when nothing is said."""
-    text = " ".join([*(f"{k} {v}" for k, v in features.items()), desc]).lower()
-    lease = re.search(r"erfpacht|long[- ]?lease|lease ?land|leasehold|government lease", text)
-    owned = re.search(r"eigendom|freehold|owned land|private land|fee simple|ownership land", text)
-    if lease and not (owned and owned.start() < lease.start()):
-        years = re.search(r"(\d{2})\s*(?:years?|yrs?)\s*(?:left|remaining)", text)
-        left = int(years.group(1)) if years and int(years.group(1)) <= 99 else None
-        return "Erfpacht", left
-    return "Eigendom", None
+# "Property land" and "full ownership land" are how Aruba's agents write eigendom.
+OWNED = re.compile(r"eigendom|freehold|property[ -]?land|owned[ -]land|ownership land|fee simple")
+LEASED = re.compile(r"erfpacht|long[- ]?lease\b|lease[ -]?land|leasehold|government lease")
+
+
+def tenure_of(title: str, desc: str) -> tuple[str | None, int | None]:
+    """('Erfpacht' | 'Eigendom' | None, lease years left). None when the page does not say, or says both."""
+    text = f"{title}\n{desc}".lower()
+    owned, leased = bool(OWNED.search(text)), bool(LEASED.search(text))
+    if owned == leased:
+        return None, None
+    if owned:
+        return "Eigendom", None
+    years = re.search(r"(\d{2})\s*(?:years?|yrs?)\s*(?:left|remaining)", text)
+    return "Erfpacht", int(years.group(1)) if years else None
 
 
 def pool_of(features: dict[str, str]) -> str | None:
@@ -303,7 +308,7 @@ def read_raw(raw: dict[str, Any]) -> Fields:
     if not pin_exact:
         lat, lng = approx_pin(district, raw["source_url"])
 
-    tenure, lease_left = tenure_of(features, desc)
+    tenure, lease_left = tenure_of(title, desc)
     status = STATUS_MAP.get((raw.get("raw_status") or "for sale").strip().lower(), "For sale")
     photos = [p for p in (raw.get("raw_photos") or []) if p][:1]
 

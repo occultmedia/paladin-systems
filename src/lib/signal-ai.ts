@@ -123,7 +123,7 @@ export function listingFacts(l: Listing, all: Listing[]): ListingFacts {
     kind: kindOf(l),
     district: l.district,
     status: l.status,
-    tenure: l.tenure,
+    tenure: l.tenure ?? "not stated by the agency",
     lease_years_left: l.lease_years_left,
     asking_price_usd: l.asking_price_usd,
     price_per_m2_usd: psf === null ? null : pricePerM2(l),
@@ -195,6 +195,7 @@ export function computedListingNote(f: ListingFacts): ListingNote {
   else if (f.days_on_market === 0) points.push("First indexed today, so there is no price history yet.");
   else points.push(`No price changes since it was listed ${f.days_on_market} day${f.days_on_market === 1 ? "" : "s"} ago.`);
   if (f.days_on_market > 0) points.push(`${f.days_on_market} days on market vs a ${c.median_days_on_market}-day median for its comps.`);
+  if (f.tenure !== "Erfpacht" && f.tenure !== "Eigendom") points.push("The agency does not state the land title; ask whether it is owned or leased.");
   if (f.tenure === "Erfpacht") points.push(`Leasehold (erfpacht)${f.lease_years_left ? ` with ${f.lease_years_left} years left` : ""}; check the lease terms.`);
 
   const analysis =

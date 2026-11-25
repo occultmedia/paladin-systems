@@ -56,6 +56,7 @@ import {
   type PriceEvent,
   type IndexRun,
   type Signal,
+  TENURE_NOT_STATED,
   type Tenure,
 } from "@/lib/aruba-data";
 import { publishMarket, useMasterMarket } from "@/lib/live-market";
@@ -622,7 +623,7 @@ function downloadCsv(rows: Listing[]) {
     ["Status", (l) => l.status],
     ["Status since", (l) => l.status_changed],
     ["Pool", (l) => l.pool],
-    ["Land title", (l) => l.tenure],
+    ["Land title", (l) => l.tenure ?? "Not stated"],
     ["Erfpacht years left", (l) => l.lease_years_left],
     ["New today", (l) => (l.is_new ? "Yes" : "")],
     ["Last price change", (l) => l.last_price_change?.date],
@@ -1185,6 +1186,12 @@ function ListingAgentRow({ l }: { l: Listing }) {
 const TENURE_COLOR: Record<Tenure, string> = { Eigendom: "#0A0A0A", Erfpacht: "#8A6A2E" };
 
 function TenureTag({ l }: { l: Listing }) {
+  if (!l.tenure)
+    return (
+      <span title="The agency does not say whether the land is owned (eigendom) or leased (erfpacht). Ask the agent." className="inline-flex items-center whitespace-nowrap rounded border border-dashed border-zinc-300 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-zinc-500">
+        {TENURE_NOT_STATED}
+      </span>
+    );
   return (
     <span
       title={TENURE_HINT[l.tenure]}
@@ -1844,8 +1851,16 @@ function ListingDetails({ l }: { l: Listing }) {
       />
       <DetailItem
         label="Land title"
-        value={l.tenure === "Erfpacht" ? `Erfpacht · ${l.lease_years_left} yrs left` : "Eigendom (freehold)"}
-        color={TENURE_COLOR[l.tenure]}
+        value={
+          !l.tenure
+            ? "Not stated by the agency"
+            : l.tenure === "Eigendom"
+              ? "Eigendom (freehold)"
+              : l.lease_years_left
+                ? `Erfpacht · ${l.lease_years_left} yrs left`
+                : "Erfpacht (lease years not stated)"
+        }
+        color={l.tenure ? TENURE_COLOR[l.tenure] : undefined}
       />
       {l.member ? (
         <>
@@ -2017,7 +2032,7 @@ function ActiveListings({
   onFullClosed?: () => void;
 }) {
   const [query, setQuery] = useState(initialQuery ?? "");
-  const [tenure, setTenure] = useState<Tenure | "All">("All");
+  const [tenure, setTenure] = useState<Tenure | "All" | "None">("All");
   // Available, Under contract and Sold are tabs: only one shows at a time
   const [status, setStatus] = useState<ListingStatus>("For sale");
   const [revealId, setRevealId] = useState(initialOpenId ?? null);
@@ -2129,7 +2144,7 @@ function ActiveListings({
         (district === "All" || l.district === district) &&
         (agency === "All" || agencyKey(l) === agency) &&
         (signal === "ALL" || isClosed(l) || l.signal === signal) &&
-        (tenure === "All" || l.tenure === tenure) &&
+        (tenure === "All" || (tenure === "None" ? !l.tenure : l.tenure === tenure)) &&
         (pool === "Any" || (pool === "Has pool" ? l.pool === "Private pool" || l.pool === "Shared pool" : l.pool === pool)) &&
         (!newToday || l.is_new) &&
         (!offMarket || Boolean(l.member)) &&
@@ -2140,7 +2155,7 @@ function ActiveListings({
         (!newOnly || l.days_on_market <= 7) &&
         (!dropsOnly || l.price_change_pct < 0) &&
         (!reliableOnly || l.confidence_score >= 80) &&
-        (!q || `${l.asset_name} ${l.district} ${l.listing_id} ${l.source} ${typeLine(l)} ${l.tenure}`.toLowerCase().includes(q))
+        (!q || `${l.asset_name} ${l.district} ${l.listing_id} ${l.source} ${typeLine(l)} ${l.tenure ?? TENURE_NOT_STATED}`.toLowerCase().includes(q))
       );
     });
   }, [listings, deferredQuery, category, subtypes, district, agency, signal, priceMin, priceMax, bedsMin, sizeMin, newOnly, dropsOnly, reliableOnly, tenure, newToday, offMarket, pool]);
@@ -2389,16 +2404,16 @@ function ActiveListings({
             </div>
           )}
           <div className="no-scrollbar flex max-w-full overflow-x-auto rounded-md border border-zinc-300" role="group" aria-label="Land title">
-            {(["All", ...TENURES] as const).map((t) => (
+            {(["All", ...TENURES, "None"] as const).map((t) => (
               <button
                 key={t}
                 type="button"
                 onClick={() => setTenure(t)}
                 aria-pressed={tenure === t}
-                title={t === "All" ? "Eigendom and erfpacht" : TENURE_HINT[t]}
+                title={t === "All" ? "Every land title" : t === "None" ? "The agency does not say whether the land is owned or leased" : TENURE_HINT[t]}
                 className={segBtn(tenure === t)}
               >
-                {t === "All" ? "Any title" : t}
+                {t === "All" ? "Any title" : t === "None" ? "Not stated" : t}
               </button>
             ))}
           </div>
@@ -3417,7 +3432,7 @@ function TerminalUpdates({
                             <span className="min-w-0 flex-1">
                               <span className="block truncate font-medium text-zinc-950">{m.l.asset_name}</span>
                               <span className="block truncate text-[11px] text-zinc-500">
-                                {typeLine(m.l)} · {m.l.district} · {m.l.tenure}
+                                {typeLine(m.l)} · {m.l.district} · {m.l.tenure ?? TENURE_NOT_STATED}
                               </span>
                             </span>
                             <span className={`${MONO} shrink-0 text-right`}>

@@ -315,7 +315,7 @@ export type Database = {
           built_sqft: number | null;
           lot_sqft: number | null;
           pool: PoolDb | null;
-          tenure: TenureDb;
+          tenure: TenureDb | null;
           lease_years_left: number | null;
           district: string;
           address: string | null;
@@ -368,7 +368,7 @@ export type Database = {
           built_sqft?: number | null;
           lot_sqft?: number | null;
           pool?: PoolDb | null;
-          tenure?: TenureDb;
+          tenure?: TenureDb | null;
           lease_years_left?: number | null;
           district: string;
           address?: string | null;
@@ -567,7 +567,7 @@ export type Database = {
           built_sqft: number | null;
           lot_sqft: number | null;
           pool: PoolDb | null;
-          tenure: TenureDb;
+          tenure: TenureDb | null;
           lease_years_left: number | null;
           asking_price_usd: number;
           first_price_usd: number;
