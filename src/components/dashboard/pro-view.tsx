@@ -7,7 +7,8 @@
  * the sections; both are empty until those Index runs start.
  */
 
-import { Check, Gavel, Loader2, Lock, MessageCircle } from "lucide-react";
+import { BedDouble, Check, Gavel, Loader2, Lock, MessageCircle } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { GrainField } from "@/components/landing/grain-field";
 import { usePlan } from "@/lib/plan";
@@ -15,34 +16,71 @@ import { PLANS, fmtPlanPrice, type Billing } from "@/lib/site";
 import type { Listing } from "@/lib/aruba-data";
 import { RentalIncome } from "./rental-income";
 
+/** The Pro pages. Each has its own tab and address: /dashboard?tab=pro&section=<key>. */
 const SECTIONS = [
   {
+    key: "auctions",
+    label: "Auctions",
     icon: Gavel,
     title: "Property auctions",
     text: "Homes, land and commercial property going to auction in Aruba, with the auction date, starting bid and where to register.",
+    columns: ["Auction date", "Property", "District", "Starting bid", "Where to register"],
   },
   {
+    key: "social",
+    label: "Social media",
     icon: MessageCircle,
     title: "Social media listings",
     text: "Properties offered on social media that are not on any agency site, indexed and placed on the map next to agency listings.",
+    columns: ["Posted", "Property", "District", "Asking", "Contact"],
+  },
+  {
+    key: "rentals",
+    label: "Airbnb income",
+    icon: BedDouble,
+    title: "Short-term rental income",
+    text: "What a home could earn on Airbnb: nightly rates and occupancy by area, and a calculator for yearly income and yield.",
+    columns: [],
   },
 ] as const;
+type SectionKey = (typeof SECTIONS)[number]["key"];
+const sectionOf = (v: string | null): SectionKey => SECTIONS.find((x) => x.key === v)?.key ?? "auctions";
 
-/** Grey placeholder rows: shows that there is a list here without showing any data. */
-function GhostRows() {
+/** Grey placeholder rows under real column names: shows the list without showing any data. */
+function GhostTable({ columns }: { columns: readonly string[] }) {
+  const grid = { gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))` };
   return (
-    <div aria-hidden className="space-y-2.5">
-      {[0.92, 0.78, 0.86, 0.7].map((w, i) => (
-        <div key={i} className="flex items-center gap-3 rounded-lg border border-zinc-100 px-3 py-2.5">
-          <span className="size-10 shrink-0 rounded-md bg-zinc-100" />
-          <span className="flex-1 space-y-1.5">
-            <span className="block h-2.5 rounded bg-zinc-200" style={{ width: `${w * 70}%` }} />
-            <span className="block h-2 rounded bg-zinc-100" style={{ width: `${w * 45}%` }} />
-          </span>
-          <span className="h-3 w-14 rounded bg-zinc-200" />
+    <div aria-hidden className="overflow-hidden rounded-lg border border-zinc-200">
+      <div className="grid gap-3 bg-zinc-50 px-4 py-2.5 text-[10.5px] font-semibold uppercase tracking-wide text-zinc-500" style={grid}>
+        {columns.map((c) => (
+          <span key={c} className="truncate">{c}</span>
+        ))}
+      </div>
+      {[0.92, 0.7, 0.84, 0.62, 0.78, 0.88].map((w, r) => (
+        <div key={r} className="grid items-center gap-3 border-t border-zinc-100 px-4 py-3.5" style={grid}>
+          {columns.map((c, i) => (
+            <span key={c} className={`block h-2.5 rounded ${i === 1 ? "bg-zinc-300" : "bg-zinc-200"}`} style={{ width: `${(i === 1 ? w : 0.4 + ((w * (i + 3)) % 0.45)) * 100}%` }} />
+          ))}
         </div>
       ))}
     </div>
+  );
+}
+
+function ListPage({ section, isPro }: { section: (typeof SECTIONS)[number]; isPro: boolean }) {
+  return (
+    <section aria-label={section.title} className="rounded-2xl border border-zinc-200 p-4 sm:p-5">
+      <div className="relative">
+        <div className={isPro ? "opacity-50" : "select-none blur-[2px]"}>
+          <GhostTable columns={section.columns} />
+        </div>
+        <div className="absolute inset-0 grid place-items-center">
+          <p className="rounded-full bg-white/90 px-4 py-2 text-center text-[12.5px] font-medium text-zinc-700 shadow-sm ring-1 ring-zinc-200">
+            {isPro ? "The first Index run for this is coming soon." : `Unlock with ${PLANS.pro.name}`}
+          </p>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -87,19 +125,46 @@ export function UpgradeButton({ className = "", billing }: { className?: string;
 
 export function ProView({ listings }: { listings: Listing[] }) {
   const { isPro, billing } = usePlan();
+  const params = useSearchParams();
+  const [section, setSectionState] = useState<SectionKey>(() => sectionOf(params.get("section")));
+  const setSection = (k: SectionKey) => {
+    setSectionState(k);
+    window.history.replaceState(null, "", `?tab=pro&section=${k}`);
+  };
+  const current = SECTIONS.find((x) => x.key === section)!;
+
   return (
     <div className="pb-8 sm:pb-10">
       <div className="deck bleed relative isolate">
         <GrainField variant="ink" particles={false} className="-z-10" />
-        <div className="mx-auto max-w-[1400px] px-4 pb-8 pt-8 sm:px-6 sm:pt-10">
+        <div className="mx-auto max-w-[1400px] px-4 pt-8 sm:px-6 sm:pt-10">
           <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500">{isPro ? "Included in your plan" : "Pro plan"}</p>
           <h1 className="mt-2 flex items-center gap-3 font-display text-[28px] font-bold tracking-tight text-white sm:text-[34px]">
-            Pro data
+            {current.title}
             {!isPro && <Lock size={20} strokeWidth={2} className="text-zinc-500" aria-label="Locked" />}
           </h1>
-          <p className="mt-1 max-w-xl text-[13px] text-zinc-400">
-            Property auctions, listings from social media, and what a home could earn on Airbnb.
-          </p>
+          <p className="mt-1 max-w-xl text-[13px] text-zinc-400">{current.text}</p>
+          <nav aria-label="Pro sections" className="no-scrollbar -mx-4 mt-6 flex gap-1 overflow-x-auto px-4 sm:mx-0 sm:px-0" role="tablist">
+            {SECTIONS.map(({ key, label, icon: Icon }) => {
+              const on = section === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  role="tab"
+                  aria-selected={on}
+                  onClick={() => setSection(key)}
+                  className={`relative inline-flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-3 pb-3 pt-1 text-[13px] font-medium transition-colors ${
+                    on ? "border-lime text-white" : "border-transparent text-zinc-400 hover:text-white"
+                  }`}
+                >
+                  <Icon size={14} strokeWidth={1.75} />
+                  {label}
+                  {!isPro && <Lock size={11} strokeWidth={2} className="text-zinc-500" />}
+                </button>
+              );
+            })}
+          </nav>
         </div>
       </div>
 
@@ -115,40 +180,9 @@ export function ProView({ listings }: { listings: Listing[] }) {
         </div>
       )}
 
-      <div className="mt-6 grid gap-5 lg:grid-cols-2">
-        {SECTIONS.map(({ icon: Icon, title, text }) => (
-          <section key={title} className="rounded-2xl border border-zinc-200 p-5 sm:p-6">
-            <div className="flex items-start gap-3">
-              <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-zinc-950 text-lime">
-                <Icon size={17} strokeWidth={1.75} />
-              </span>
-              <div>
-                <h2 className="flex items-center gap-2 font-display text-[16px] font-bold text-zinc-950">
-                  {title}
-                  {!isPro && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-zinc-950 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-lime">
-                      <Lock size={9} strokeWidth={2.5} /> Pro
-                    </span>
-                  )}
-                </h2>
-                <p className="mt-1 text-[13px] leading-relaxed text-zinc-600">{text}</p>
-              </div>
-            </div>
-            <div className="relative mt-5">
-              <div className={isPro ? "opacity-40" : "select-none blur-[2px]"}>
-                <GhostRows />
-              </div>
-              <div className="absolute inset-0 grid place-items-center">
-                <p className="rounded-full bg-white/90 px-4 py-2 text-center text-[12.5px] font-medium text-zinc-700 shadow-sm ring-1 ring-zinc-200">
-                  {isPro ? "The first Index run for this is coming soon." : `Unlock with ${PLANS.pro.name}`}
-                </p>
-              </div>
-            </div>
-          </section>
-        ))}
+      <div className="mt-6">
+        {current.key === "rentals" ? <RentalIncome listings={listings} locked={!isPro} /> : <ListPage section={current} isPro={isPro} />}
       </div>
-
-      <RentalIncome listings={listings} locked={!isPro} />
     </div>
   );
 }

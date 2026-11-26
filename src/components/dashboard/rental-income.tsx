@@ -94,7 +94,7 @@ export function RentalIncome({ listings, locked }: { listings: Listing[]; locked
   const picked = homes.find((l) => l.listing_id === from);
 
   return (
-    <section className="mt-5 rounded-2xl border border-zinc-200 p-5 sm:p-6">
+    <section className="rounded-2xl border border-zinc-200 p-5 sm:p-6">
       <div className="flex items-start gap-3">
         <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-zinc-950 text-lime">
           <BedDouble size={17} strokeWidth={1.75} />
