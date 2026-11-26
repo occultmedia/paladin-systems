@@ -3,7 +3,7 @@
 /*
  * Settings tab: your member profile (photo, company logo, name, role,
  * company), the contact details other members use to reach you, billing and
- * payment preferences, and account access. Profile + contact save together;
+ * payment preferences, your plan (Standard or Pro), and account access. Profile + contact save together;
  * billing saves on its own.
  */
 
@@ -17,7 +17,9 @@ import { GrainField } from "@/components/landing/grain-field";
 import { ROLES, logOut, sendReset, useUser } from "@/lib/auth";
 import { DEFAULT_BILLING, PAY_METHODS, useBilling, type BillingPrefs, type PayMethod } from "@/lib/billing";
 import { profileComplete, type Profile } from "@/lib/profile";
-import { PLANS, YEARLY_SAVINGS_USD } from "@/lib/site";
+import { PLANS, PLAN_ORDER, PRO_FEATURES, fmtPlanPrice } from "@/lib/site";
+import { usePlan } from "@/lib/plan";
+import { UpgradeButton } from "@/components/dashboard/pro-view";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 const field =
@@ -26,6 +28,7 @@ const field =
 const SECTIONS = [
   ["profile", "Profile"],
   ["contact", "Contact info"],
+  ["plan", "Plan"],
   ["billing", "Billing & payment"],
   ["account", "Account"],
 ] as const;
@@ -169,6 +172,56 @@ function ProfileForm({ initial, onSave, shared }: { initial: Profile; onSave: (p
   );
 }
 
+/* ── plan ────────────────────────────────────────────────────────────── */
+
+function PlanCard() {
+  const { plan, requested } = usePlan();
+  return (
+    <Card id="plan" title="Plan" text="Both plans are billed once a year. Pro adds property auctions and social media listings.">
+      <div className="grid gap-3 sm:grid-cols-2">
+        {PLAN_ORDER.map((k) => {
+          const on = plan === k;
+          return (
+            <div key={k} className={`relative rounded-xl border p-4 ${on ? "border-zinc-950 shadow-[0_0_0_3px_rgb(172_250_104/0.55)]" : "border-zinc-200"}`}>
+              <span className="flex items-center justify-between">
+                <span className="text-[13px] font-semibold text-zinc-950">{PLANS[k].name}</span>
+                {on && <span className="rounded-full bg-zinc-950 px-2 py-0.5 text-[10.5px] font-semibold text-lime">Your plan</span>}
+                {!on && k === "pro" && requested !== null && <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10.5px] font-semibold text-zinc-600">Requested</span>}
+              </span>
+              <span className="mt-2 block font-display text-[22px] font-bold leading-none text-zinc-950">
+                ${PLANS[k].price.toLocaleString("en-US")}
+                <span className="text-[12px] font-semibold text-zinc-500">/{PLANS[k].per}</span>
+              </span>
+              <span className="mt-1.5 block text-[11.5px] leading-snug text-zinc-500">{PLANS[k].blurb}</span>
+              {k === "pro" && (
+                <ul className="mt-3 space-y-1">
+                  {PRO_FEATURES.map((f) => (
+                    <li key={f} className="flex items-center gap-2 text-[12px] text-zinc-700">
+                      <Check size={12} strokeWidth={2.5} className="text-zinc-950" /> {f}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      {plan === "standard" ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-zinc-100 pt-4">
+          <p className="max-w-md text-[11.5px] leading-relaxed text-zinc-500">
+            {requested !== null
+              ? "We have your request. Pro opens on your account as soon as the Pro invoice is paid."
+              : `Upgrading moves you from ${fmtPlanPrice("standard")} to ${fmtPlanPrice("pro")}. We email the invoice; Pro opens as soon as it is paid. You are not charged now.`}
+          </p>
+          <UpgradeButton />
+        </div>
+      ) : (
+        <p className="border-t border-zinc-100 pt-4 text-[11.5px] text-zinc-500">You have everything in Terminal, auctions and social media listings included.</p>
+      )}
+    </Card>
+  );
+}
+
 /* ── billing ─────────────────────────────────────────────────────────── */
 
 function BillingForm({ initial, onSave, shared }: { initial: BillingPrefs; onSave: (b: BillingPrefs) => Promise<void>; shared: boolean }) {
@@ -182,7 +235,7 @@ function BillingForm({ initial, onSave, shared }: { initial: BillingPrefs; onSav
   };
 
   return (
-    <Card id="billing" title="Billing & payment" text="Your plan, how you would like to pay and where invoices go.">
+    <Card id="billing" title="Billing & payment" text="How you would like to pay and where invoices go.">
       <form
         className="space-y-5"
         onSubmit={async (e) => {
@@ -200,36 +253,6 @@ function BillingForm({ initial, onSave, shared }: { initial: BillingPrefs; onSav
           }
         }}
       >
-        <fieldset>
-          <legend className="mb-2 text-[12.5px] font-medium text-zinc-700">Plan</legend>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {(["monthly", "yearly"] as const).map((k) => {
-              const on = b.plan === k;
-              return (
-                <button
-                  key={k}
-                  type="button"
-                  aria-pressed={on}
-                  onClick={() => set("plan", k)}
-                  className={`relative rounded-xl border p-4 text-left transition-[border-color,box-shadow] ${on ? "border-zinc-950 shadow-[0_0_0_3px_rgb(172_250_104/0.55)]" : "border-zinc-200 hover:border-zinc-400"}`}
-                >
-                  <span className="flex items-center justify-between">
-                    <span className="text-[13px] font-semibold text-zinc-950">{k === "monthly" ? "Monthly" : "Yearly"}</span>
-                    <span className={`grid size-4 place-items-center rounded-full border ${on ? "border-zinc-950 bg-zinc-950" : "border-zinc-300"}`}>
-                      {on && <Check size={10} strokeWidth={3.5} className="text-lime" />}
-                    </span>
-                  </span>
-                  <span className="mt-2 block font-display text-[22px] font-bold leading-none text-zinc-950">
-                    ${PLANS[k].price.toLocaleString("en-US")}
-                    <span className="text-[12px] font-semibold text-zinc-500">/{PLANS[k].per}</span>
-                  </span>
-                  <span className="mt-1.5 block text-[11.5px] text-zinc-500">{k === "monthly" ? "Cancel anytime" : `Save $${YEARLY_SAVINGS_USD} a year`}</span>
-                </button>
-              );
-            })}
-          </div>
-        </fieldset>
-
         <fieldset>
           <legend className="mb-2 text-[12.5px] font-medium text-zinc-700">How would you like to pay?</legend>
           <div className="grid gap-2">
@@ -349,7 +372,7 @@ export function SettingsView({ profile, onSaveProfile, shared }: { profile: { dr
   return (
     <div className="pb-16">
       <div className="deck bleed relative isolate">
-        <GrainField variant="band" className="-z-10" />
+        <GrainField variant="ink" particles={false} className="-z-10" />
         <div className="mx-auto max-w-[1400px] px-4 pb-7 pt-8 sm:px-6 sm:pt-10">
           <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500">Your account</p>
           <h1 className="mt-2 font-display text-[28px] font-bold tracking-tight text-white sm:text-[34px]">Settings</h1>
@@ -378,6 +401,7 @@ export function SettingsView({ profile, onSaveProfile, shared }: { profile: { dr
           ) : (
             <ProfileForm initial={profile.draft} onSave={onSaveProfile} shared={shared} />
           )}
+          <PlanCard />
           {hydrated ? (
             <BillingForm key={billing.shared ? "account" : "device"} initial={billing.prefs ?? DEFAULT_BILLING} onSave={billing.save} shared={billing.shared} />
           ) : (

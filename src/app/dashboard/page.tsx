@@ -35,7 +35,9 @@ import { useWatchlist, type WatchEntry } from "@/lib/watchlist";
 import { useInterestedClients, type ClientInput, type InterestedClient } from "@/lib/clients";
 import { useListingNote, useMarketBrief } from "@/lib/use-signal";
 import { authConfigured, displayName, logOut, useUser } from "@/lib/auth";
-import { PLANS } from "@/lib/site";
+import { PLANS, fmtPlanPrice } from "@/lib/site";
+import { usePlan } from "@/lib/plan";
+import { ProView } from "@/components/dashboard/pro-view";
 import type { AISource, Verdict } from "@/lib/signal-ai";
 import {
   COMMERCIAL_USES,
@@ -183,21 +185,23 @@ function Logo() {
   );
 }
 
-const TABS = ["Listings", "Watchlist", "Market feed", "Settings"] as const;
+const TABS = ["Listings", "Watchlist", "Market feed", "Pro", "Settings"] as const;
 type Tab = (typeof TABS)[number];
 const TAB_SLUG: Record<Tab, string> = {
   Listings: "listings",
   Watchlist: "watchlist",
   "Market feed": "market-feed",
+  Pro: "pro",
   Settings: "settings",
 };
 
-const TAB_ICON: Record<Tab, typeof Pin> = { Listings: LayoutList, Watchlist: Pin, "Market feed": Megaphone, Settings: SettingsIcon };
+const TAB_ICON: Record<Tab, typeof Pin> = { Listings: LayoutList, Watchlist: Pin, "Market feed": Megaphone, Pro: Lock, Settings: SettingsIcon };
 
 /** Pill switch between the dashboard tabs. */
 function TabSwitch({ tab, onTab, watchCount, full = false }: { tab: Tab; onTab: (t: Tab) => void; watchCount: number; full?: boolean }) {
+  const { isPro } = usePlan();
   return (
-    <div className={`${full ? "grid w-full grid-cols-4" : "inline-flex"} gap-1 rounded-full bg-white/[0.06] p-1 ring-1 ring-white/10`} role="tablist">
+    <div className={`${full ? "grid w-full grid-cols-5" : "inline-flex"} gap-1 rounded-full bg-white/[0.06] p-1 ring-1 ring-white/10`} role="tablist">
       {TABS.map((t) => {
         const on = tab === t;
         const Icon = TAB_ICON[t];
@@ -208,13 +212,14 @@ function TabSwitch({ tab, onTab, watchCount, full = false }: { tab: Tab; onTab: 
             role="tab"
             aria-selected={on}
             onClick={() => onTab(t)}
-            className={`relative inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full ${full ? "px-1 text-[12.5px]" : "px-4 text-[13px]"} py-1.5 font-medium transition-colors ${
+            className={`relative inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full ${full ? "px-0.5 text-[11.5px]" : "px-4 text-[13px]"} py-1.5 font-medium transition-colors ${
               on ? "text-zinc-950" : "text-zinc-400 hover:text-white"
             }`}
           >
             {on && <motion.span layoutId={full ? "tab-pill-mobile" : "tab-pill"} className="absolute inset-0 rounded-full bg-lime" transition={{ type: "spring", stiffness: 500, damping: 40 }} />}
             <span className="relative inline-flex items-center gap-2">
-              {!full && <Icon size={14} strokeWidth={1.75} fill={t === "Watchlist" && on ? "currentColor" : "none"} />}
+              {!full && t !== "Pro" && <Icon size={14} strokeWidth={1.75} fill={t === "Watchlist" && on ? "currentColor" : "none"} />}
+              {t === "Pro" && !isPro && <Lock size={full ? 11 : 13} strokeWidth={2} aria-label="Locked" />}
               {t}
               {t === "Watchlist" && watchCount > 0 && (
                 <span
@@ -235,6 +240,7 @@ function TabSwitch({ tab, onTab, watchCount, full = false }: { tab: Tab; onTab: 
 
 function AccountMenu({ compact = false, onProfile }: { compact?: boolean; onProfile: () => void }) {
   const { user } = useUser();
+  const { plan } = usePlan();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -276,7 +282,6 @@ function AccountMenu({ compact = false, onProfile }: { compact?: boolean; onProf
     );
 
   const name = displayName(user);
-  const plan = user.user_metadata?.plan === "yearly" ? "yearly" : "monthly";
   const initials = name
     .split(/\s+/)
     .map((w) => w[0])
@@ -317,7 +322,7 @@ function AccountMenu({ compact = false, onProfile }: { compact?: boolean; onProf
             <p className="truncate text-[13px] font-semibold text-zinc-950">{name}</p>
             <p className="truncate text-[12px] text-zinc-500">{user.email}</p>
             <p className="mt-2 inline-flex rounded-full bg-lime px-2 py-0.5 text-[11px] font-semibold text-zinc-950">
-              Aruba · ${PLANS[plan].price.toLocaleString("en-US")}/{PLANS[plan].per}
+              {PLANS[plan].name} · {fmtPlanPrice(plan)}
             </p>
           </div>
           {items.map(({ icon: Icon, label, onClick }) => (
@@ -356,7 +361,7 @@ function AccountMenu({ compact = false, onProfile }: { compact?: boolean; onProf
 function Header({ tab, onTab, updates, onUpdates, watchCount, onProfile, updatedAt }: { tab: Tab; onTab: (t: Tab) => void; updates: number; onUpdates: () => void; watchCount: number; onProfile: () => void; /** Latest Index run (ISO), null before the first one. */ updatedAt: string | null }) {
   return (
     <header className="deck relative isolate z-40 border-b border-white/[0.08]">
-      <GrainField variant="ink" className="-z-10" />
+      <GrainField variant="ink" particles={false} className="-z-10" />
       <div className="mx-auto flex max-w-[1400px] flex-col px-4 pt-3 sm:px-6 lg:h-16 lg:flex-row lg:items-center lg:justify-between lg:pt-0">
         <div className="flex items-center justify-between gap-4 lg:justify-start lg:gap-12">
           <Logo />
@@ -2249,7 +2254,7 @@ function ActiveListings({
   return (
     <>
       <div className="deck bleed relative isolate">
-      <GrainField variant="band" className="-z-10" />
+      <GrainField variant="ink" particles={false} className="-z-10" />
       <div className="mx-auto max-w-[1400px] px-4 sm:px-6">
       <div className="flex flex-wrap items-end justify-between gap-4 border-b border-white/10 py-6 sm:py-8">
         <div>
@@ -2945,7 +2950,7 @@ function Watchlist({ listings, runs, onOpenListing, onBrowse }: { listings?: Lis
   return (
     <div className="pb-8 sm:pb-10">
       <div className="deck bleed relative isolate">
-      <GrainField variant="band" className="-z-10" />
+      <GrainField variant="ink" particles={false} className="-z-10" />
       <div className="mx-auto max-w-[1400px] px-4 pb-8 pt-8 sm:px-6 sm:pt-10">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
@@ -3229,7 +3234,7 @@ function TerminalUpdates({
 
   return (
     <div ref={boxRef} id="terminal-updates" className="deck bleed relative isolate z-30 scroll-mt-4">
-      <GrainField variant="ink" className="-z-10" />
+      <GrainField variant="ink" particles={false} className="-z-10" />
       <div className="relative mx-auto max-w-[1400px] px-4 pt-4 sm:px-6">
       {/* slim bar */}
       <button
@@ -3286,7 +3291,7 @@ function TerminalUpdates({
         <div className="absolute right-0 top-full z-40 mt-2 w-full max-w-[640px] overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-[0_18px_40px_-12px_rgb(0_0_0/0.25)]">
           <div className="max-h-[min(72vh,620px)] overflow-y-auto overscroll-contain" data-lenis-prevent>
           <section aria-label="AI Signal briefing" className="deck relative isolate overflow-hidden border-b border-zinc-200 px-4 py-4 [background-attachment:scroll] sm:px-5">
-            <GrainField variant="ink" className="-z-10" />
+            <GrainField variant="ink" particles={false} className="-z-10" />
             <RunLine speed={8} delay={-2} />
             <div className="flex items-center justify-between gap-2">
               <AIMark dark />
@@ -3558,6 +3563,8 @@ function Dashboard() {
           </>
         ) : tab === "Market feed" ? (
           <FeedView profile={me.profile} profileLoading={me.loading} shared={me.shared} onEditProfile={openProfile} onOpenListing={openListing} />
+        ) : tab === "Pro" ? (
+          <ProView />
         ) : tab === "Settings" ? (
           <SettingsView profile={{ draft: me.draft, loading: me.loading }} onSaveProfile={me.save} shared={me.shared} />
         ) : (

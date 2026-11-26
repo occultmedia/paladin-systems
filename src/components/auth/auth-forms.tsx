@@ -11,7 +11,7 @@ import { ImagePick } from "@/components/feed/profile-dialog";
 import { Wordmark } from "@/components/logo";
 import { ROLES, logIn, sendReset, signUp, supabase, updatePassword, type AuthResult, type Role } from "@/lib/auth";
 import { saveSignupProfile } from "@/lib/profile";
-import { CONTACT_EMAIL, PLANS, YEARLY_SAVINGS_USD, type Billing } from "@/lib/site";
+import { CONTACT_EMAIL, PLANS, PLAN_ORDER, type Plan } from "@/lib/site";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
@@ -472,13 +472,13 @@ function StepLabel({ step }: { step: 1 | 2 }) {
   );
 }
 
-export function SignupForm({ initialPlan = "monthly" }: { initialPlan?: Billing }) {
+export function SignupForm({ initialPlan = "standard" }: { initialPlan?: Plan }) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<Role>("Agent");
-  const [plan, setPlan] = useState<Billing>(initialPlan);
+  const [plan, setPlan] = useState<Plan>(initialPlan);
   const [step, setStep] = useState<1 | 2>(1);
   const [company, setCompany] = useState("");
   const [title, setTitle] = useState("");
@@ -599,7 +599,7 @@ export function SignupForm({ initialPlan = "monthly" }: { initialPlan?: Billing 
         <fieldset>
           <legend className="mb-1.5 text-[13px] font-medium text-zinc-800">Plan</legend>
           <div className="grid grid-cols-2 gap-3">
-            {(["monthly", "yearly"] as const).map((b) => {
+            {PLAN_ORDER.map((b) => {
               const on = plan === b;
               return (
                 <button
@@ -610,7 +610,7 @@ export function SignupForm({ initialPlan = "monthly" }: { initialPlan?: Billing 
                   className={`relative rounded-xl border p-4 text-left transition-[border-color,box-shadow,transform] active:scale-[0.99] ${on ? "border-zinc-950 shadow-[0_0_0_3px_rgb(172_250_104/0.5)]" : "border-zinc-200 hover:border-zinc-300"}`}
                 >
                   <span className="flex items-center justify-between">
-                    <span className="text-[13px] font-semibold text-zinc-950">{b === "monthly" ? "Monthly" : "Yearly"}</span>
+                    <span className="text-[13px] font-semibold text-zinc-950">{PLANS[b].name}</span>
                     <span className={`grid size-4 place-items-center rounded-full border ${on ? "border-zinc-950 bg-zinc-950" : "border-zinc-300"}`}>
                       {on && <Check size={10} strokeWidth={3.5} className="text-lime" />}
                     </span>
@@ -619,7 +619,7 @@ export function SignupForm({ initialPlan = "monthly" }: { initialPlan?: Billing 
                     ${PLANS[b].price.toLocaleString("en-US")}
                     <span className="text-[12px] font-semibold text-zinc-500">/{PLANS[b].per}</span>
                   </span>
-                  <span className="mt-1.5 block text-[11.5px] text-zinc-500">{b === "monthly" ? "Cancel anytime" : `Save $${YEARLY_SAVINGS_USD} a year`}</span>
+                  <span className="mt-1.5 block text-[11.5px] leading-snug text-zinc-500">{b === "pro" ? "Adds auctions and social media listings" : "Every agency listing and signal"}</span>
                 </button>
               );
             })}

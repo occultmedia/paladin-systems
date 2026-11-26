@@ -15,7 +15,7 @@ import { scoreConfidence } from "@/lib/confidence";
 import { marketBrief } from "@/lib/scan-data";
 import { TerminalPreview, type PreviewData } from "@/components/landing/terminal-preview";
 import { MotionRoot, Reveal, Stagger, StaggerItem } from "@/components/motion/reveal";
-import { CONTACT_EMAIL, PLANS, SITE_DESCRIPTION, SITE_NAME, SITE_URL, YEARLY_SAVINGS_USD } from "@/lib/site";
+import { CONTACT_EMAIL, PLANS, PLAN_ORDER, SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/site";
 import { Faq, type FaqItem } from "@/components/landing/faq";
 import {
   ALL_LISTINGS,
@@ -369,12 +369,12 @@ const jsonLd = {
   description: SITE_DESCRIPTION,
   url: SITE_URL,
   brand: { "@type": "Organization", name: SITE_NAME, url: SITE_URL, email: CONTACT_EMAIL },
-  offers: (["monthly", "yearly"] as const).map((b) => ({
+  offers: PLAN_ORDER.map((b) => ({
     "@type": "Offer",
-    name: b === "monthly" ? "Monthly" : "Yearly",
+    name: PLANS[b].name,
     price: String(PLANS[b].price),
     priceCurrency: "USD",
-    priceSpecification: { "@type": "UnitPriceSpecification", price: String(PLANS[b].price), priceCurrency: "USD", unitText: b === "monthly" ? "MONTH" : "ANN" },
+    priceSpecification: { "@type": "UnitPriceSpecification", price: String(PLANS[b].price), priceCurrency: "USD", unitText: "ANN" },
   })),
 };
 
@@ -454,7 +454,7 @@ const FAQ: FaqItem[] = [
   },
   {
     q: "How much does it cost?",
-    a: `One plan with everything in it: $${PLANS.monthly.price} a month, or $${PLANS.yearly.price.toLocaleString("en-US")} a year, which saves $${YEARLY_SAVINGS_USD}. Teams that need several seats can contact us for team access.`,
+    a: `Two plans, billed once a year. Standard is $${PLANS.standard.price} a year and has every agency listing, the value signals, watchlist and Market feed. Pro is $${PLANS.pro.price.toLocaleString("en-US")} a year and adds property auctions and listings from social media. You can move from Standard to Pro in Settings. Teams that need several seats can contact us for team access.`,
   },
   {
     q: "My agency's listings are missing or wrong. What do I do?",
@@ -590,7 +590,7 @@ export default function Home() {
           <div className="mx-auto max-w-[1240px] px-5 py-16 sm:px-6 sm:py-24">
             <Reveal className="text-center">
               <Eyebrow>Pricing</Eyebrow>
-              <h2 className="mt-4 font-display text-[30px] font-bold tracking-tight text-zinc-950 sm:text-[44px]">One plan. Full access.</h2>
+              <h2 className="mt-4 font-display text-[30px] font-bold tracking-tight text-zinc-950 sm:text-[44px]">Two plans. Billed yearly.</h2>
             </Reveal>
             <div className="relative mx-auto mt-10 max-w-[1000px] sm:mt-12">
             {/* soft shapes behind the glass so the frost has something to blur */}
@@ -600,30 +600,15 @@ export default function Home() {
               <div className="absolute -right-6 -top-6 size-[260px] rounded-full bg-[#d8f7b8] blur-3xl" />
               <div className="hero-grain absolute inset-0 opacity-[0.25] mix-blend-overlay" />
             </div>
-            <Stagger className="relative grid gap-5 lg:grid-cols-[1.35fr_1fr]" gap={0.12}>
+            <Stagger className="relative grid gap-5 md:grid-cols-2 lg:grid-cols-3" gap={0.12}>
+              <StaggerItem className="relative rounded-3xl border border-white/80 bg-white/50 shadow-[inset_0_1px_0_rgb(255_255_255/0.95),inset_0_0_0_1px_rgb(255_255_255/0.35),0_24px_60px_-28px_rgb(10_10_10/0.35)] ring-1 ring-zinc-950/[0.06] backdrop-blur-2xl backdrop-saturate-150 p-7 sm:p-10">
+                <PlanPrice plan="standard" />
+              </StaggerItem>
               <StaggerItem className="relative rounded-3xl border border-white/80 bg-white/50 shadow-[inset_0_1px_0_rgb(255_255_255/0.95),inset_0_0_0_1px_rgb(255_255_255/0.35),0_24px_60px_-28px_rgb(10_10_10/0.35)] ring-1 ring-zinc-950/[0.06] backdrop-blur-2xl backdrop-saturate-150 p-7 sm:p-10">
                 <RunLine speed={9} width={2} />
-                <p className="font-display text-[18px] font-bold text-zinc-950">Aruba</p>
-                <div className="mt-5">
-                  <PlanPrice />
-                </div>
-                <ul className="mt-8 space-y-3">
-                  {[
-                    "Listings from Aruba agencies, updated daily",
-                    "Value signal, price history and Confidence Score",
-                    "AI morning briefing and a note on every listing",
-                    "Watchlist and interested clients",
-                    "Members-only Market feed",
-                    "3D map, agent contact and CSV export",
-                  ].map((f) => (
-                    <li key={f} className="flex gap-3 text-[14px] text-zinc-700">
-                      <span className="mt-[7px] size-1.5 shrink-0 rounded-full bg-zinc-950" />
-                      {f}
-                    </li>
-                  ))}
-                </ul>
+                <PlanPrice plan="pro" />
               </StaggerItem>
-              <StaggerItem className="flex flex-col justify-between rounded-3xl border border-white/80 bg-white/50 shadow-[inset_0_1px_0_rgb(255_255_255/0.95),inset_0_0_0_1px_rgb(255_255_255/0.35),0_24px_60px_-28px_rgb(10_10_10/0.35)] ring-1 ring-zinc-950/[0.06] backdrop-blur-2xl backdrop-saturate-150 p-7 sm:p-10">
+              <StaggerItem className="flex flex-col justify-between md:col-span-2 lg:col-span-1 rounded-3xl border border-white/80 bg-white/50 shadow-[inset_0_1px_0_rgb(255_255_255/0.95),inset_0_0_0_1px_rgb(255_255_255/0.35),0_24px_60px_-28px_rgb(10_10_10/0.35)] ring-1 ring-zinc-950/[0.06] backdrop-blur-2xl backdrop-saturate-150 p-7 sm:p-10">
                 <div>
                   <p className="font-display text-[18px] font-bold text-zinc-950">Teams &amp; data access</p>
                   <p className="mt-4 font-display text-[40px] font-bold leading-none text-zinc-950">Custom</p>

@@ -114,7 +114,7 @@ function Particles({ density = 0.00009 }: { density?: number }) {
   return <canvas ref={ref} aria-hidden className="absolute inset-0 size-full" />;
 }
 
-export function GrainField({ variant = "rise", className = "" }: { variant?: Variant; className?: string }) {
+export function GrainField({ variant = "rise", className = "", particles = true }: { variant?: Variant; className?: string; /** false: no floating specks (inside the app) */ particles?: boolean }) {
   const glow = {
     // lime rising from the bottom centre, ink at the top (hero window backdrop)
     rise: "radial-gradient(150% 115% at 50% 100%, #ACFA68 0%, #8ED653 16%, #4C7F24 34%, #1D2C10 56%, #0B0D08 82%)",
@@ -132,7 +132,7 @@ export function GrainField({ variant = "rise", className = "" }: { variant?: Var
       {variant !== "ink" && (
         <div className="absolute inset-0 opacity-60 mix-blend-screen" style={{ background: "radial-gradient(60% 50% at 18% 0%, rgb(172 250 104 / 0.16), transparent 70%)" }} />
       )}
-      <Particles density={variant === "ink" ? 0.00006 : 0.00009} />
+      {particles && <Particles density={variant === "ink" ? 0.00006 : 0.00009} />}
       {/* film grain over everything */}
       <div className="hero-grain absolute inset-0 opacity-[0.55] mix-blend-overlay" />
       <div className="hero-grain absolute inset-0 opacity-[0.12]" />
