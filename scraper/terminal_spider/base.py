@@ -73,6 +73,7 @@ class SpiderStats:
     rows_changed: int = 0
     rows_unchanged: int = 0
     index_failures: int = 0       # index pages that would not load
+    skipped: int = 0              # pages read that are not an Aruba sale (rentals, other islands)
     seconds: float = 0.0
     field_misses: dict[str, int] = field(default_factory=dict)  # selector -> times it found nothing
 
@@ -177,6 +178,10 @@ class BaseSpider(abc.ABC):
         Read a listing page and return the standard record (see `normalise`).
         `card` is what parse_index() found for it, so the detail parser can
         fall back to the card when a field is missing.
+
+        Return {"skip": "why"} for a page that is not an Aruba sale (a rental,
+        another island). It is stored as raw_status "Skipped" with nothing
+        else, so it is not opened again until its card changes.
         """
 
     async def prepare(self) -> None:
@@ -501,6 +506,10 @@ class BaseSpider(abc.ABC):
                     await self._upsert([self._seen_row(url, prev, seen_at)])
                     continue
                 read = data is not None
+                if data and data.get("skip"):
+                    self.stats.skipped += 1
+                    log.info("[%s] %s/%s skipped %s: %s", self.agency_id, n, len(plan), url, data["skip"])
+                    data = {"raw_status": "Skipped", "extra": {"skipped": data["skip"]}}
                 data = {**card} if data is None else data
                 data["source_url"] = url
                 rec = self.normalise(data)

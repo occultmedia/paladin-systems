@@ -489,7 +489,7 @@ class Normaliser:
         self.everything = everything
         self.dry_run = dry_run
         self.limit = limit
-        self.stats = {"read": 0, "inserted": 0, "updated": 0, "merged": 0, "failed": 0, "signals": 0}
+        self.stats = {"read": 0, "inserted": 0, "updated": 0, "merged": 0, "failed": 0, "skipped": 0, "signals": 0}
         self.failures: list[str] = []
         self.planned: list[dict[str, Any]] = []
 
@@ -537,6 +537,11 @@ class Normaliser:
 
         for raw in raws:
             self.stats["read"] += 1
+            if raw.get("raw_status") == "Skipped":
+                # not an Aruba sale (a rental, another island): nothing to list
+                self.stats["skipped"] += 1
+                self._mark(raw["id"], raw.get("property_id"), f"skipped: {(raw.get('raw_payload') or {}).get('skipped', '')}"[:500])
+                continue
             try:
                 f = read_raw(raw)
             except Exception as exc:  # noqa: BLE001 - keep the error on the raw row, carry on
@@ -562,6 +567,13 @@ class Normaliser:
                         key=lambda x: x[0],
                         default=(0, None),
                     )
+                    # Without a printed pin on both sides the location is only a district,
+                    # so the asking prices must also agree (within 15%) to call it one property.
+                    if best[0] >= DUP_LIKELY and not (f.pin_exact and best[1]["id"] in exact):
+                        theirs, ours = float(best[1]["asking_price_usd"]), f.row["asking_price_usd"]
+                        if abs(theirs - ours) > 0.15 * max(theirs, ours):
+                            log.info("no merge of %s into %s (score %s): no pin and the prices differ", raw["source_url"], best[1]["listing_id"], best[0])
+                            best = (0, None)
                     if best[0] >= DUP_LIKELY:
                         master = best[1]
                         self.stats["merged"] += 1

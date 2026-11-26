@@ -17,7 +17,8 @@ No signal at all (so no estimate either) for:
   - anything not for sale (under contract, sold, de-listed);
   - fixer-uppers and homes sold with several apartments: nothing to compare
     them with;
-  - homes without a built size, or with fewer than 3 similar homes near them.
+  - homes without a built size, without a known district (no pin and only
+    "Aruba" as the place), or with fewer than 3 similar homes near them.
 
 Why 20%: measured 25 November 2026 on 184 homes, the estimate is typically
 about 20-30% away from the asking price. A 10% line (the rule before this)
@@ -54,6 +55,9 @@ MULTI_TEXT = re.compile(
     r"|divided into (?:two|three|[2-9])\b|multi[- ]?(?:unit|family)",
     re.I,
 )
+
+
+from .normalise import DISTRICT_CENTERS  # noqa: E402
 
 
 def group_of(row: dict[str, Any]) -> str | None:
@@ -232,6 +236,8 @@ def score(rows: list[dict[str, Any]], texts: dict[str, str]) -> tuple[dict[str, 
             why[r["id"]] = "sold or de-listed"
         elif not r.get("built_sqft"):
             why[r["id"]] = "no built size"
+        elif r["district"] not in DISTRICT_CENTERS:
+            why[r["id"]] = "location not known"  # placed at the island's centre, so "nearby" means nothing
         else:
             live.append(Home(r, texts.get(r.get("source_url") or "", "")))
     mark_projects(live)

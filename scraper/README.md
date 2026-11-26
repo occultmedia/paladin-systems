@@ -15,6 +15,7 @@ scraper/
     kw_aruba.py               KWArubaSpider: selectors for kw-aruba.com only
     all_property_aruba.py     AllPropertyArubaSpider: selectors for allpropertyaruba.com only
     remax_aruba.py            RemaxArubaSpider: selectors for remaxaruba.com only (crawled with RE/MAX's consent, see its header)
+    bold_aruba.py             BoldArubaSpider: bold.realestate, Aruba sales only (reads the property sitemap)
     normalise.py              raw_listings -> property_master (runs at the end of every crawl)
     signals.py                Below market / At market / Above market (run by normalise.py)
     parsing.py                "USD 3.900.000" -> 3900000, "10 bedroom(s)" -> 10, currency, Cloudflare e-mails
@@ -190,6 +191,6 @@ On land, a "Bedrooms 0" in the table is stored as null (not applicable).
    If the listings are not in the page's HTML, set `engine = "browser"`.
 3. Register the class in `terminal_spider/__init__.py` (`SPIDERS`).
 4. Add its photo host to `src/lib/photo-hosts.ts`, so its photos are resized
-   (not needed for Framer sites, whose image host resizes by itself).
+   (not needed for Framer or Luxury Presence sites, whose image hosts resize by themselves).
 5. Check its robots.txt and terms first, then
    `python -m terminal_spider <agency> --dry-run --limit 3`.

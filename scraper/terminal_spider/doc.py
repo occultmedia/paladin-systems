@@ -13,7 +13,12 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from bs4 import BeautifulSoup, NavigableString, Tag
+import warnings
+
+from bs4 import BeautifulSoup, NavigableString, Tag, XMLParsedAsHTMLWarning
+
+# Sitemaps are read with the same parser; their <loc> tags are found either way.
+warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 
 from .parsing import clean, decode_cf_email
 
