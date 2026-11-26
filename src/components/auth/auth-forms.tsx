@@ -634,7 +634,7 @@ export function SignupForm({ initialPlan = "standard", initialBilling = "monthly
                     ${PLANS[b].price[billing].toLocaleString("en-US")}
                     <span className="text-[12px] font-semibold text-zinc-500">/{PER[billing]}</span>
                   </span>
-                  <span className="mt-1.5 block text-[11.5px] leading-snug text-zinc-500">{b === "pro" ? "Adds auctions and social media listings" : "Every agency listing and signal"}
+                  <span className="mt-1.5 block text-[11.5px] leading-snug text-zinc-500">{b === "pro" ? "Adds auctions, social media and Airbnb income" : "Every agency listing and signal"}
                     {billing === "yearly" && <span className="block font-semibold text-zinc-700">Saves ${yearlySavings(b)} a year</span>}
                   </span>
                 </button>

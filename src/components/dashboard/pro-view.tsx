@@ -1,7 +1,8 @@
 "use client";
 
 /*
- * The Pro tab: property auctions and listings indexed from social media.
+ * The Pro tab: property auctions, listings indexed from social media, and
+ * short-term rental income from Airbnb (rental-income.tsx).
  * Standard members see it locked, with the way to upgrade. Pro members see
  * the sections; both are empty until those Index runs start.
  */
@@ -11,6 +12,8 @@ import { useState } from "react";
 import { GrainField } from "@/components/landing/grain-field";
 import { usePlan } from "@/lib/plan";
 import { PLANS, fmtPlanPrice, type Billing } from "@/lib/site";
+import type { Listing } from "@/lib/aruba-data";
+import { RentalIncome } from "./rental-income";
 
 const SECTIONS = [
   {
@@ -82,7 +85,7 @@ export function UpgradeButton({ className = "", billing }: { className?: string;
   );
 }
 
-export function ProView() {
+export function ProView({ listings }: { listings: Listing[] }) {
   const { isPro, billing } = usePlan();
   return (
     <div className="pb-8 sm:pb-10">
@@ -95,7 +98,7 @@ export function ProView() {
             {!isPro && <Lock size={20} strokeWidth={2} className="text-zinc-500" aria-label="Locked" />}
           </h1>
           <p className="mt-1 max-w-xl text-[13px] text-zinc-400">
-            Property auctions and listings from social media: deals that never reach an agency site.
+            Property auctions, listings from social media, and what a home could earn on Airbnb.
           </p>
         </div>
       </div>
@@ -105,7 +108,7 @@ export function ProView() {
           <div>
             <p className="font-display text-[17px] font-bold text-zinc-950">You&rsquo;re on {PLANS.standard.name}</p>
             <p className="mt-1 max-w-xl text-[13px] text-zinc-600">
-              Pro adds property auctions and social media listings for {fmtPlanPrice("pro", billing)}, instead of {fmtPlanPrice("standard", billing)}.
+              Pro adds property auctions, social media listings and Airbnb rental income for {fmtPlanPrice("pro", billing)}, instead of {fmtPlanPrice("standard", billing)}.
             </p>
           </div>
           <UpgradeButton />
@@ -144,6 +147,8 @@ export function ProView() {
           </section>
         ))}
       </div>
+
+      <RentalIncome listings={listings} locked={!isPro} />
     </div>
   );
 }

@@ -3564,7 +3564,7 @@ function Dashboard() {
         ) : tab === "Market feed" ? (
           <FeedView profile={me.profile} profileLoading={me.loading} shared={me.shared} onEditProfile={openProfile} onOpenListing={openListing} />
         ) : tab === "Pro" ? (
-          <ProView />
+          <ProView listings={market ?? []} />
         ) : tab === "Settings" ? (
           <SettingsView profile={{ draft: me.draft, loading: me.loading }} onSaveProfile={me.save} shared={me.shared} />
         ) : (

@@ -81,7 +81,7 @@ export function PlanPrice({ plan }: { plan: Plan }) {
         {!pro && (
           <li className="flex items-center gap-3 text-[14px] text-zinc-400">
             <Lock size={12} strokeWidth={2} className="shrink-0" />
-            Auctions and social media listings (Pro)
+            Auctions, social media and Airbnb income (Pro)
           </li>
         )}
       </ul>

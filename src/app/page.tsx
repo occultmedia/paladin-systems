@@ -456,7 +456,7 @@ const FAQ: FaqItem[] = [
   },
   {
     q: "How much does it cost?",
-    a: `Two plans, billed monthly or once a year. Standard is $${PLANS.standard.price.monthly} a month or $${PLANS.standard.price.yearly} a year (saves $${yearlySavings("standard")}) and has every agency listing, the value signals, watchlist and Market feed. Pro is $${PLANS.pro.price.monthly} a month or $${PLANS.pro.price.yearly.toLocaleString("en-US")} a year (saves $${yearlySavings("pro")}) and adds property auctions and listings from social media. You can move from Standard to Pro in Settings. Teams that need several seats can contact us for team access.`,
+    a: `Two plans, billed monthly or once a year. Standard is $${PLANS.standard.price.monthly} a month or $${PLANS.standard.price.yearly} a year (saves $${yearlySavings("standard")}) and has every agency listing, the value signals, watchlist and Market feed. Pro is $${PLANS.pro.price.monthly} a month or $${PLANS.pro.price.yearly.toLocaleString("en-US")} a year (saves $${yearlySavings("pro")}) and adds property auctions, listings from social media, and Airbnb rental income by area with a yield calculator for investors. You can move from Standard to Pro in Settings. Teams that need several seats can contact us for team access.`,
   },
   {
     q: "My agency's listings are missing or wrong. What do I do?",

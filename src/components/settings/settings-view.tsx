@@ -179,7 +179,7 @@ function PlanCard() {
   const [billing, setLocal] = useState<Billing>(savedBilling);
   const [error, setError] = useState<string | null>(null);
   return (
-    <Card id="plan" title="Plan" text="Pay monthly, or once a year and save. Pro adds property auctions and social media listings.">
+    <Card id="plan" title="Plan" text="Pay monthly, or once a year and save. Pro adds property auctions, social media listings and Airbnb rental income.">
       <div className="flex flex-wrap items-center gap-3">
         <div role="radiogroup" aria-label="Billing" className="inline-flex rounded-full bg-zinc-100 p-1 text-[12.5px] font-semibold">
           {BILLING_ORDER.map((b) => (
@@ -249,7 +249,7 @@ function PlanCard() {
           <UpgradeButton billing={billing} />
         </div>
       ) : (
-        <p className="border-t border-zinc-100 pt-4 text-[11.5px] text-zinc-500">You have everything in Terminal, auctions and social media listings included.</p>
+        <p className="border-t border-zinc-100 pt-4 text-[11.5px] text-zinc-500">You have everything in Terminal: auctions, social media listings and Airbnb rental income included.</p>
       )}
     </Card>
   );
