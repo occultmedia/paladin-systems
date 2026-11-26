@@ -16,6 +16,7 @@ scraper/
     all_property_aruba.py     AllPropertyArubaSpider: selectors for allpropertyaruba.com only
     remax_aruba.py            RemaxArubaSpider: selectors for remaxaruba.com only (crawled with RE/MAX's consent, see its header)
     bold_aruba.py             BoldArubaSpider: bold.realestate, Aruba sales only (reads the property sitemap)
+    weichert_aruba.py         WeichertArubaSpider: weichertaruba.com (reads the site's public WordPress property API)
     normalise.py              raw_listings -> property_master (runs at the end of every crawl)
     signals.py                Below market / At market / Above market (run by normalise.py)
     parsing.py                "USD 3.900.000" -> 3900000, "10 bedroom(s)" -> 10, currency, Cloudflare e-mails

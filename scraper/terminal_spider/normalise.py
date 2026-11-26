@@ -87,6 +87,8 @@ DISTRICT_ALIASES = {
     "seroe pita": "Paradera", "rooi santo": "Noord", "opal": "Noord", "nanki beach": "San Nicolas",
     "rodgers beach": "San Nicolas", "rodger's beach": "San Nicolas", "baby beach": "San Nicolas",
 }
+# Place names: shared by unrelated listings, so never a sign of one building project.
+PLACE_WORDS = {w for name in [*DISTRICT_CENTERS, *DISTRICT_ALIASES] for w in re.findall(r"[a-zà-ÿ]{3,}", name.lower())}
 ISLAND_CENTER = (12.52, -70.0)
 # Where the map in KW's and RE/MAX's sites stands until someone sets the pin.
 DEFAULT_PIN = (12.5092044, -70.0086306)
@@ -421,6 +423,10 @@ def match_score(a: dict[str, Any], b: dict[str, Any]) -> int:
         return 0  # both name a unit, and not the same one
     if a.get("property_type") in UNIT_TYPES and (not ua or ua != ub):
         return 0  # flats in one building look alike: only the same unit number makes them the same flat
+    if bool(ua) != bool(ub) and (project_key(a["asset_name"]) & project_key(b["asset_name"])) - PLACE_WORDS:
+        # The same project, but only one names a unit: "Villa Nevis 5811 ... Caribbean Town" is one house,
+        # "Caribbean Town - Villa Nassau" a model sold many times over. Places ("Savaneta") do not count.
+        return 0
     s = 0
     if None not in (a["lat"], a["lng"], b["lat"], b["lng"]):
         d = distance_m(a["lat"], a["lng"], b["lat"], b["lng"])
@@ -431,6 +437,17 @@ def match_score(a: dict[str, Any], b: dict[str, Any]) -> int:
         s += 25
     else:
         return 0
+    pa, pb = float(a["asking_price_usd"] or 0), float(b["asking_price_usd"] or 0)
+    same_project = bool((project_key(a["asset_name"]) & project_key(b["asset_name"])) - PLACE_WORDS)
+    if (
+        ua and ua == ub and same_project
+        and a.get("bedrooms") == b.get("bedrooms")
+        and pa > 0 and pb > 0 and abs(pa - pb) <= 0.03 * max(pa, pb)
+    ):
+        # "The Reef 2B" at $1,629,999 and "The Reef 2B | Partial Ocean View ..." at $1,630,000:
+        # agencies measure a flat differently (with or without the terrace), but the same
+        # project, unit, bedrooms and price is one flat.
+        return 95
     diff = None
     if a.get("built_sqft") and b.get("built_sqft"):
         diff = abs(a["built_sqft"] - b["built_sqft"]) / max(a["built_sqft"], b["built_sqft"])
@@ -440,7 +457,6 @@ def match_score(a: dict[str, Any], b: dict[str, Any]) -> int:
         s += 30 if diff <= 0.02 else 20 if diff <= 0.06 else 8 if diff <= 0.12 else -20 if diff > 0.25 else 0
     if a.get("bedrooms") is not None and b.get("bedrooms") is not None:
         s += 10 if a["bedrooms"] == b["bedrooms"] else -15
-    pa, pb = float(a["asking_price_usd"] or 0), float(b["asking_price_usd"] or 0)
     if pa > 0 and pb > 0:
         p = abs(pa - pb) / max(pa, pb)
         s += 12 if p <= 0.03 else 7 if p <= 0.1 else 0

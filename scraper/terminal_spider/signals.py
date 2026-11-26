@@ -18,7 +18,11 @@ No signal at all (so no estimate either) for:
   - fixer-uppers and homes sold with several apartments: nothing to compare
     them with;
   - homes without a built size, without a known district (no pin and only
-    "Aruba" as the place), or with fewer than 3 similar homes near them.
+    "Aruba" as the place), or with fewer than 3 similar homes near them;
+  - every unit of a project when 3 or more are scored and at least 3 in 4
+    of them lean the same way (added 26 November 2026, when 13 Caribbean
+    Town units all came out about 50% below their area): the whole project
+    is priced apart from its area, which says nothing about one unit.
 
 Why 20%: measured 25 November 2026 on 184 homes, the estimate is typically
 about 20-30% away from the asking price. A 10% line (the rule before this)
@@ -38,6 +42,9 @@ THRESHOLD = 0.20
 NEAREST = 5
 NEAR_KM = 4.0      # a comparable further than this is not "near"
 MIN_NEAR = 3
+# A project with at least this many scored units, this share of them leaning the same way
+PROJECT_MIN = 3
+PROJECT_SHARE = 0.75
 UNIT_TYPES = {"Condo", "Apartment", "Townhouse", "Penthouse"}
 # How price grows with size: twice the house is not twice the price.
 SIZE_POWER = {"house": 0.6, "unit": 0.85}
@@ -274,4 +281,20 @@ def score(rows: list[dict[str, Any]], texts: dict[str, str]) -> tuple[dict[str, 
             "comps_count": len(comps),
             "price_vs_comps_pct": round((h.price / estimate - 1) * 100, 2),
         }
+
+    # A project whose units nearly all lean the same way is priced apart from its area
+    # (a budget development, a beachfront tower): that says nothing about any one unit.
+    by_project: dict[int, list[Home]] = {}
+    for h in live:
+        if h.id not in why:
+            by_project.setdefault(h.project, []).append(h)
+    for units in by_project.values():
+        if len(units) < PROJECT_MIN:
+            continue
+        lean = Counter("below" if out[u.id]["price_vs_comps_pct"] <= -THRESHOLD * 100 else "above" if out[u.id]["price_vs_comps_pct"] >= THRESHOLD * 100 else "near" for u in units)
+        side, n = lean.most_common(1)[0]
+        if side != "near" and n / len(units) >= PROJECT_SHARE:
+            for u in units:
+                out[u.id] = dict(NO_SIGNAL)
+                why[u.id] = "project priced apart from its area"
     return out, why
