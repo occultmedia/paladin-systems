@@ -3,7 +3,7 @@ import { RunLine } from "@/components/run-line";
 import Link from "next/link";
 import { ArrowRight, ArrowUpRight, FileSpreadsheet, Flag, Handshake, LineChart, Map as MapIcon, MessageCircle, Pin, Rss, Scale, ShieldCheck, Sparkles, Users } from "lucide-react";
 import { SequenceLockup, Wordmark } from "@/components/logo";
-import { PlanPrice } from "@/components/landing/plan-price";
+import { BillingToggle, PlanPrice } from "@/components/landing/plan-price";
 import { AIBadge } from "@/components/ai/ai-visuals";
 import { Hero, type HeroEvent, type HeroKpi } from "@/components/landing/hero";
 import { SiteHeader } from "@/components/landing/site-header";
@@ -15,7 +15,7 @@ import { scoreConfidence } from "@/lib/confidence";
 import { marketBrief } from "@/lib/scan-data";
 import { TerminalPreview, type PreviewData } from "@/components/landing/terminal-preview";
 import { MotionRoot, Reveal, Stagger, StaggerItem } from "@/components/motion/reveal";
-import { CONTACT_EMAIL, PLANS, PLAN_ORDER, SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/site";
+import { BILLING_LABEL, BILLING_ORDER, CONTACT_EMAIL, PLANS, PLAN_ORDER, SITE_DESCRIPTION, SITE_NAME, SITE_URL, yearlySavings } from "@/lib/site";
 import { Faq, type FaqItem } from "@/components/landing/faq";
 import {
   ALL_LISTINGS,
@@ -369,13 +369,15 @@ const jsonLd = {
   description: SITE_DESCRIPTION,
   url: SITE_URL,
   brand: { "@type": "Organization", name: SITE_NAME, url: SITE_URL, email: CONTACT_EMAIL },
-  offers: PLAN_ORDER.map((b) => ({
-    "@type": "Offer",
-    name: PLANS[b].name,
-    price: String(PLANS[b].price),
-    priceCurrency: "USD",
-    priceSpecification: { "@type": "UnitPriceSpecification", price: String(PLANS[b].price), priceCurrency: "USD", unitText: "ANN" },
-  })),
+  offers: PLAN_ORDER.flatMap((p) =>
+    BILLING_ORDER.map((b) => ({
+      "@type": "Offer",
+      name: `${PLANS[p].name}, ${BILLING_LABEL[b].toLowerCase()}`,
+      price: String(PLANS[p].price[b]),
+      priceCurrency: "USD",
+      priceSpecification: { "@type": "UnitPriceSpecification", price: String(PLANS[p].price[b]), priceCurrency: "USD", unitText: b === "monthly" ? "MONTH" : "ANN" },
+    })),
+  ),
 };
 
 /* ── building blocks ─────────────────────────────────────────────────── */
@@ -454,7 +456,7 @@ const FAQ: FaqItem[] = [
   },
   {
     q: "How much does it cost?",
-    a: `Two plans, billed once a year. Standard is $${PLANS.standard.price} a year and has every agency listing, the value signals, watchlist and Market feed. Pro is $${PLANS.pro.price.toLocaleString("en-US")} a year and adds property auctions and listings from social media. You can move from Standard to Pro in Settings. Teams that need several seats can contact us for team access.`,
+    a: `Two plans, billed monthly or once a year. Standard is $${PLANS.standard.price.monthly} a month or $${PLANS.standard.price.yearly} a year (saves $${yearlySavings("standard")}) and has every agency listing, the value signals, watchlist and Market feed. Pro is $${PLANS.pro.price.monthly} a month or $${PLANS.pro.price.yearly.toLocaleString("en-US")} a year (saves $${yearlySavings("pro")}) and adds property auctions and listings from social media. You can move from Standard to Pro in Settings. Teams that need several seats can contact us for team access.`,
   },
   {
     q: "My agency's listings are missing or wrong. What do I do?",
@@ -590,7 +592,10 @@ export default function Home() {
           <div className="mx-auto max-w-[1240px] px-5 py-16 sm:px-6 sm:py-24">
             <Reveal className="text-center">
               <Eyebrow>Pricing</Eyebrow>
-              <h2 className="mt-4 font-display text-[30px] font-bold tracking-tight text-zinc-950 sm:text-[44px]">Two plans. Billed yearly.</h2>
+              <h2 className="mt-4 font-display text-[30px] font-bold tracking-tight text-zinc-950 sm:text-[44px]">Two plans. Monthly or yearly.</h2>
+              <div className="mt-6">
+                <BillingToggle />
+              </div>
             </Reveal>
             <div className="relative mx-auto mt-10 max-w-[1000px] sm:mt-12">
             {/* soft shapes behind the glass so the frost has something to blur */}

@@ -11,7 +11,7 @@
 
 import { createClient, type SupabaseClient, type User } from "@supabase/supabase-js";
 import { useEffect, useState } from "react";
-import type { Plan } from "./site";
+import type { Billing, Plan } from "./site";
 import type { Database } from "./database.types";
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -35,6 +35,7 @@ export interface SignUpInput {
   role: Role;
   /** The plan chosen at sign-up. Pro opens only once it is paid (app_metadata.plan, see lib/plan.ts). */
   plan: Plan;
+  billing: Billing;
   /** Feed profile details entered at sign-up (photo and logo upload after the first sign-in). */
   company?: string;
   title?: string;
@@ -56,6 +57,7 @@ export async function signUp(input: SignUpInput): Promise<AuthResult> {
         full_name: input.name.trim(),
         role: input.role,
         requested_plan: input.plan,
+        billing_cycle: input.billing,
         company: input.company?.trim() ?? "",
         title: input.title?.trim() ?? "",
         whatsapp: input.whatsapp?.trim() ?? "",

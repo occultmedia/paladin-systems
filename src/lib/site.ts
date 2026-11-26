@@ -12,17 +12,24 @@ export const SITE_DESCRIPTION =
 export const CONTACT_EMAIL = "ops@sequencedata.aw";
 
 /**
- * Pricing: two plans, billed once a year.
+ * Pricing: two plans, each billed monthly or once a year.
  * Pro adds property auctions and listings indexed from social media; on
  * Standard those are shown locked. Who is on Pro: see lib/plan.ts.
  */
 export type Plan = "standard" | "pro";
+export type Billing = "monthly" | "yearly";
 export const PLAN_ORDER: Plan[] = ["standard", "pro"];
-export const PLANS: Record<Plan, { name: string; price: number; per: "year"; blurb: string }> = {
-  standard: { name: "Standard", price: 550, per: "year", blurb: "Every agency listing, value signals, watchlist and Market feed." },
-  pro: { name: "Pro", price: 1000, per: "year", blurb: "Everything in Standard, plus property auctions and social media listings." },
+export const BILLING_ORDER: Billing[] = ["monthly", "yearly"];
+export const BILLING_LABEL: Record<Billing, string> = { monthly: "Monthly", yearly: "Yearly" };
+export const PER: Record<Billing, "month" | "year"> = { monthly: "month", yearly: "year" };
+export const PLANS: Record<Plan, { name: string; price: Record<Billing, number>; blurb: string }> = {
+  standard: { name: "Standard", price: { monthly: 50, yearly: 550 }, blurb: "Every agency listing, value signals, watchlist and Market feed." },
+  pro: { name: "Pro", price: { monthly: 99, yearly: 1000 }, blurb: "Everything in Standard, plus property auctions and social media listings." },
 };
 export const PRO_FEATURES = ["Property auctions in Aruba", "Listings posted on social media"];
-export const fmtPlanPrice = (p: Plan) => `$${PLANS[p].price.toLocaleString("en-US")}/${PLANS[p].per}`;
+export const fmtPlanPrice = (p: Plan, b: Billing) => `$${PLANS[p].price[b].toLocaleString("en-US")}/${PER[b]}`;
+/** What paying yearly saves against 12 monthly payments ($50 Standard, $188 Pro). */
+export const yearlySavings = (p: Plan) => PLANS[p].price.monthly * 12 - PLANS[p].price.yearly;
 /** Anything that is not "pro" (old "monthly"/"yearly" values included) is Standard. */
 export const planOf = (v: unknown): Plan => (v === "pro" ? "pro" : "standard");
+export const billingOf = (v: unknown): Billing => (v === "yearly" ? "yearly" : "monthly");

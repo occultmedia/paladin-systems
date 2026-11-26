@@ -240,7 +240,7 @@ function TabSwitch({ tab, onTab, watchCount, full = false }: { tab: Tab; onTab: 
 
 function AccountMenu({ compact = false, onProfile }: { compact?: boolean; onProfile: () => void }) {
   const { user } = useUser();
-  const { plan } = usePlan();
+  const { plan, billing } = usePlan();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -322,7 +322,7 @@ function AccountMenu({ compact = false, onProfile }: { compact?: boolean; onProf
             <p className="truncate text-[13px] font-semibold text-zinc-950">{name}</p>
             <p className="truncate text-[12px] text-zinc-500">{user.email}</p>
             <p className="mt-2 inline-flex rounded-full bg-lime px-2 py-0.5 text-[11px] font-semibold text-zinc-950">
-              {PLANS[plan].name} · {fmtPlanPrice(plan)}
+              {PLANS[plan].name} · {fmtPlanPrice(plan, billing)}
             </p>
           </div>
           {items.map(({ icon: Icon, label, onClick }) => (

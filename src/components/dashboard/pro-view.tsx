@@ -10,7 +10,7 @@ import { Check, Gavel, Loader2, Lock, MessageCircle } from "lucide-react";
 import { useState } from "react";
 import { GrainField } from "@/components/landing/grain-field";
 import { usePlan } from "@/lib/plan";
-import { PLANS, fmtPlanPrice } from "@/lib/site";
+import { PLANS, fmtPlanPrice, type Billing } from "@/lib/site";
 
 const SECTIONS = [
   {
@@ -43,8 +43,9 @@ function GhostRows() {
   );
 }
 
-export function UpgradeButton({ className = "" }: { className?: string }) {
-  const { requested, requestPro, signedIn } = usePlan();
+export function UpgradeButton({ className = "", billing }: { className?: string; /** defaults to how the member is billed now */ billing?: Billing }) {
+  const { requested, requestPro, setBilling, signedIn, billing: current } = usePlan();
+  const cycle = billing ?? current;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   if (requested !== null)
@@ -62,6 +63,7 @@ export function UpgradeButton({ className = "" }: { className?: string }) {
           setBusy(true);
           setError(null);
           try {
+            if (cycle !== current) await setBilling(cycle);
             await requestPro();
           } catch (e) {
             setError(e instanceof Error ? e.message : "Could not send the request.");
@@ -72,7 +74,7 @@ export function UpgradeButton({ className = "" }: { className?: string }) {
         className="inline-flex items-center gap-2 rounded-full bg-zinc-950 px-5 py-2.5 font-display text-[13px] font-semibold text-lime transition-colors hover:bg-zinc-800 disabled:opacity-60"
       >
         {busy && <Loader2 size={14} className="animate-spin" />}
-        Upgrade to Pro · {fmtPlanPrice("pro")}
+        Upgrade to Pro · {fmtPlanPrice("pro", cycle)}
       </button>
       {!signedIn && <span className="text-[11.5px] text-zinc-500">Sign in to upgrade.</span>}
       {error && <span className="text-[11.5px] text-[#B23A3A]">{error}</span>}
@@ -81,7 +83,7 @@ export function UpgradeButton({ className = "" }: { className?: string }) {
 }
 
 export function ProView() {
-  const { isPro } = usePlan();
+  const { isPro, billing } = usePlan();
   return (
     <div className="pb-8 sm:pb-10">
       <div className="deck bleed relative isolate">
@@ -103,7 +105,7 @@ export function ProView() {
           <div>
             <p className="font-display text-[17px] font-bold text-zinc-950">You&rsquo;re on {PLANS.standard.name}</p>
             <p className="mt-1 max-w-xl text-[13px] text-zinc-600">
-              Pro adds property auctions and social media listings for {fmtPlanPrice("pro")}, instead of {fmtPlanPrice("standard")}.
+              Pro adds property auctions and social media listings for {fmtPlanPrice("pro", billing)}, instead of {fmtPlanPrice("standard", billing)}.
             </p>
           </div>
           <UpgradeButton />

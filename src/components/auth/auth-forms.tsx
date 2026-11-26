@@ -11,7 +11,7 @@ import { ImagePick } from "@/components/feed/profile-dialog";
 import { Wordmark } from "@/components/logo";
 import { ROLES, logIn, sendReset, signUp, supabase, updatePassword, type AuthResult, type Role } from "@/lib/auth";
 import { saveSignupProfile } from "@/lib/profile";
-import { CONTACT_EMAIL, PLANS, PLAN_ORDER, type Plan } from "@/lib/site";
+import { BILLING_LABEL, BILLING_ORDER, CONTACT_EMAIL, PER, PLANS, PLAN_ORDER, yearlySavings, type Billing, type Plan } from "@/lib/site";
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
@@ -472,13 +472,14 @@ function StepLabel({ step }: { step: 1 | 2 }) {
   );
 }
 
-export function SignupForm({ initialPlan = "standard" }: { initialPlan?: Plan }) {
+export function SignupForm({ initialPlan = "standard", initialBilling = "monthly" }: { initialPlan?: Plan; initialBilling?: Billing }) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<Role>("Agent");
   const [plan, setPlan] = useState<Plan>(initialPlan);
+  const [billing, setBilling] = useState<Billing>(initialBilling);
   const [step, setStep] = useState<1 | 2>(1);
   const [company, setCompany] = useState("");
   const [title, setTitle] = useState("");
@@ -519,7 +520,7 @@ export function SignupForm({ initialPlan = "standard" }: { initialPlan?: Plan })
       setBusy(false);
       return setResult({ ok: false, error: err instanceof Error ? err.message : "Could not save your profile." });
     }
-    const r = await signUp({ name, email, password, role, plan, company, title, whatsapp });
+    const r = await signUp({ name, email, password, role, plan, billing, company, title, whatsapp });
     setBusy(false);
     if (r.ok) return r.message === "confirm-email" ? setSent(true) : router.push("/dashboard?tab=listings");
     setResult(r);
@@ -598,6 +599,20 @@ export function SignupForm({ initialPlan = "standard" }: { initialPlan?: Plan })
 
         <fieldset>
           <legend className="mb-1.5 text-[13px] font-medium text-zinc-800">Plan</legend>
+          <div role="radiogroup" aria-label="Billing" className="mb-3 inline-flex rounded-full bg-zinc-100 p-1 text-[12.5px] font-semibold">
+            {BILLING_ORDER.map((c) => (
+              <button
+                key={c}
+                type="button"
+                role="radio"
+                aria-checked={billing === c}
+                onClick={() => setBilling(c)}
+                className={`rounded-full px-4 py-1.5 transition-colors ${billing === c ? "bg-zinc-950 text-white" : "text-zinc-600 hover:text-zinc-950"}`}
+              >
+                {BILLING_LABEL[c]}
+              </button>
+            ))}
+          </div>
           <div className="grid grid-cols-2 gap-3">
             {PLAN_ORDER.map((b) => {
               const on = plan === b;
@@ -616,10 +631,12 @@ export function SignupForm({ initialPlan = "standard" }: { initialPlan?: Plan })
                     </span>
                   </span>
                   <span className="mt-2 block font-display text-[22px] font-bold leading-none tracking-tight text-zinc-950">
-                    ${PLANS[b].price.toLocaleString("en-US")}
-                    <span className="text-[12px] font-semibold text-zinc-500">/{PLANS[b].per}</span>
+                    ${PLANS[b].price[billing].toLocaleString("en-US")}
+                    <span className="text-[12px] font-semibold text-zinc-500">/{PER[billing]}</span>
                   </span>
-                  <span className="mt-1.5 block text-[11.5px] leading-snug text-zinc-500">{b === "pro" ? "Adds auctions and social media listings" : "Every agency listing and signal"}</span>
+                  <span className="mt-1.5 block text-[11.5px] leading-snug text-zinc-500">{b === "pro" ? "Adds auctions and social media listings" : "Every agency listing and signal"}
+                    {billing === "yearly" && <span className="block font-semibold text-zinc-700">Saves ${yearlySavings(b)} a year</span>}
+                  </span>
                 </button>
               );
             })}

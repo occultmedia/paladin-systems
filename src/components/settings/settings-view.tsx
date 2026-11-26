@@ -17,7 +17,7 @@ import { GrainField } from "@/components/landing/grain-field";
 import { ROLES, logOut, sendReset, useUser } from "@/lib/auth";
 import { DEFAULT_BILLING, PAY_METHODS, useBilling, type BillingPrefs, type PayMethod } from "@/lib/billing";
 import { profileComplete, type Profile } from "@/lib/profile";
-import { PLANS, PLAN_ORDER, PRO_FEATURES, fmtPlanPrice } from "@/lib/site";
+import { BILLING_LABEL, BILLING_ORDER, PER, PLANS, PLAN_ORDER, PRO_FEATURES, fmtPlanPrice, yearlySavings, type Billing } from "@/lib/site";
 import { usePlan } from "@/lib/plan";
 import { UpgradeButton } from "@/components/dashboard/pro-view";
 
@@ -175,9 +175,42 @@ function ProfileForm({ initial, onSave, shared }: { initial: Profile; onSave: (p
 /* ── plan ────────────────────────────────────────────────────────────── */
 
 function PlanCard() {
-  const { plan, requested } = usePlan();
+  const { plan, billing: savedBilling, requested, setBilling, signedIn } = usePlan();
+  const [billing, setLocal] = useState<Billing>(savedBilling);
+  const [error, setError] = useState<string | null>(null);
   return (
-    <Card id="plan" title="Plan" text="Both plans are billed once a year. Pro adds property auctions and social media listings.">
+    <Card id="plan" title="Plan" text="Pay monthly, or once a year and save. Pro adds property auctions and social media listings.">
+      <div className="flex flex-wrap items-center gap-3">
+        <div role="radiogroup" aria-label="Billing" className="inline-flex rounded-full bg-zinc-100 p-1 text-[12.5px] font-semibold">
+          {BILLING_ORDER.map((b) => (
+            <button
+              key={b}
+              type="button"
+              role="radio"
+              aria-checked={billing === b}
+              onClick={async () => {
+                const before = billing;
+                setLocal(b);
+                setError(null);
+                if (!signedIn) return;
+                try {
+                  await setBilling(b);
+                } catch (e) {
+                  setLocal(before);
+                  setError(e instanceof Error ? e.message : "Could not save.");
+                }
+              }}
+              className={`rounded-full px-4 py-1.5 transition-colors ${billing === b ? "bg-zinc-950 text-white" : "text-zinc-600 hover:text-zinc-950"}`}
+            >
+              {BILLING_LABEL[b]}
+            </button>
+          ))}
+        </div>
+        <span className="text-[11.5px] text-zinc-500">
+          {billing === "yearly" ? `Yearly saves $${yearlySavings(plan)} on ${PLANS[plan].name}.` : "Cancel anytime."}
+        </span>
+        {error && <span className="text-[11.5px] text-[#B23A3A]">{error}</span>}
+      </div>
       <div className="grid gap-3 sm:grid-cols-2">
         {PLAN_ORDER.map((k) => {
           const on = plan === k;
@@ -189,8 +222,8 @@ function PlanCard() {
                 {!on && k === "pro" && requested !== null && <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10.5px] font-semibold text-zinc-600">Requested</span>}
               </span>
               <span className="mt-2 block font-display text-[22px] font-bold leading-none text-zinc-950">
-                ${PLANS[k].price.toLocaleString("en-US")}
-                <span className="text-[12px] font-semibold text-zinc-500">/{PLANS[k].per}</span>
+                ${PLANS[k].price[billing].toLocaleString("en-US")}
+                <span className="text-[12px] font-semibold text-zinc-500">/{PER[billing]}</span>
               </span>
               <span className="mt-1.5 block text-[11.5px] leading-snug text-zinc-500">{PLANS[k].blurb}</span>
               {k === "pro" && (
@@ -211,9 +244,9 @@ function PlanCard() {
           <p className="max-w-md text-[11.5px] leading-relaxed text-zinc-500">
             {requested !== null
               ? "We have your request. Pro opens on your account as soon as the Pro invoice is paid."
-              : `Upgrading moves you from ${fmtPlanPrice("standard")} to ${fmtPlanPrice("pro")}. We email the invoice; Pro opens as soon as it is paid. You are not charged now.`}
+              : `Upgrading moves you from ${fmtPlanPrice("standard", billing)} to ${fmtPlanPrice("pro", billing)}. We email the invoice; Pro opens as soon as it is paid. You are not charged now.`}
           </p>
-          <UpgradeButton />
+          <UpgradeButton billing={billing} />
         </div>
       ) : (
         <p className="border-t border-zinc-100 pt-4 text-[11.5px] text-zinc-500">You have everything in Terminal, auctions and social media listings included.</p>
