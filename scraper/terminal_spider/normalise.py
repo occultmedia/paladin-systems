@@ -49,7 +49,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
-from .colisting import same_home, why_not
+from .colisting import named_home, named_pairs, same_home, why_not
 from .parsing import clean, parse_number
 
 log = logging.getLogger("terminal_spider.normalise")
@@ -88,6 +88,12 @@ DISTRICT_ALIASES = {
     "seroe pita": "Paradera", "rooi santo": "Noord", "opal": "Noord", "nanki beach": "San Nicolas",
     "rodgers beach": "San Nicolas", "rodger's beach": "San Nicolas", "baby beach": "San Nicolas",
     "sta cruz": "Santa Cruz", "sta. cruz": "Santa Cruz", "bakval": "Malmok",
+    # neighbourhoods and the district they belong to, as Aruba's listing sites file them
+    "calbas": "Noord", "calabas": "Noord", "kamay": "Noord", "koyari": "Noord", "boegeroei": "Noord",
+    "casibari": "Paradera", "papaya": "Paradera", "cashero": "Santa Cruz", "macuarima": "Santa Cruz",
+    "sabanilla abou": "Santa Cruz", "san fuego": "Santa Cruz", "sero alejandro": "Savaneta",
+    "sabana basora": "Savaneta", "modanza": "Oranjestad", "primavera": "Oranjestad", "rooi afo": "Oranjestad",
+    "sero blanco": "Oranjestad", "solito": "Oranjestad", "mahuma": "Oranjestad",
 }
 # Place names: shared by unrelated listings, so never a sign of one building project.
 PLACE_WORDS = {w for name in [*DISTRICT_CENTERS, *DISTRICT_ALIASES] for w in re.findall(r"[a-zà-ÿ]{3,}", name.lower())}
@@ -600,6 +606,16 @@ class Normaliser:
                         log.info("no merge of %s into %s (score %s): co-listing check says %s", raw["source_url"], best[1]["listing_id"], best[0],
                                  why_not(f.row, best[1], pins_exact=f.pin_exact and best[1]["id"] in exact))
                         best = (0, None)
+                    if best[0] < DUP_LIKELY:
+                        # the named home: one house the agencies pin and file differently (colisting.py)
+                        twin = next(
+                            (m for m in masters
+                             if (m["id"], raw["agency_id"]) not in held and named_home(f.row, raw["agency_id"], m, masters)),
+                            None,
+                        )
+                        if twin:
+                            log.info("named home: %s is %s (%s)", raw["source_url"], twin["listing_id"], twin["asset_name"])
+                            best = (DUP_LIKELY, twin)
                     if best[0] >= DUP_LIKELY:
                         master = best[1]
                         self.stats["merged"] += 1
@@ -642,6 +658,39 @@ class Normaliser:
                 log.exception("failed %s", raw["source_url"])
                 self._mark(raw["id"], None, str(exc)[:500])
 
+    def fold_named_homes(self) -> None:
+        """
+        Fold listings made before the named-home rule (colisting.py): the newer
+        listing's agency rows move to the older one, and the newer is archived
+        (hidden, not deleted). Skipped when the newer has member flags or posts.
+        """
+        masters = _all(lambda: self.db.table("property_master").select(MATCH_COLS + ",first_seen").eq("status", "active").order("id"))
+        keeper_of: dict[str, dict[str, Any]] = {}
+
+        def root(m: dict[str, Any]) -> dict[str, Any]:
+            while m["id"] in keeper_of:
+                m = keeper_of[m["id"]]
+            return m
+
+        for a, b in named_pairs(masters):
+            a, b = root(a), root(b)
+            if a["id"] == b["id"]:
+                continue
+            keep, fold = sorted((a, b), key=lambda m: (m.get("first_seen") or "", m["listing_id"]))
+            used = [t for t, col in (("property_flags", "property_id"), ("deal_desk_posts", "listing_id"))
+                    if self.db.table(t).select(col, count="exact").eq(col, fold["id"]).limit(1).execute().count]
+            if used:
+                log.info("named home %s = %s: not folded (%s on %s)", keep["listing_id"], fold["listing_id"], ", ".join(used), fold["listing_id"])
+                continue
+            log.info("named home: fold %s (%s, %s) into %s (%s, %s)", fold["listing_id"], fold["agency_id"], fold["asset_name"],
+                     keep["listing_id"], keep["agency_id"], keep["asset_name"])
+            self.stats["folded"] = self.stats.get("folded", 0) + 1
+            self.planned.append({"action": "fold", "listing_id": fold["listing_id"], "asset_name": f"into {keep['listing_id']}"})
+            keeper_of[fold["id"]] = keep
+            if not self.dry_run:
+                self.db.table("raw_listings").update({"property_id": keep["id"]}).eq("property_id", fold["id"]).execute()
+                self.db.table("property_master").update({"status": "archived", "archived_at": datetime.now(timezone.utc).isoformat()}).eq("id", fold["id"]).execute()
+
     def comps_pass(self) -> None:
         """Recompute the signals of every active listing (see signals.py)."""
         from .signals import score
@@ -666,6 +715,7 @@ class Normaliser:
         from . import projects
 
         self.process_queue()
+        self.fold_named_homes()
         self.comps_pass()
         if not self.dry_run:
             projects.run(self.db)  # group flats into building projects (projects.py)

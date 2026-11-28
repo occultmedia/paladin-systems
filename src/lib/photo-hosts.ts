@@ -7,6 +7,8 @@ export const PHOTO_HOSTS = [
   { hostname: "kw-aruba.com", pathname: "/storage/app/uploads/public/**" },
   { hostname: "remaxaruba.com", pathname: "/storage/app/uploads/public/**" },
   { hostname: "www.coldwellbanker.aw", pathname: "/images/listing_photos/**" },
+  { hostname: "mpgaruba.com", pathname: "/storage/app/uploads/public/**" },
+  { hostname: "www.bhhsaruba.com", pathname: "/storage/app/uploads/public/**" },
   // Not weichertaruba.com: its Cloudflare refuses Vercel's resizer (HTTP 502), so its
   // photos load directly; the spider picks WordPress's own resized copy instead.
 ] as const;
