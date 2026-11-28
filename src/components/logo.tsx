@@ -2,6 +2,7 @@ import Image from "next/image";
 
 /*
  * Brand: the product is "Baseline" (named Terminal until 28 Nov 2026), powered by Sequence Data.
+ * Logo: the name on a rule (BaselineLogo); no icon.
  *  - sd-lockup-*.png   : "SD | Sequence Data" lockup (from public/brand/sequence-data-logo-2026.webp)
  *  - sd-monogram-*.png : the SD monogram alone
  *  - sd-icon.png       : white SD on black square (favicon / app icon)
@@ -32,50 +33,39 @@ export function SequenceMonogram({ className = "h-6 w-auto", tone = "black" }: {
 }
 
 /**
- * The Baseline mark: a house whose wall rises into a price line, over a
- * baseline. Drawn in currentColor; the small accent is lime on dark only.
+ * The Baseline logo ("The rule", since 28 November 2026): the name set in
+ * Inter Tight, standing on a straight rule, the baseline itself, with a
+ * short lime mark where the line starts. No icon.
+ *
+ * `size` is the type size in px; the rule and gap scale with it.
  */
-export function BaselineMark({ className = "h-5 w-auto", accent = false }: { className?: string; accent?: boolean }) {
+export function BaselineLogo({ tone = "black", size = 19, className = "" }: { tone?: Tone; size?: number; className?: string }) {
+  const ink = tone === "black" ? "#0A0A0A" : "#FFFFFF";
+  const rule = Math.max(2, Math.round(size / 9));
   return (
-    <svg viewBox="0 0 100 60" className={className} fill="none" stroke="currentColor" strokeWidth={5.5} strokeLinecap="butt" strokeLinejoin="miter" aria-hidden>
-      <path d="M18 47V25.5L43.5 8l16.5 12" />
-      <path d="M15.5 54.5L41.5 29l8 8L86 2" />
-      <path d="M0 55.5h100" />
-      {accent && <path d="M45.6 27.4a5 5 0 0 1 7.6 0L49.4 31z" fill="#ACFA68" stroke="none" />}
-    </svg>
-  );
-}
-
-/** The mark in a lime app-icon tile (the logo since 28 November 2026). `size` in px. */
-export function BaselineTile({ size = 28, className = "" }: { size?: number; className?: string }) {
-  return (
-    <span
-      className={`inline-grid shrink-0 place-items-center bg-lime text-zinc-950 ${className}`}
-      style={{ width: size, height: size, borderRadius: Math.round(size * 0.27) }}
-      aria-hidden
-    >
-      <svg viewBox="0 0 100 60" style={{ width: size * 0.66 }} fill="none" stroke="currentColor" strokeWidth={7} strokeLinejoin="round">
-        <path d="M18 47V25.5L43.5 8l16.5 12" />
-        <path d="M15.5 54.5L41.5 29l8 8L86 2" />
-        <path d="M0 55.5h100" />
-      </svg>
+    <span className={`inline-flex flex-col leading-none ${className}`} aria-label="Baseline">
+      <span
+        aria-hidden
+        className="font-[family-name:var(--font-wordmark)] font-bold"
+        style={{ fontSize: size, letterSpacing: "-0.035em", color: ink, lineHeight: 1 }}
+      >
+        Baseline
+      </span>
+      <span aria-hidden className="relative block" style={{ height: rule, marginTop: Math.round(size * 0.2), background: ink }}>
+        <span className="absolute inset-y-0 left-0 bg-lime" style={{ width: Math.round(size * 0.7) }} />
+      </span>
     </span>
   );
 }
 
 /**
- * "Baseline" wordmark: the lime tile and the name in Sora capitals, spaced
- * wide, plus an optional "Powered by Sequence Data" line.
+ * The header wordmark, plus an optional "Powered by Sequence Data" line.
  */
 export function Wordmark({ tone = "black", tagline = false }: { tone?: Tone; tagline?: boolean }) {
-  const text = tone === "black" ? "text-zinc-950" : "text-white";
   const muted = tone === "black" ? "text-zinc-500" : "text-zinc-400";
   return (
     <span className="inline-block leading-none">
-      <span className={`flex items-center gap-2.5 whitespace-nowrap font-[family-name:var(--font-sora)] text-[16px] font-bold uppercase tracking-[0.16em] ${text}`}>
-        <BaselineTile size={26} />
-        Baseline
-      </span>
+      <BaselineLogo tone={tone} size={21} />
       {tagline && (
         <span className={`mt-2 flex items-center gap-1.5 whitespace-nowrap text-[8.5px] font-medium uppercase tracking-[0.14em] ${muted}`}>
           Powered by

@@ -451,19 +451,16 @@ body {
   }
 }
 
-/* Pro badge (components/pro-badge.tsx): a light sweep every few seconds and a soft lime glow. */
-.pro-badge {
-  box-shadow: 0 0 12px -2px rgb(172 250 104 / 0.45);
-}
+/* Pro badge (components/pro-badge.tsx): a light sweep every few seconds. */
 .pro-badge::after {
   content: "";
   position: absolute;
   inset: 0;
   z-index: 1;
   pointer-events: none;
-  background: linear-gradient(105deg, transparent 30%, rgb(255 255 255 / 0.55) 50%, transparent 70%);
+  background: linear-gradient(105deg, transparent 30%, rgb(255 255 255 / 0.3) 50%, transparent 70%);
   transform: translateX(-130%);
-  animation: pro-shine 3.6s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+  animation: pro-shine 5s cubic-bezier(0.22, 1, 0.36, 1) infinite;
 }
 @keyframes pro-shine {
   0%, 55% { transform: translateX(-130%); }

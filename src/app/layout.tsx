@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { IBM_Plex_Mono, Inter, Sora } from "next/font/google";
+import { IBM_Plex_Mono, Inter, Inter_Tight, Sora } from "next/font/google";
 import {
   SITE_DESCRIPTION,
   SITE_NAME,
@@ -20,6 +20,13 @@ const sora = Sora({
   subsets: ["latin"],
   weight: ["500", "600", "700"],
   variable: "--font-sora",
+});
+
+// The wordmark ("The rule", 28 November 2026)
+const interTight = Inter_Tight({
+  subsets: ["latin"],
+  weight: ["700"],
+  variable: "--font-wordmark",
 });
 
 const plexMono = IBM_Plex_Mono({
@@ -67,7 +74,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${inter.variable} ${sora.variable} ${plexMono.variable} h-full antialiased`}
+      className={`${inter.variable} ${sora.variable} ${interTight.variable} ${plexMono.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col font-sans text-fg">
         <script
