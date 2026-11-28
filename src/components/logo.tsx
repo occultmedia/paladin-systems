@@ -2,7 +2,7 @@ import Image from "next/image";
 
 /*
  * Brand: the product is "Baseline" (named Terminal until 28 Nov 2026), powered by Sequence Data.
- * Logo: one line that rises into a lime house outline and runs on under BASELINE (BaselineLogo).
+ * Logo: one line that rises into a house outline and runs on under BASELINE (BaselineLogo).
  *  - sd-lockup-*.png   : "SD | Sequence Data" lockup (from public/brand/sequence-data-logo-2026.webp)
  *  - sd-monogram-*.png : the SD monogram alone
  *  - sd-icon.png       : white SD on black square (favicon / app icon)
@@ -34,8 +34,8 @@ export function SequenceMonogram({ className = "h-6 w-auto", tone = "black" }: {
 
 /**
  * The Baseline logo (28 November 2026): one unbroken line that rises into a
- * house outline, in lime, and runs on as the rule under BASELINE, set in
- * letter-spaced Inter Tight capitals.
+ * house outline and runs on as the rule under BASELINE, set in letter-spaced
+ * Inter Tight capitals. All in one ink: black on light, white on dark.
  *
  * `size` is the type size in px; the house, the line and the gaps scale with it.
  */
@@ -52,7 +52,7 @@ export function BaselineLogo({ tone = "black", size = 19, className = "" }: { to
   return (
     <span className={`inline-flex items-end leading-none ${className}`} aria-label="Baseline" role="img">
       <svg width={lead + w} height={h} viewBox={`0 0 ${lead + w} ${h}`} fill="none" aria-hidden className="shrink-0 overflow-visible">
-        <path d={house} stroke="#ACFA68" strokeWidth={stroke} strokeLinejoin="miter" strokeLinecap="butt" />
+        <path d={house} stroke={ink} strokeWidth={stroke} strokeLinejoin="miter" strokeLinecap="butt" />
       </svg>
       <span aria-hidden className="flex flex-col">
         <span
