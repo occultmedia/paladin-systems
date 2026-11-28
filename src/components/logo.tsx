@@ -46,17 +46,34 @@ export function BaselineMark({ className = "h-5 w-auto", accent = false }: { cla
   );
 }
 
+/** The mark in a lime app-icon tile (the logo since 28 November 2026). `size` in px. */
+export function BaselineTile({ size = 28, className = "" }: { size?: number; className?: string }) {
+  return (
+    <span
+      className={`inline-grid shrink-0 place-items-center bg-lime text-zinc-950 ${className}`}
+      style={{ width: size, height: size, borderRadius: Math.round(size * 0.27) }}
+      aria-hidden
+    >
+      <svg viewBox="0 0 100 60" style={{ width: size * 0.66 }} fill="none" stroke="currentColor" strokeWidth={7} strokeLinejoin="round">
+        <path d="M18 47V25.5L43.5 8l16.5 12" />
+        <path d="M15.5 54.5L41.5 29l8 8L86 2" />
+        <path d="M0 55.5h100" />
+      </svg>
+    </span>
+  );
+}
+
 /**
- * "Baseline" wordmark: the mark and the name in bold caps, plus an
- * optional "Powered by Sequence Data" line.
+ * "Baseline" wordmark: the lime tile and the name in Sora capitals, spaced
+ * wide, plus an optional "Powered by Sequence Data" line.
  */
 export function Wordmark({ tone = "black", tagline = false }: { tone?: Tone; tagline?: boolean }) {
   const text = tone === "black" ? "text-zinc-950" : "text-white";
   const muted = tone === "black" ? "text-zinc-500" : "text-zinc-400";
   return (
     <span className="inline-block leading-none">
-      <span className={`flex items-end gap-2 whitespace-nowrap font-display text-[19px] font-bold uppercase tracking-[0.2em] ${text}`}>
-        <BaselineMark className="mb-[1px] h-[19px] w-auto" accent={tone === "white"} />
+      <span className={`flex items-center gap-2.5 whitespace-nowrap font-[family-name:var(--font-sora)] text-[16px] font-bold uppercase tracking-[0.16em] ${text}`}>
+        <BaselineTile size={26} />
         Baseline
       </span>
       {tagline && (

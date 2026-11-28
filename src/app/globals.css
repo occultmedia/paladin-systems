@@ -24,7 +24,7 @@
 }
 
 @theme inline {
-  --font-display: var(--font-inter);
+  --font-display: var(--font-sora), var(--font-inter);
   --font-sans: var(--font-inter);
   --font-mono: var(--font-plex);
 }
@@ -543,7 +543,7 @@ body {
 /* Display type: Inter (optical display size) at 600, tight. Overrides font-bold on headings on purpose. */
 .font-display {
   font-weight: 600;
-  font-optical-sizing: auto;
+  letter-spacing: -0.02em;
 }
 
 /* ── Running outline: a lime light that travels around a frame ─────────── */

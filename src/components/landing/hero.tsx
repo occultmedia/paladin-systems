@@ -11,7 +11,7 @@
 import { RunLine } from "@/components/run-line";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { BaselineMark } from "@/components/logo";
+import { BaselineTile } from "@/components/logo";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { LayoutList, Megaphone, Pin, Search, Settings, Sparkles } from "lucide-react";
@@ -78,8 +78,8 @@ function TerminalWindow({
 
       {/* Baseline app bar */}
       <div className="flex h-11 shrink-0 items-center gap-3 border-b border-zinc-200 px-3 sm:px-4">
-        <span className="flex items-end gap-1.5 whitespace-nowrap font-display text-[12.5px] uppercase tracking-[0.2em] text-zinc-950">
-          <BaselineMark className="h-[12px] w-auto" />
+        <span className="flex items-center gap-1.5 whitespace-nowrap font-[family-name:var(--font-sora)] text-[11.5px] font-bold uppercase tracking-[0.16em] text-zinc-950">
+          <BaselineTile size={18} />
           Baseline
         </span>
         <nav className="ml-3 hidden items-center gap-0.5 md:flex" aria-hidden>
