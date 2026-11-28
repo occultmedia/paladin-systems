@@ -47,6 +47,12 @@ export interface PreviewData {
     asking: Array<[number, number]>;
     /** today's estimate */
     estimate: [number, number];
+    /** The price chart: each price event, price ticks and month labels (positions 0-1, y up). */
+    chart: {
+      points: Array<{ x: number; y: number; price: string; date: string; pct: number | null }>;
+      ticks: Array<{ y: number; label: string }>;
+      months: Array<{ x: number; label: string }>;
+    };
     askingLabel: string;
     marketLabel: string;
     verdict: string;
@@ -187,25 +193,104 @@ function IndexPane({ data }: { data: PreviewData }) {
   );
 }
 
-function linePath(pts: Array<[number, number]>, w: number, h: number, step: boolean) {
-  return pts
-    .map(([x, y], i) => {
-      const X = (x * w * 0.94 + w * 0.02).toFixed(1);
-      const Y = ((1 - y) * h).toFixed(1);
-      if (i === 0) return `M${X},${Y}`;
-      if (step) {
-        const prevY = ((1 - pts[i - 1][1]) * h).toFixed(1);
-        return `L${X},${prevY}L${X},${Y}`;
-      }
-      return `L${X},${Y}`;
-    })
-    .join("");
+
+/** Asking price over time: a step line over a lime wash, a marker per price event, today's estimate dashed. */
+function PriceChart({ f }: { f: PreviewData["featured"] }) {
+  const W = 640;
+  const H = 200;
+  const pad = { l: 10, r: 58, t: 28, b: 24 };
+  const pw = W - pad.l - pad.r;
+  const ph = H - pad.t - pad.b;
+  const X = (x: number) => pad.l + x * pw;
+  const Y = (y: number) => pad.t + (1 - y) * ph;
+  const pts = f.chart.points;
+  // a step line: the price holds until it changes, then runs on to today
+  let line = "";
+  pts.forEach((p, i) => {
+    line += i === 0 ? `M${X(p.x)},${Y(p.y)}` : `H${X(p.x)}V${Y(p.y)}`;
+  });
+  if (pts.length) line += `H${X(1)}`;
+  const area = pts.length ? `${line}V${pad.t + ph}H${X(pts[0].x)}Z` : "";
+  const estY = Y(f.estimate[1]);
+  const last = pts[pts.length - 1];
+  return (
+    <div className="mt-3 flex min-h-0 flex-1 flex-col">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-zinc-500">
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-0.5 w-3.5 rounded bg-zinc-950" /> Asking price
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-0 w-3.5 border-t-2 border-dashed" style={{ borderColor: UP }} /> Est. market value today
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="size-2 rounded-full border-2 border-zinc-950 bg-white" /> Price change
+        </span>
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" className="mt-2 min-h-0 w-full flex-1" role="img" aria-label="Asking price over time and today's estimated market value">
+        <defs>
+          <linearGradient id="hist-wash" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#ACFA68" stopOpacity="0.45" />
+            <stop offset="1" stopColor="#ACFA68" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {f.chart.ticks.map((t) => (
+          <g key={t.label}>
+            <line x1={pad.l} x2={W - pad.r} y1={Y(t.y)} y2={Y(t.y)} stroke="#EEEEF0" />
+            <text x={W - pad.r + 8} y={Y(t.y) + 3.5} fontSize="10" fill="#A1A1AA">{t.label}</text>
+          </g>
+        ))}
+        {f.chart.months.map((m) => (
+          <text key={m.label + m.x} x={X(m.x)} y={H - 8} fontSize="10" fill="#A1A1AA" textAnchor="middle">{m.label}</text>
+        ))}
+        <motion.path d={area} fill="url(#hist-wash)" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.8, delay: 0.6 }} />
+        <motion.path
+          d={line}
+          fill="none"
+          stroke="#0A0A0A"
+          strokeWidth={2.4}
+          strokeLinejoin="round"
+          initial={{ pathLength: 0 }}
+          animate={{ pathLength: 1 }}
+          transition={{ duration: 1.3, ease: "easeOut", delay: 0.15 }}
+        />
+        {/* today's estimate */}
+        <line x1={pad.l} x2={W - pad.r} y1={estY} y2={estY} stroke={UP} strokeWidth={1.6} strokeDasharray="5 5" />
+        <g transform={`translate(${pad.l + 4}, ${estY + 5})`}>
+          <rect x={0} y={0} width={108} height={16} rx={8} fill="#E8F6EE" />
+          <text x={54} y={11} fontSize="9.5" fontWeight="600" fill={UP} textAnchor="middle">Est. today {f.marketLabel}</text>
+        </g>
+        {pts.map((p, i) => {
+          const cx = X(p.x);
+          const cy = Y(p.y);
+          const label = p.pct === null ? "Listed" : `${p.pct > 0 ? "+" : "−"}${Math.abs(p.pct).toFixed(1)}%`;
+          const color = p.pct === null ? "#52525B" : p.pct < 0 ? DOWN : UP;
+          return (
+            <motion.g key={i} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 + i * 0.25, duration: 0.4 }}>
+              <circle cx={cx} cy={cy} r={5} fill="#FFFFFF" stroke="#0A0A0A" strokeWidth={2.2} />
+              <text x={Math.min(Math.max(cx, pad.l + 30), W - pad.r - 30)} y={cy - 12} fontSize="10" textAnchor="middle">
+                <tspan fill="#71717A">{p.date} · </tspan>
+                <tspan fill={color} fontWeight="600">{label}</tspan>
+              </text>
+              <text x={Math.min(Math.max(cx, pad.l + 30), W - pad.r - 30)} y={cy + 19} fontSize="10.5" fontWeight="700" fill="#0A0A0A" textAnchor="middle">{p.price}</text>
+            </motion.g>
+          );
+        })}
+        {last && (
+          <g>
+            <circle cx={X(1)} cy={Y(last.y)} r={4} fill="#ACFA68" stroke="#0A0A0A" strokeWidth={1.5} />
+            <circle cx={X(1)} cy={Y(last.y)} r={4} fill="none" stroke="#ACFA68" strokeWidth={2}>
+              <animate attributeName="r" values="4;11;4" dur="2.4s" repeatCount="indefinite" />
+              <animate attributeName="opacity" values="0.9;0;0.9" dur="2.4s" repeatCount="indefinite" />
+            </circle>
+          </g>
+        )}
+      </svg>
+    </div>
+  );
 }
 
 export function HistoryPane({ data }: { data: PreviewData }) {
   const f = data.featured;
-  const W = 340;
-  const H = 130;
   return (
     <div className="grid h-full gap-3 sm:grid-cols-[1fr_160px]">
       <div className="flex min-w-0 flex-col rounded-lg border border-zinc-200 bg-white p-3">
@@ -221,31 +306,7 @@ export function HistoryPane({ data }: { data: PreviewData }) {
             </p>
           </div>
         </div>
-        <div className="mt-3 flex items-center gap-3 text-[10px] text-zinc-500">
-          <span className="inline-flex items-center gap-1.5">
-            <span className="h-0.5 w-3 bg-zinc-950" /> Asking
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="size-2 rounded-full" style={{ background: UP }} /> Est. market value today
-          </span>
-        </div>
-        <svg viewBox={`0 0 ${W} ${H}`} className="mt-2 w-full flex-1" preserveAspectRatio="none" aria-label="Asking price over time and today's estimated market value">
-          {[0.25, 0.5, 0.75].map((g) => (
-            <line key={g} x1={0} x2={W} y1={g * H} y2={g * H} stroke="#F4F4F5" />
-          ))}
-          <motion.path
-            d={linePath(f.asking, W, H, true)}
-            fill="none"
-            stroke="#0A0A0A"
-            strokeWidth={2.2}
-            vectorEffect="non-scaling-stroke"
-            initial={{ pathLength: 0 }}
-            animate={{ pathLength: 1 }}
-            transition={{ duration: 1.2, ease: "easeOut", delay: 0.15 }}
-          />
-          {/* a zero-length round stroke stays a circle however the chart is stretched */}
-          <path d={`${linePath([f.estimate], W, H, false)}h0.01`} fill="none" stroke={UP} strokeWidth={9} strokeLinecap="round" vectorEffect="non-scaling-stroke" />
-        </svg>
+        <PriceChart f={f} />
         <p className="mt-2 text-[11px]">
           <span className="font-semibold tabular-nums text-zinc-950">{f.askingLabel}</span>
           <span className="text-zinc-500"> vs est. today </span>

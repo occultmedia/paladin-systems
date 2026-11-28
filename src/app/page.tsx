@@ -7,6 +7,7 @@ import { BillingToggle, PlanPrice } from "@/components/landing/plan-price";
 import { AIBadge } from "@/components/ai/ai-visuals";
 import { Hero, type HeroEvent, type HeroKpi } from "@/components/landing/hero";
 import type { MapPin } from "@/lib/market-api";
+import { getShowcase, type Showcase, type ShowcaseHome } from "@/lib/landing-showcase";
 import { SiteHeader } from "@/components/landing/site-header";
 import { GrainField } from "@/components/landing/grain-field";
 import { AgentMorningCard, AiCapabilities, BrokerBoardCard, InvestorPostCard, type AgentMorning, type AiExamples, type BrokerExample, type InvestorExample } from "@/components/landing/sell-sections";
@@ -122,8 +123,8 @@ function previewData(): PreviewData {
       };
     });
 
-  // Featured listing for the price-history pane: one with a price drop.
-  const f = ALL_LISTINGS.find((l) => l.listing_id === "AW-0388") ?? ALL_LISTINGS[0];
+  // Featured listing for the price-history pane: the home with the most price changes.
+  const f = [...ALL_LISTINGS].filter((l) => l.category === "Property").sort((a, b) => b.price_history.length - a.price_history.length)[0] ?? ALL_LISTINGS[0];
   const marketNow =
     f.category === "Property" ? f.comps_psf_usd * f.built_sqft : f.asking_price_usd;
   const DAYMS = 86_400_000;
@@ -142,6 +143,16 @@ function previewData(): PreviewData {
     ...events.map((e) => [nx(e.t), ny(e.p)] as [number, number]),
     [1, ny(events[events.length - 1].p)],
   ];
+  // the chart: every price event, price ticks and month labels (all 0-1, y up)
+  const chartPoints = f.price_history.map((e) => ({ x: nx(Date.parse(e.date)), y: ny(e.price_usd), price: usdShort(e.price_usd), date: shortDate(e.date), pct: e.change_pct }));
+  const tickStep = [50_000, 100_000, 250_000, 500_000, 1_000_000, 2_500_000].find((st) => (hi - lo) / st <= 4) ?? 5_000_000;
+  const ticks: Array<{ y: number; label: string }> = [];
+  for (let v = Math.ceil(lo / tickStep) * tickStep; v <= hi; v += tickStep) ticks.push({ y: ny(v), label: usdShort(v) });
+  const months: Array<{ x: number; label: string }> = [];
+  for (let d = new Date(start); d.getTime() <= today; d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1))) {
+    const first = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1);
+    if (first >= start) months.push({ x: nx(first), label: new Date(first).toLocaleDateString("en-US", { month: "short", timeZone: "UTC" }) });
+  }
   const gap = (f.asking_price_usd - marketNow) / marketNow;
   const verdict =
     f.signal === "UNDERVALUED" ? `${Math.abs(gap * 100).toFixed(0)}% below market` : f.signal === "OVERPRICED" ? `${(gap * 100).toFixed(0)}% above market` : "Within the normal range";
@@ -166,6 +177,7 @@ function previewData(): PreviewData {
       offers: [usdShort(f.asking_price_usd), usdShort(f.asking_price_usd * 1.02)],
       asking,
       estimate: [1, ny(marketNow)] as [number, number],
+      chart: { points: chartPoints, ticks, months },
       askingLabel: usdShort(f.asking_price_usd),
       marketLabel: usdShort(marketNow),
       verdict,
@@ -302,11 +314,102 @@ function heroData() {
   };
   const cuts = RUN.price_changes.filter((c) => (c.change.change_pct ?? 0) < 0).length;
   const ups = RUN.price_changes.length - cuts;
-  const signal = `${RUN.new_listings.length} new, ${cuts} ${cuts === 1 ? "cut" : "cuts"}, ${ups} ${ups === 1 ? "increase" : "increases"} today.`;
+  const signal = `Market steady: ${RUN.new_listings.length} new, ${cuts} ${cuts === 1 ? "cut" : "cuts"}, ${ups} ${ups === 1 ? "increase" : "increases"} today.`;
   return { events, kpis, pins, auctions: auction ? [auction] : [], statuses, signal, runLabel: `Read ${PREVIEW.run.time} · ${live.length} listings · ${RUN.new_listings.length} new` };
 }
 
 const HERO = heroData();
+
+/* ── the hero from the real market (landing_showcase): real homes, no names ── */
+
+// The landing page reads the live market once an hour.
+export const revalidate = 3600;
+
+const showType = (h: ShowcaseHome) =>
+  h.asset_class === "Land" ? "Land" : h.asset_class === "Commercial" ? "Commercial" : h.property_type || "Home";
+function liveWhat(h: ShowcaseHome): string {
+  if (h.asset_class === "Land") return `Land${h.lot_sqft ? ` · ${Math.round(h.lot_sqft / 10.7639).toLocaleString("en-US")} m²` : ""}`;
+  if (h.asset_class === "Commercial") return "Commercial";
+  return `${showType(h)}${h.bedrooms ? ` · ${h.bedrooms} bd` : ""}`;
+}
+const astTime = (iso: string) =>
+  `${new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/Aruba" })} AST`;
+
+function liveHero(sc: Showcase) {
+  const p = sc.picks;
+  const c = sc.counts;
+  const seen = new Set<string>();
+  const once = (h: ShowcaseHome | null) => (h && !seen.has(h.ref) ? (seen.add(h.ref), h) : null);
+  const reduced = once(p.reduced);
+  const newest = once(p.newest) ?? once(p.homes.find((h) => !seen.has(h.ref)) ?? null);
+  const below = once(p.below);
+  const several = once(p.several);
+  const leased = once(p.leasehold);
+  const contract = once(p.contract);
+  const sold = once(p.sold);
+  const spare = p.homes.filter((h) => !seen.has(h.ref));
+  const [watched, clients, mine, wanted, steady] = [spare[0], spare[1], spare[2], spare[3], spare[4] ?? spare[0]];
+
+  const events: HeroEvent[] = [];
+  const add = (e: HeroEvent) => events.push(e);
+  const at = (h: ShowcaseHome) => ({ listingId: h.ref });
+  if (newest) add({ ...at(newest), id: "new", feature: "Daily feed", kind: "New listing today", tone: "mint", title: newest.title, detail: `${newest.district} · ${liveWhat(newest)}`, value: usdM(newest.price) });
+  if (reduced) add({ ...at(reduced), id: "cut", feature: "Price history", kind: "Price reduced", tone: "down", title: reduced.title, detail: `${reduced.district} · ${liveWhat(reduced)}`, value: `Now ${usdM(reduced.price)} · every change kept` });
+  if (below && below.vs_comps !== null)
+    add({ ...at(below), id: "ai", feature: "AI Signal", kind: "Below market 🔥", tone: "up", title: below.title, detail: below.psf && below.comps_psf ? `${usd(perM2(below.psf))}/m² vs ${usd(perM2(below.comps_psf))} for ${below.comps_count ?? "similar"} similar homes` : `${below.district} · ${liveWhat(below)}`, value: `${pct(below.vs_comps)} vs similar homes · ${usdM(below.price)}` });
+  if (several) add({ ...at(several), id: "multi", feature: "One pin per home", kind: `Listed by ${several.agencies} agencies`, tone: "mint", title: several.title, detail: "One pin, every agency's asking price side by side", value: `From ${usdM(several.price)} · ${several.agencies} offers` });
+  if (p.project) add({ listingId: p.project.key, id: "project", feature: "Building projects", kind: `Building project · ${p.project.units} units`, tone: "mint", title: p.project.name, detail: `${p.project.district ?? "Aruba"} · every unit on one pin`, value: `${usdM(p.project.lo)} – ${usdM(p.project.hi)}` });
+  if (leased) add({ ...at(leased), id: "title", feature: "Land title", kind: "Erfpacht · leasehold land", tone: "warn", title: leased.title, detail: `${leased.district} · filter Eigendom or Erfpacht`, value: usdM(leased.price) });
+  if (contract) add({ ...at(contract), id: "contract", feature: "Status", chip: "contract", kind: "Under contract", tone: "warn", title: contract.title, detail: `${contract.district} · ${liveWhat(contract)}`, value: `Asking was ${usdM(contract.price)}` });
+  if (sold) add({ ...at(sold), id: "sold", feature: "Status", chip: "sold", kind: "Sold", tone: "down", title: sold.title, detail: `${sold.district} · ${liveWhat(sold)}`, value: `Last asking ${usdM(sold.price)}` });
+  if (steady) add({ ...at(steady), id: "confidence", feature: "Confidence Score", kind: "Confidence 100%", tone: "up", title: steady.title, detail: "Seen on its agency's website this morning", value: "Still for sale · no ghost listing" });
+  if (watched) add({ ...at(watched), id: "watch", feature: "Watchlist", tab: "Watchlist", kind: "Pinned to your watchlist", tone: "mint", title: watched.title, detail: `${watched.district} · ${liveWhat(watched)}`, value: `${usdM(watched.price)} · every move since you pinned` });
+  if (clients) add({ ...at(clients), id: "clients", feature: "Interested clients", kind: "Your buyers on this listing", tone: "mint", title: clients.title, detail: "Name, phone and notes, saved on the listing", value: "Call them first when the price drops" });
+  if (mine) add({ ...at(mine), id: "mine", feature: "Your own listings", kind: "Add an off-market listing", tone: "mint", title: `Your listing near ${mine.district}`, detail: "Only you, or every member · duplicate check first", value: "Shown next to the agency listings" });
+  if (wanted) add({ ...at(wanted), id: "feed", feature: "Market feed", tab: "Market feed", kind: "Buyer request · members only", tone: "mint", title: `${wanted.bedrooms ?? 3} bd home in ${wanted.district}`, detail: "Posted by a member · open for 14 days", value: `Up to ${usdM(wanted.price * 1.05)} · I'm interested` });
+  const auction = p.auction
+    ? { id: "hero-auction", lat: p.auction.lat, lng: p.auction.lng, title: `${p.auction.property_type ?? "Property"} in ${p.auction.district ?? "Aruba"}`, tracked: true }
+    : null;
+  if (p.auction && auction)
+    add({ listingId: "", auctionId: auction.id, id: "auction", feature: "Notary auctions · Pro", tab: "Pro", kind: "Notary auction · Pro", tone: "warn", title: auction.title, detail: `${new Date(p.auction.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "America/Aruba" })} · ${astTime(p.auction.date)}${p.auction.tenure ? ` · ${p.auction.tenure}` : ""}`, value: "Track Auction Date: calendar and alert" });
+  add({ listingId: "", id: "csv", feature: "CSV export", kind: "Export CSV", tone: "mint", title: `${c.for_sale} listings for sale`, detail: "Every column and filter you set, in your spreadsheet", value: "baseline-listings.csv" });
+
+  const pins: MapPin[] = sc.pins.map((g) => ({
+    group_key: g.k,
+    group_type: g.k.startsWith("p:") ? "project" : "property",
+    title: "",
+    lat: g.lat,
+    lng: g.lng,
+    min_price: g.lo,
+    max_price: g.hi,
+    unit_count: g.u,
+    agency_count: g.n,
+    agency_ids: [],
+    rep_ref: g.k,
+    category: g.c,
+    signal: g.s,
+    district: "",
+    bedrooms: null,
+    bathrooms: null,
+    size_sqft: null,
+    is_new: g.fresh,
+    price_change_pct: null,
+    thumbnail_url: null,
+  }));
+  // sold homes are off the map; the tour still flies to the one it shows
+  if (sold && sold.lat !== null && sold.lng !== null && !pins.some((x) => x.group_key === sold.ref))
+    pins.push({ ...pins[0], group_key: sold.ref, group_type: "property", lat: sold.lat, lng: sold.lng, min_price: sold.price, max_price: sold.price, unit_count: 1, agency_count: sold.agencies, rep_ref: sold.ref, category: sold.asset_class, signal: "NO_SIGNAL", is_new: false });
+
+  const kpis: HeroKpi[] = [
+    { label: "Listings indexed", value: c.indexed },
+    { label: "New today", value: c.new_today },
+    { label: "For sale", value: c.for_sale },
+    { label: "Below market", value: c.below_market },
+  ];
+  const statuses = { available: c.for_sale, contract: c.under_contract, sold: c.sold };
+  const signal = `Today: ${c.indexed} listings indexed, ${c.new_today} new, ${c.below_market} below market.`;
+  return { events, kpis, pins, auctions: auction ? [auction] : [], statuses, signal, runTime: astTime(sc.as_of) };
+}
 
 /* ── selling sections: AI examples, an agent's morning, an investor post, the 3D map tour ── */
 
@@ -561,7 +664,9 @@ const faqJsonLd = {
 
 /* ── page ────────────────────────────────────────────────────────────── */
 
-export default function Home() {
+export default async function Home() {
+  const live = await getShowcase();
+  const hero = live ? liveHero(live) : { ...HERO, runTime: PREVIEW.run.time };
   return (
     <MotionRoot>
     <div className="relative min-h-screen bg-white font-sans text-zinc-800 antialiased selection:bg-lime selection:text-zinc-950">
@@ -572,7 +677,7 @@ export default function Home() {
       <SiteHeader />
 
       <main id="main">
-        <Hero pins={HERO.pins} auctions={HERO.auctions} events={HERO.events} kpis={HERO.kpis} statuses={HERO.statuses} signal={HERO.signal} brief={BRIEF.headline} runTime={PREVIEW.run.time} total={HERO.pins.length} />
+        <Hero pins={hero.pins} auctions={hero.auctions} events={hero.events} kpis={hero.kpis} statuses={hero.statuses} signal={hero.signal} runTime={hero.runTime} total={live ? live.counts.indexed : hero.pins.length} />
 
         {/* numbers */}
         <section aria-label="Today in numbers" className="border-y border-zinc-200 bg-white">

@@ -100,7 +100,7 @@ function TerminalWindow({
     ul.scrollTo({ top: Math.max(0, li.offsetTop - ul.clientHeight / 2 + li.clientHeight / 2), behavior: "smooth" });
   }, [active]);
   const chipClass = (on: boolean) =>
-    `rounded-full px-2.5 py-1 transition-colors duration-300 ${on ? "bg-zinc-950 font-semibold text-white" : "font-medium text-zinc-700 ring-1 ring-zinc-200"}`;
+    `whitespace-nowrap rounded-full px-2 py-1 transition-colors duration-300 ${on ? "bg-zinc-950 font-semibold text-white" : "font-medium text-zinc-700 ring-1 ring-zinc-200"}`;
   return (
     <div className="relative flex h-full flex-col overflow-hidden rounded-t-xl bg-white shadow-[0_1px_0_rgb(255_255_255/0.6)_inset,0_30px_80px_-24px_rgb(15_23_42/0.45)] ring-1 ring-black/5">
       <RunLine speed={8} delay={-3} />
@@ -146,7 +146,7 @@ function TerminalWindow({
         <span className="inline-flex shrink-0 items-center gap-1 font-semibold text-zinc-950">
           <Sparkles size={12} /> AI Signal
         </span>
-        <span className="min-w-0 truncate text-zinc-600">Market steady: {signal}</span>
+        <span className="min-w-0 truncate text-zinc-600">{signal}</span>
         <span className="ml-auto hidden shrink-0 font-medium text-zinc-950 sm:inline">Today&apos;s briefing</span>
       </div>
 
@@ -163,7 +163,7 @@ function TerminalWindow({
               </div>
             ))}
           </div>
-          <div className="flex gap-1.5 border-b border-zinc-200 px-3 py-2.5 text-[11.5px]">
+          <div className="flex gap-1 overflow-hidden border-b border-zinc-200 px-3 py-2.5 text-[11px]">
             <span className={chipClass(chip === "available")}>
               Available <span className={chip === "available" ? "ml-0.5 text-lime" : "text-zinc-400"}>{statuses.available}</span>
             </span>
