@@ -87,6 +87,7 @@ DISTRICT_ALIASES = {
     "weststraat": "Oranjestad", "pos abou": "Eagle Beach", "pos abao": "Eagle Beach", "sero pita": "Paradera",
     "seroe pita": "Paradera", "rooi santo": "Noord", "opal": "Noord", "nanki beach": "San Nicolas",
     "rodgers beach": "San Nicolas", "rodger's beach": "San Nicolas", "baby beach": "San Nicolas",
+    "sta cruz": "Santa Cruz", "sta. cruz": "Santa Cruz", "bakval": "Malmok",
 }
 # Place names: shared by unrelated listings, so never a sign of one building project.
 PLACE_WORDS = {w for name in [*DISTRICT_CENTERS, *DISTRICT_ALIASES] for w in re.findall(r"[a-zà-ÿ]{3,}", name.lower())}
