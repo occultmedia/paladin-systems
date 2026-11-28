@@ -6,8 +6,10 @@
  * browser window. The window shows what members get today: the AI Signal
  * line, the market numbers, Available / Under contract / Sold, grouped map
  * pins (a home listed by several agencies is one pin), Pro notary auctions
- * and the day's moves, which the map tours. Sample data, and never an agency
- * or agent name. Motion stops for prefers-reduced-motion and off screen.
+ * and the day's moves. The tour plays every feature in turn: the map flies
+ * to it, the app tab and status filter it lives in light up, and a glass card
+ * names it. Sample data, and never an agency or agent name. Motion stops for
+ * prefers-reduced-motion and off screen.
  */
 
 import { RunLine } from "@/components/run-line";
@@ -27,13 +29,28 @@ const ArubaMap = dynamic(() => import("@/components/dashboard/aruba-map"), {
   loading: () => <div className="h-full w-full animate-pulse bg-zinc-100" />,
 });
 
-export type HeroEvent = { id: string; listingId: string; auctionId?: string; kind: string; tone: "up" | "down" | "warn" | "mint"; title: string; detail: string; value: string };
+export type HeroTab = "Listings" | "Watchlist" | "Market feed" | "Pro";
+export type HeroEvent = {
+  id: string;
+  listingId: string;
+  auctionId?: string;
+  /** The Baseline feature this step shows (the card's label). */
+  feature: string;
+  /** The app tab it lives in (default Listings) and the status filter it needs (default Available). */
+  tab?: HeroTab;
+  chip?: "available" | "contract" | "sold";
+  kind: string;
+  tone: "up" | "down" | "warn" | "mint";
+  title: string;
+  detail: string;
+  value: string;
+};
 export type HeroAuction = { id: string; lat: number; lng: number; title: string; tracked: boolean };
 export type HeroStatuses = { available: number; contract: number; sold: number };
 export type HeroKpi = { label: string; value: number; prefix?: string; suffix?: string; decimals?: number };
 
 const EASE = [0.22, 1, 0.36, 1] as const;
-const STEP_MS = 6500;
+const STEP_MS = 5200;
 const DOT: Record<HeroEvent["tone"], string> = { up: "#4CA30D", down: "#E5484D", warn: "#E59A1E", mint: "#18181B" };
 const TABS = [
   { label: "Listings", icon: LayoutList },
@@ -72,6 +89,18 @@ function TerminalWindow({
 }) {
   const active = events.length ? step % events.length : 0;
   const event = events[active];
+  const tab = event?.tab ?? "Listings";
+  const chip = event?.chip ?? "available";
+  // keep the playing step in view in the moves list (the list scrolls, never the page)
+  const listRef = useRef<HTMLUListElement>(null);
+  useEffect(() => {
+    const ul = listRef.current;
+    const li = ul?.children[active] as HTMLElement | undefined;
+    if (!ul || !li) return;
+    ul.scrollTo({ top: Math.max(0, li.offsetTop - ul.clientHeight / 2 + li.clientHeight / 2), behavior: "smooth" });
+  }, [active]);
+  const chipClass = (on: boolean) =>
+    `rounded-full px-2.5 py-1 transition-colors duration-300 ${on ? "bg-zinc-950 font-semibold text-white" : "font-medium text-zinc-700 ring-1 ring-zinc-200"}`;
   return (
     <div className="relative flex h-full flex-col overflow-hidden rounded-t-xl bg-white shadow-[0_1px_0_rgb(255_255_255/0.6)_inset,0_30px_80px_-24px_rgb(15_23_42/0.45)] ring-1 ring-black/5">
       <RunLine speed={8} delay={-3} />
@@ -90,8 +119,11 @@ function TerminalWindow({
       <div className="flex h-11 shrink-0 items-center gap-3 border-b border-zinc-200 px-3 sm:px-4">
         <BaselineLogo size={11} />
         <nav className="ml-3 hidden items-center gap-0.5 md:flex" aria-hidden>
-          {TABS.map(({ label, icon: Icon }, i) => (
-            <span key={label} className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-2 py-1 text-[12px] font-medium lg:px-2.5 ${i === 0 ? "bg-zinc-100 text-zinc-950" : "text-zinc-500"}`}>
+          {TABS.map(({ label, icon: Icon }) => (
+            <span
+              key={label}
+              className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-2 py-1 text-[12px] font-medium transition-colors duration-300 lg:px-2.5 ${label === tab ? "bg-zinc-100 text-zinc-950" : "text-zinc-500"}`}
+            >
               <Icon size={13} strokeWidth={1.8} />
               {label}
             </span>
@@ -132,18 +164,23 @@ function TerminalWindow({
             ))}
           </div>
           <div className="flex gap-1.5 border-b border-zinc-200 px-3 py-2.5 text-[11.5px]">
-            <span className="rounded-full bg-zinc-950 px-2.5 py-1 font-semibold text-white">
-              Available <span className="ml-0.5 text-lime">{statuses.available}</span>
+            <span className={chipClass(chip === "available")}>
+              Available <span className={chip === "available" ? "ml-0.5 text-lime" : "text-zinc-400"}>{statuses.available}</span>
             </span>
-            <span className="rounded-full px-2.5 py-1 font-medium text-zinc-700 ring-1 ring-zinc-200">
-              Under contract <span className="text-zinc-400">{statuses.contract}</span>
+            <span className={chipClass(chip === "contract")}>
+              Under contract <span className={chip === "contract" ? "ml-0.5 text-lime" : "text-zinc-400"}>{statuses.contract}</span>
             </span>
-            <span className="rounded-full px-2.5 py-1 font-medium text-zinc-700 ring-1 ring-zinc-200">
-              Sold <span className="text-zinc-400">{statuses.sold}</span>
+            <span className={chipClass(chip === "sold")}>
+              Sold <span className={chip === "sold" ? "ml-0.5 text-lime" : "text-zinc-400"}>{statuses.sold}</span>
             </span>
           </div>
-          <p className="px-4 pb-1.5 pt-3 text-[11.5px] font-medium text-zinc-500">Today&apos;s market moves</p>
-          <ul className="min-h-0 flex-1 overflow-hidden px-2 pb-2">
+          <p className="flex items-center justify-between px-4 pb-1.5 pt-3 text-[11.5px] font-medium text-zinc-500">
+            Today&apos;s market moves
+            <span className="tabular-nums text-zinc-400">
+              {active + 1}/{events.length}
+            </span>
+          </p>
+          <ul ref={listRef} className="relative min-h-0 flex-1 overflow-hidden px-2 pb-2">
             {events.map((e, i) => {
               const on = i === active;
               return (
@@ -162,7 +199,7 @@ function TerminalWindow({
                     )}
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[12.5px] font-medium text-zinc-950">{e.title}</span>
-                      <span className="block truncate text-[11px] text-zinc-500">{e.kind}</span>
+                      <span className="block truncate text-[11px] text-zinc-500">{e.feature}</span>
                     </span>
                     <span className="shrink-0 text-[11.5px] tabular-nums text-zinc-600">{e.value.split(" · ")[0]}</span>
                     {on && running && (
@@ -188,7 +225,7 @@ function TerminalWindow({
             mode="pins"
             pins={pins}
             auctions={auctions}
-            selectedId={event && !event.auctionId ? event.listingId : null}
+            selectedId={event && !event.auctionId && event.listingId ? event.listingId : null}
             selectedAuctionId={event?.auctionId ?? null}
             interactive={false}
             fill
@@ -217,8 +254,9 @@ function TerminalWindow({
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 6 }}
                 transition={{ duration: 0.4, ease: EASE }}
-                className="pointer-events-none absolute bottom-4 left-4 right-4 max-w-[300px] rounded-xl p-3.5 glass"
+                className="pointer-events-none absolute bottom-4 left-4 right-4 max-w-[320px] rounded-xl p-3.5 glass"
               >
+                <span className="absolute -top-2.5 left-3.5 rounded-full bg-zinc-950 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-lime shadow-sm">{event.feature}</span>
                 <p className="flex items-center gap-1.5 text-[11.5px] font-medium text-zinc-500">
                   {event.auctionId ? <Gavel size={11} className="text-zinc-950" /> : <span className="size-1.5 rounded-full" style={{ background: DOT[event.tone] }} />}
                   {event.kind}

@@ -1,7 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { useLayoutEffect, useRef, useState } from "react";
+import { useId, useLayoutEffect, useRef, useState } from "react";
+import { useReducedMotion } from "framer-motion";
 
 /*
  * Brand: the product is "Baseline" (named Terminal until 28 Nov 2026), powered by Sequence Data.
@@ -42,8 +43,21 @@ export function SequenceMonogram({ className = "h-6 w-auto", tone = "black" }: {
  *
  * `size` is the type size in px; the house, the line and the gaps scale with it.
  */
-export function BaselineLogo({ tone = "black", size = 19, run = true, className = "" }: { tone?: Tone; size?: number; run?: boolean; className?: string }) {
+/** Snowflakes inside the house: x across the house (0-1), radius (x stroke), seconds per fall, start offset. */
+const SNOW: Array<[number, number, number, number]> = [
+  [0.22, 0.55, 5.2, 0],
+  [0.5, 0.75, 6.4, 1.7],
+  [0.74, 0.5, 4.8, 3.1],
+  [0.36, 0.42, 5.9, 4.4],
+  [0.62, 0.62, 7.1, 2.4],
+  [0.86, 0.4, 5.5, 0.9],
+];
+
+export function BaselineLogo({ tone = "black", size = 19, run = true, glass = true, className = "" }: { tone?: Tone; size?: number; run?: boolean; glass?: boolean; className?: string }) {
   const ink = tone === "black" ? "#0A0A0A" : "#FFFFFF";
+  const dark = tone !== "black";
+  const uid = useId().replace(/:/g, "");
+  const still = useReducedMotion() ?? false;
   const tracking = 0.3; // letter spacing; the last letter's is taken back so the line ends with the E
   const stroke = Math.max(1.5, Math.round((size / 9.5) * 2) / 2);
   const h = Math.round(size * 1.75); // house height, roof tip to the line
@@ -69,7 +83,12 @@ export function BaselineLogo({ tone = "black", size = 19, run = true, className 
   const total = lead + w + gap + textW;
 
   // One path: along the line, up the left wall, over the roof, down the right wall, on under the name.
-  const d = `M0 ${base} H${lead} V${Math.round(h * 0.38)} L${lead + w / 2} ${s2 + 0.5} L${lead + w} ${Math.round(h * 0.38)} V${base} H${total}`;
+  const eave = Math.round(h * 0.38);
+  const tip = s2 + 0.5;
+  const d = `M0 ${base} H${lead} V${eave} L${lead + w / 2} ${tip} L${lead + w} ${eave} V${base} H${total}`;
+  // The inside of the house: frosted glass with a little snow falling in it.
+  const house = `M${lead} ${base} V${eave} L${lead + w / 2} ${tip} L${lead + w} ${eave} V${base} Z`;
+  const roof = `M${lead + stroke} ${eave + stroke * 0.6} L${lead + w / 2} ${tip + stroke * 1.4} L${lead + w - stroke} ${eave + stroke * 0.6}`;
   return (
     <span className={`relative inline-flex items-end leading-none ${className}`} style={{ height: h }} aria-label="Baseline" role="img">
       <svg
@@ -80,6 +99,47 @@ export function BaselineLogo({ tone = "black", size = 19, run = true, className 
         aria-hidden
         className="baseline-logo-line absolute bottom-0 left-0 overflow-visible"
       >
+        {glass && (
+          // snowy glass: a frosted, icy fill with a light streak, a frost line under the roof and drifting snow
+          <g aria-hidden>
+            <defs>
+              <clipPath id={`bl-house-${uid}`}>
+                <path d={house} />
+              </clipPath>
+              <linearGradient id={`bl-frost-${uid}`} x1="0" y1="0" x2="0.35" y2="1">
+                <stop offset="0" stopColor={dark ? "#FFFFFF" : "#FFFFFF"} stopOpacity={dark ? 0.42 : 1} />
+                <stop offset="0.55" stopColor={dark ? "#E6F0FA" : "#EAF2FA"} stopOpacity={dark ? 0.2 : 0.95} />
+                <stop offset="1" stopColor="#ACFA68" stopOpacity={dark ? 0.22 : 0.38} />
+              </linearGradient>
+              <linearGradient id={`bl-streak-${uid}`} x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stopColor="#FFFFFF" stopOpacity="0" />
+                <stop offset="0.5" stopColor="#FFFFFF" stopOpacity={dark ? 0.55 : 0.9} />
+                <stop offset="1" stopColor="#FFFFFF" stopOpacity="0" />
+              </linearGradient>
+            </defs>
+            <g clipPath={`url(#bl-house-${uid})`}>
+              <path d={house} fill={`url(#bl-frost-${uid})`} />
+              <rect x={lead + w * 0.05} y={-h * 0.2} width={w * 0.22} height={h * 1.6} fill={`url(#bl-streak-${uid})`} transform={`rotate(28 ${lead + w / 2} ${h / 2})`} />
+              <path d={roof} stroke={dark ? "#FFFFFF" : "#FFFFFF"} strokeOpacity={dark ? 0.7 : 1} strokeWidth={stroke * 1.3} strokeLinecap="round" strokeLinejoin="round" />
+              {SNOW.map(([x, r, dur, delay], i) => {
+                const cx = lead + w * x;
+                const rad = Math.max(0.5, stroke * r);
+                const from = eave * 0.4 - rad;
+                const to = base + rad;
+                return (
+                  <circle key={i} cx={cx} cy={still ? from + (to - from) * ((i + 1) / (SNOW.length + 1)) : from} r={rad} fill={dark ? "#FFFFFF" : "#A9BFD4"} opacity={dark ? 0.9 : 0.85}>
+                    {!still && (
+                      <>
+                        <animate attributeName="cy" from={from} to={to} dur={`${dur}s`} begin={`-${delay}s`} repeatCount="indefinite" />
+                        <animate attributeName="cx" values={`${cx};${cx + rad * 1.6};${cx}`} dur={`${dur * 0.8}s`} begin={`-${delay}s`} repeatCount="indefinite" />
+                      </>
+                    )}
+                  </circle>
+                );
+              })}
+            </g>
+          </g>
+        )}
         <path d={d} stroke={ink} strokeWidth={stroke} strokeLinejoin="miter" pathLength={1000} />
         {run && (
           // the brand's running light: a lime comet along the line (still when motion is reduced)

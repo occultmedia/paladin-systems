@@ -16,7 +16,7 @@ import { scoreConfidence } from "@/lib/confidence";
 import { marketBrief } from "@/lib/scan-data";
 import { TerminalPreview, type PreviewData } from "@/components/landing/terminal-preview";
 import { MotionRoot, Reveal, Stagger, StaggerItem } from "@/components/motion/reveal";
-import { BILLING_LABEL, BILLING_ORDER, CONTACT_EMAIL, INDEXED_AGENCIES, PLANS, PLAN_ORDER, SITE_DESCRIPTION, SITE_NAME, SITE_URL, yearlySavings } from "@/lib/site";
+import { BILLING_LABEL, BILLING_ORDER, CONTACT_EMAIL, PLANS, PLAN_ORDER, SITE_DESCRIPTION, SITE_NAME, SITE_URL, yearlySavings } from "@/lib/site";
 import { Faq, type FaqItem } from "@/components/landing/faq";
 import {
   ALL_LISTINGS,
@@ -48,8 +48,6 @@ const usd = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
 const usdM = (n: number) => (n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(2)}M` : usd(n));
 const pct = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${Math.abs(n).toFixed(1)}%`;
 
-// The real number of agency websites indexed, not the sample data's (no agency is named on this page).
-const AGENCIES = INDEXED_AGENCIES;
 const NEW_THIS_WEEK = ALL_LISTINGS.filter((l) => l.days_on_market <= 7).length;
 
 
@@ -214,47 +212,65 @@ function whatItIs(l: Listing): string {
 function heroData() {
   const at = (l: Listing) => ({ listingId: l.listing_id });
   const live = ALL_LISTINGS.filter((l) => l.status !== "De-listed");
-  const fresh = RUN.new_listings.filter((l) => l.category === "Property").slice(0, 2);
-  const moves = RUN.price_changes.slice(0, 2);
-  const status = RUN.status_changes.filter((l) => l.status === "Under contract" || l.status === "Sold").slice(0, 1);
-  const doubt = [...ALL_LISTINGS].sort((a, b) => a.confidence_score - b.confidence_score)[0];
+  const used = new Set<string>();
+  const take = <T extends Listing>(l: T | undefined | null): T | null => {
+    if (!l) return null;
+    used.add(l.listing_id);
+    return l;
+  };
+  const free = (l: Listing) => !used.has(l.listing_id);
   const homes = ALL_LISTINGS.filter((l): l is ListingSignal => l.category === "Property" && l.status === "For sale");
-  const best = [...homes].filter((l) => !fresh.some((f) => f.listing_id === l.listing_id)).sort((a, b) => a.price_vs_comps_pct - b.price_vs_comps_pct)[0];
-  // a home that several agencies list: one pin, every agency's asking price side by side
-  const used = new Set([...fresh, ...moves.map((m) => m.listing), ...status, best, doubt].filter(Boolean).map((l) => l!.listing_id));
-  const shared = homes.find((l) => !used.has(l.listing_id) && l.asking_price_usd > 600_000) ?? null;
-  // a notary auction (Pro): a sample house in the south, auctioned next Thursday
-  const south = ALL_LISTINGS.find((l) => l.category === "Property" && /Savaneta|San Nicolas/.test(l.district) && !used.has(l.listing_id));
+
+  const fresh = take(RUN.new_listings.find((l) => l.category === "Property"));
+  const cut = RUN.price_changes.find((c) => (c.change.change_pct ?? 0) < 0 && free(c.listing));
+  if (cut) take(cut.listing);
+  const best = take([...homes].filter(free).sort((a, b) => a.price_vs_comps_pct - b.price_vs_comps_pct)[0]);
+  const shared = take(homes.find((l) => free(l) && l.asking_price_usd > 600_000));
+  const project = take(homes.find((l) => free(l) && (l.property_type === "Condo" || l.property_type === "Apartment")));
+  const leased = take(ALL_LISTINGS.find((l) => free(l) && l.tenure === "Erfpacht" && l.status === "For sale"));
+  const contract = take(live.find((l) => free(l) && l.status === "Under contract"));
+  const sold = take(live.find((l) => free(l) && l.status === "Sold"));
+  const doubt = take([...ALL_LISTINGS].filter(free).sort((a, b) => a.confidence_score - b.confidence_score)[0]);
+  const watched = take(RUN.price_changes.map((c) => c.listing).find(free) ?? homes.find(free));
+  const clients = take(homes.find((l) => free(l) && l.asking_price_usd > 1_000_000));
+  const mine = take(homes.find((l) => free(l) && l.district === "Noord"));
+  const wanted = take(homes.find((l) => free(l) && l.district !== mine?.district && l.asking_price_usd < 1_200_000) ?? homes.find(free));
+  const south = take(ALL_LISTINGS.find((l) => l.category === "Property" && /Savaneta|San Nicolas/.test(l.district) && free(l)));
   const auction = south
-    ? { id: "hero-auction", lat: south.lat + 0.004, lng: south.lng - 0.006, title: `House in ${south.district}`, tracked: false, district: south.district }
+    ? { id: "hero-auction", lat: south.lat + 0.004, lng: south.lng - 0.006, title: `House in ${south.district}`, tracked: true, district: south.district }
     : null;
 
   const events: HeroEvent[] = [];
-  if (fresh[0]) events.push({ ...at(fresh[0]), id: `new-${fresh[0].listing_id}`, kind: "New listing", tone: "mint", title: fresh[0].asset_name, detail: `${fresh[0].district} · ${whatItIs(fresh[0])}`, value: `${usdM(fresh[0].asking_price_usd)} · ${SIGNAL[fresh[0].signal].label}` });
-  moves.forEach((c, i) => {
-    const p = c.change.change_pct ?? 0;
-    events.push({ ...at(c.listing), id: `px-${c.listing.listing_id}-${i}`, kind: p < 0 ? "Price cut" : "Price raised", tone: p < 0 ? "down" : "up", title: c.listing.asset_name, detail: `${c.listing.district} · ${whatItIs(c.listing)}`, value: `${pct(p)} → ${usdM(c.change.price_usd)}` });
-  });
-  if (best)
-    events.push({ ...at(best), id: `ai-${best.listing_id}`, kind: "AI Signal", tone: "up", title: best.asset_name, detail: `${usd(perM2(best.price_per_sqft_usd))}/m² vs ${usd(perM2(best.comps_psf_usd))} for ${best.comps_count} similar homes`, value: `${pct(best.price_vs_comps_pct)} vs similar · Below market 🔥` });
-  if (shared)
-    events.push({ ...at(shared), id: `multi-${shared.listing_id}`, kind: "Listed by 3 agencies", tone: "mint", title: shared.asset_name, detail: "One pin, every agency's asking price side by side", value: `From ${usdM(shared.asking_price_usd)} · 3 offers` });
-  status.forEach((l) => events.push({ ...at(l), id: `st-${l.listing_id}`, kind: l.status, tone: "warn", title: l.asset_name, detail: `${l.district} · ${whatItIs(l)}`, value: `Was ${usdM(l.asking_price_usd)}` }));
-  if (auction)
-    events.push({ listingId: "", auctionId: auction.id, id: "auction", kind: "Notary auction · Pro", tone: "warn", title: auction.title, detail: "Next Thursday · 10:00 · from the notaries' public notices", value: "Track auction date → calendar" });
-  if (doubt && doubt.confidence_score < 80)
-    events.push({ ...at(doubt), id: `cf-${doubt.listing_id}`, kind: `Confidence ${doubt.confidence_score}%`, tone: "warn", title: doubt.asset_name, detail: "Missing from the agency site, price unchanged", value: "Possible ghost listing" });
+  const add = (e: HeroEvent) => events.push(e);
+  if (fresh) add({ ...at(fresh), id: "new", feature: "Daily feed", kind: "New listing", tone: "mint", title: fresh.asset_name, detail: `${fresh.district} · ${whatItIs(fresh)}`, value: `${usdM(fresh.asking_price_usd)} · ${SIGNAL[fresh.signal].label}` });
+  if (cut) {
+    const p = cut.change.change_pct ?? 0;
+    add({ ...at(cut.listing), id: "cut", feature: "Price history", kind: "Price cut", tone: "down", title: cut.listing.asset_name, detail: `${cut.listing.district} · ${whatItIs(cut.listing)}`, value: `${pct(p)} → ${usdM(cut.change.price_usd)}` });
+  }
+  if (best) add({ ...at(best), id: "ai", feature: "AI Signal", kind: "Below market 🔥", tone: "up", title: best.asset_name, detail: `${usd(perM2(best.price_per_sqft_usd))}/m² vs ${usd(perM2(best.comps_psf_usd))} for ${best.comps_count} similar homes`, value: `${pct(best.price_vs_comps_pct)} vs similar homes` });
+  if (shared) add({ ...at(shared), id: "multi", feature: "One pin per home", kind: "Listed by 3 agencies", tone: "mint", title: shared.asset_name, detail: "One pin, every agency's asking price side by side", value: `From ${usdM(shared.asking_price_usd)} · 3 offers` });
+  if (project) add({ ...at(project), id: "project", feature: "Building projects", kind: "Building project · 12 units", tone: "mint", title: `${project.district} Residences`, detail: "Every unit of one development, grouped on one pin", value: `${usdM(project.asking_price_usd * 0.82)} – ${usdM(project.asking_price_usd * 1.35)}` });
+  if (leased) add({ ...at(leased), id: "title", feature: "Land title", kind: "Erfpacht · leasehold land", tone: "warn", title: leased.asset_name, detail: "Filter Eigendom or Erfpacht on every listing", value: usdM(leased.asking_price_usd) });
+  if (contract) add({ ...at(contract), id: "contract", feature: "Status", chip: "contract", kind: "Under contract", tone: "warn", title: contract.asset_name, detail: `${contract.district} · ${whatItIs(contract)}`, value: `Was ${usdM(contract.asking_price_usd)}` });
+  if (sold) add({ ...at(sold), id: "sold", feature: "Status", chip: "sold", kind: "Sold", tone: "down", title: sold.asset_name, detail: `${sold.district} · ${whatItIs(sold)}`, value: `Last asking ${usdM(sold.asking_price_usd)}` });
+  if (doubt) add({ ...at(doubt), id: "ghost", feature: "Confidence Score", kind: `Confidence ${doubt.confidence_score}%`, tone: "warn", title: doubt.asset_name, detail: "Missing from the agency site, price unchanged", value: "Possible ghost listing" });
+  if (watched) add({ ...at(watched), id: "watch", feature: "Watchlist", tab: "Watchlist", kind: "Pinned 12 days ago", tone: "down", title: watched.asset_name, detail: `${watched.district} · ${whatItIs(watched)}`, value: `−4.2% since you pinned · ${usdM(watched.asking_price_usd)}` });
+  if (clients) add({ ...at(clients), id: "clients", feature: "Interested clients", kind: "3 interested clients", tone: "mint", title: clients.asset_name, detail: "Saved buyers with phone and notes", value: "Call them first when the price drops" });
+  if (mine) add({ listingId: `mine-${mine.listing_id}`, id: "mine", feature: "Your own listings", kind: "Your listing · Off-market", tone: "mint", title: `Private villa, ${mine.district}`, detail: "Only you see it · duplicate check: no match", value: usdM(mine.asking_price_usd * 0.96) });
+  if (wanted) add({ ...at(wanted), id: "feed", feature: "Market feed", tab: "Market feed", kind: "Buyer request · members only", tone: "mint", title: `3 bd home in ${wanted.district}`, detail: "Posted by a member · open for 14 days", value: `Up to ${usdM(wanted.asking_price_usd * 1.05)} · I'm interested` });
+  if (auction) add({ listingId: "", auctionId: auction.id, id: "auction", feature: "Notary auctions · Pro", tab: "Pro", kind: "Notary auction · Pro", tone: "warn", title: auction.title, detail: "Next Thursday · 10:00 · from the notaries' public notices", value: "Tracked: in your calendar, alert the day before" });
+  add({ listingId: "", id: "csv", feature: "CSV export", kind: "Export CSV", tone: "mint", title: `${live.filter((l) => l.status === "For sale").length} listings, your filters`, detail: "Every column you see, into your own spreadsheet", value: "baseline-listings.csv" });
 
   // the map: one grouped pin per home, as get_map_pins returns them
   const pins: MapPin[] = live.map((l) => ({
     group_key: l.listing_id,
-    group_type: "property",
-    title: l.asset_name,
+    group_type: project && l.listing_id === project.listing_id ? "project" : "property",
+    title: project && l.listing_id === project.listing_id ? `${project.district} Residences` : l.asset_name,
     lat: l.lat,
     lng: l.lng,
-    min_price: l.asking_price_usd,
-    max_price: l.asking_price_usd,
-    unit_count: 1,
+    min_price: project && l.listing_id === project.listing_id ? l.asking_price_usd * 0.82 : l.asking_price_usd,
+    max_price: project && l.listing_id === project.listing_id ? l.asking_price_usd * 1.35 : l.asking_price_usd,
+    unit_count: project && l.listing_id === project.listing_id ? 12 : 1,
     agency_count: shared && l.listing_id === shared.listing_id ? 3 : 1,
     agency_ids: [],
     rep_ref: l.listing_id,
@@ -268,6 +284,9 @@ function heroData() {
     price_change_pct: null,
     thumbnail_url: null,
   }));
+  // a member's own off-market listing: its own pin, next to the indexed ones
+  if (mine)
+    pins.push({ ...pins.find((p) => p.group_key === mine.listing_id)!, group_key: `mine-${mine.listing_id}`, group_type: "member", title: `Private villa, ${mine.district}`, lat: mine.lat - 0.003, lng: mine.lng + 0.004, rep_ref: `mine-${mine.listing_id}` });
 
   const belowMarket = ALL_LISTINGS.filter((l) => l.signal === "UNDERVALUED");
   const kpis: HeroKpi[] = [
@@ -340,7 +359,7 @@ const INVESTOR: InvestorExample = {
 
 const AI_EX = aiExamples();
 const STATS: Array<[string, string]> = [
-  [String(AGENCIES), "agency websites indexed every morning"],
+  ["7 AM", "market briefing ready before your first call"],
   ["1 pin", "per home, however many agencies list it"],
   ["3", "statuses followed: available, under contract, sold"],
   ["20%+", "below similar homes: flagged before you wake up"],
@@ -359,7 +378,7 @@ function brokerExample(): BrokerExample {
     agencies: i === 2 ? 3 : 1,
     change,
   }));
-  return { rows, agencies: AGENCIES };
+  return { rows };
 }
 const BROKER = brokerExample();
 
@@ -403,7 +422,7 @@ const AUDIENCES: Audience[] = [
 ];
 
 const HOW: Array<[string, string]> = [
-  ["We index", `Every morning Baseline reads ${INDEXED_AGENCIES} Aruba agency websites and the notaries' auction notices. A home listed by several agencies becomes one pin with every asking price.`],
+  ["We index", `Every morning Baseline reads Aruba's agency websites and the notaries' auction notices. A home listed by several agencies becomes one pin with every asking price.`],
   ["AI analyzes", "Each price against similar homes in the same district. Below market, above market, price cuts and ghost listings flagged."],
   ["You act first", "Read the morning briefing, follow your watchlist and auction dates, and call the listing agent in one tap."],
 ];
@@ -490,7 +509,7 @@ function SectionHeading({ eyebrow, title, body, light }: { eyebrow: string; titl
 const FAQ: FaqItem[] = [
   {
     q: "Where does Baseline get its listings?",
-    a: `Every morning Baseline indexes the public listing pages of Aruba's real estate agencies (${AGENCIES} websites today): homes, condos, villas, land and commercial property for sale. When several agencies list the same home, it shows as one listing with every agency's asking price side by side. Each listing shows the agency's logo and links back to the original page on its website.`,
+    a: `Every morning Baseline indexes the public listing pages of Aruba's real estate agencies: homes, condos, villas, land and commercial property for sale. When several agencies list the same home, it shows as one listing with every agency's asking price side by side. Each listing shows the agency's logo and links back to the original page on its website.`,
   },
   {
     q: "How often is the data updated?",

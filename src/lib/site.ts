@@ -27,9 +27,6 @@ export const PLANS: Record<Plan, { name: string; price: Record<Billing, number>;
   standard: { name: "Standard", price: { monthly: 50, yearly: 550 }, blurb: "Every agency listing, value signals, watchlist and Market feed." },
   pro: { name: "Pro", price: { monthly: 99, yearly: 1000 }, blurb: "Everything in Standard, plus Aruba's notary property auctions, on the map and in your calendar." },
 };
-/** Agency websites the daily Index reads (scraper/terminal_spider SPIDERS), for the landing page. */
-export const INDEXED_AGENCIES = 8;
-
 export const PRO_FEATURES = [
   "Notary property auctions in Aruba, on the map with date, time and status",
   "Track Auction Date: a calendar file and alerts before the day",

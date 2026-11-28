@@ -207,7 +207,6 @@ export function InvestorPostCard({ ex }: { ex: InvestorExample }) {
 
 export type BrokerExample = {
   rows: Array<{ name: string; district: string; price: string; type: string; agencies: number; change: string }>;
-  agencies: number;
 };
 
 /** Today's moves across every agency, with the CSV export a brokerage uses. */
@@ -217,7 +216,7 @@ export function BrokerBoardCard({ ex }: { ex: BrokerExample }) {
       <RunLine speed={9} delay={-2} />
       <div className="flex items-center justify-between border-b border-zinc-100 px-5 py-4">
         <div>
-          <p className="font-display text-[15px] font-bold text-zinc-950">Today across {ex.agencies} agencies</p>
+          <p className="font-display text-[15px] font-bold text-zinc-950">Today across the market</p>
           <p className="text-[12px] text-zinc-500">Every competitor&apos;s new listings and price moves</p>
         </div>
         <span className="rounded-full bg-zinc-950 px-3 py-1.5 text-[12px] font-semibold text-lime">Export CSV</span>
