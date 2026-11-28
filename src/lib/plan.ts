@@ -17,13 +17,40 @@
  * check the same field: (auth.jwt() -> 'app_metadata' ->> 'plan') = 'pro'.
  */
 
-import { useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase, useUser } from "./auth";
 import { billingOf, planOf, type Billing, type Plan } from "./site";
 
+// A login carries the app_metadata it was issued with until it renews itself
+// (up to an hour). Ask the server for the account once per page load, so a plan
+// set there (Pro paid, or given by hand) shows on the next visit. This reads the
+// account only; it never renews the login (that is the auth library's job, and
+// renewing it from here as well made the two clash).
+let fresh: { id: string; plan: unknown } | null = null;
+const freshListeners = new Set<() => void>();
+
 export function usePlan() {
   const { user } = useUser();
-  const plan: Plan = planOf((user?.app_metadata as { plan?: unknown } | undefined)?.plan);
+  const [, rerender] = useState(0);
+  useEffect(() => {
+    const sb = supabase();
+    if (!user || !sb) return;
+    const bump = () => rerender((n) => n + 1);
+    freshListeners.add(bump);
+    if (fresh?.id !== user.id) {
+      fresh = { id: user.id, plan: undefined };
+      sb.auth.getUser().then(({ data }) => {
+        if (data.user?.id !== user.id) return;
+        fresh = { id: user.id, plan: (data.user.app_metadata as { plan?: unknown }).plan };
+        freshListeners.forEach((f) => f());
+      });
+    }
+    return () => {
+      freshListeners.delete(bump);
+    };
+  }, [user]);
+  const serverPlan = user && fresh?.id === user.id && fresh.plan !== undefined ? fresh.plan : undefined;
+  const plan: Plan = planOf(serverPlan ?? (user?.app_metadata as { plan?: unknown } | undefined)?.plan);
   const meta = user?.user_metadata as { requested_plan?: unknown; requested_plan_at?: string; billing_cycle?: unknown; plan?: unknown } | undefined;
   const billing: Billing = billingOf(meta?.billing_cycle ?? meta?.plan);
   const requested = plan !== "pro" && meta?.requested_plan === "pro" ? (meta.requested_plan_at ?? "") : null;

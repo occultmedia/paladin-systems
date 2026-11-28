@@ -7,6 +7,7 @@
  * billing saves on its own.
  */
 
+import { ProBadge } from "@/components/pro-badge";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
@@ -249,7 +250,10 @@ function PlanCard() {
           <UpgradeButton billing={billing} />
         </div>
       ) : (
-        <p className="border-t border-zinc-100 pt-4 text-[11.5px] text-zinc-500">You have everything in Baseline: auctions, social media listings and Airbnb rental income included.</p>
+        <div className="flex flex-wrap items-center gap-3 border-t border-zinc-100 pt-4">
+          <ProBadge size="md" label="Pro member" />
+          <p className="text-[11.5px] text-zinc-500">You have everything in Baseline: auctions, social media listings and Airbnb rental income included.</p>
+        </div>
       )}
     </Card>
   );

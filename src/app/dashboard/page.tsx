@@ -11,6 +11,7 @@
  * `repository` to it. Nothing in the UI layer needs to change.
  */
 
+import { ProBadge } from "@/components/pro-badge";
 import { RunLine } from "@/components/run-line";
 import { Fragment, Suspense, createContext, useCallback, useContext, useDeferredValue, useEffect, useId, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
@@ -312,10 +313,18 @@ function AccountMenu({ compact = false, onProfile }: { compact?: boolean; onProf
           compact ? "size-9 justify-center" : "py-1 pl-1 pr-3"
         }`}
       >
-        <span className="grid size-7 place-items-center rounded-full bg-lime font-display text-[11px] font-bold text-zinc-950">{initials}</span>
+        <span className="relative">
+          <span
+            className={`grid size-7 place-items-center rounded-full bg-lime font-display text-[11px] font-bold text-zinc-950 ${plan === "pro" ? "ring-2 ring-lime/60 ring-offset-1 ring-offset-zinc-950" : ""}`}
+          >
+            {initials}
+          </span>
+          {plan === "pro" && compact && <ProBadge size="xs" label="" className="absolute -bottom-1 -right-1.5 !px-[3px]" />}
+        </span>
         {!compact && (
           <>
             <span className="max-w-[120px] truncate font-medium">{name}</span>
+            {plan === "pro" && <ProBadge size="xs" />}
             <ChevronDown size={13} strokeWidth={1.75} className={`transition-transform ${open ? "rotate-180" : ""}`} />
           </>
         )}
@@ -332,9 +341,16 @@ function AccountMenu({ compact = false, onProfile }: { compact?: boolean; onProf
           <div className="border-b border-zinc-100 px-4 py-3">
             <p className="truncate text-[13px] font-semibold text-zinc-950">{name}</p>
             <p className="truncate text-[12px] text-zinc-500">{user.email}</p>
-            <p className="mt-2 inline-flex rounded-full bg-lime px-2 py-0.5 text-[11px] font-semibold text-zinc-950">
-              {PLANS[plan].name} · {fmtPlanPrice(plan, billing)}
-            </p>
+            {plan === "pro" ? (
+              <p className="mt-2 flex items-center gap-2">
+                <ProBadge size="sm" />
+                <span className="text-[11px] text-zinc-500">Every feature unlocked</span>
+              </p>
+            ) : (
+              <p className="mt-2 inline-flex rounded-full bg-lime px-2 py-0.5 text-[11px] font-semibold text-zinc-950">
+                {PLANS[plan].name} · {fmtPlanPrice(plan, billing)}
+              </p>
+            )}
           </div>
           {items.map(({ icon: Icon, label, onClick }) => (
             <button

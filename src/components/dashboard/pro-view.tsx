@@ -7,13 +7,13 @@
  * the sections; both are empty until those Index runs start.
  */
 
+import { ProBadge } from "@/components/pro-badge";
 import { BedDouble, Check, Gavel, Loader2, Lock, MessageCircle } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { GrainField } from "@/components/landing/grain-field";
 import { usePlan } from "@/lib/plan";
 import { PLANS, fmtPlanPrice, type Billing } from "@/lib/site";
-import type { Listing } from "@/lib/aruba-data";
 import { RentalIncome } from "./rental-income";
 
 /** The Pro pages. Each has its own tab and address: /dashboard?tab=pro&section=<key>. */
@@ -141,7 +141,7 @@ export function ProView() {
           <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500">{isPro ? "Included in your plan" : "Pro plan"}</p>
           <h1 className="mt-2 flex items-center gap-3 font-display text-[28px] font-bold tracking-tight text-white sm:text-[34px]">
             {current.title}
-            {!isPro && <Lock size={20} strokeWidth={2} className="text-zinc-500" aria-label="Locked" />}
+            {isPro ? <ProBadge size="md" /> : <Lock size={20} strokeWidth={2} className="text-zinc-500" aria-label="Locked" />}
           </h1>
           <p className="mt-1 max-w-xl text-[13px] text-zinc-400">{current.text}</p>
           <nav aria-label="Pro sections" className="no-scrollbar -mx-4 mt-6 flex gap-1 overflow-x-auto px-4 sm:mx-0 sm:px-0" role="tablist">
