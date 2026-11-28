@@ -4,6 +4,7 @@ beautifulsoup4>=4.12    # reads them
 lxml>=5.2               # fast HTML parser for beautifulsoup4
 supabase>=2.10          # supabase-py: upserts into raw_listings with the service key
 python-dotenv>=1.0      # reads scraper/.env when running locally
+pypdf>=5.0              # notary auctions: reads auction conditions PDFs (text is never stored)
 
 # Only for spiders with engine = "browser"; also run: python -m playwright install chromium
 playwright>=1.48

@@ -308,6 +308,10 @@ export type ArubaMapProps =
       hoveredId?: string | null;
       onSelect?: (key: string) => void;
       onHover?: (key: string | null) => void;
+      /** Notary auction pins (Pro), drawn as gavels above the listing pins. */
+      auctions?: Array<{ id: string; lat: number; lng: number; title: string; tracked: boolean }>;
+      selectedAuctionId?: string | null;
+      onAuctionSelect?: (id: string) => void;
       /**
        * The visible area, 300 ms after the map stops moving: [west, south, east, north].
        * `user` is false when the map moved by itself (fitting the pins, flying to a pick).

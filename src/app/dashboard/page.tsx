@@ -76,6 +76,8 @@ import {
   type SortKey,
 } from "@/lib/market-api";
 import { GroupDetails, GroupPopup, GroupTags, groupPrice } from "@/components/dashboard/group-parts";
+import { AuctionPopup } from "@/components/dashboard/auctions";
+import { isLive, useAuctions, useTrackedAuctions } from "@/lib/auctions";
 import { HotFlame, AgencyLogo } from "@/components/dashboard/map-shared";
 import { Inter } from "next/font/google";
 import {
@@ -1950,6 +1952,7 @@ function ActiveListings({
   initialNewToday,
   onExitTo,
   watched,
+  onOpenAuctions,
 }: {
   /** Members' own listings (Off-market and Only me), already loaded by the dashboard. */
   members: Listing[];
@@ -1962,6 +1965,8 @@ function ActiveListings({
   onExitTo?: (tab: FullPanel) => void;
   /** Pinned listings, for the Watchlist panel in full-screen mode. */
   watched: Listing[];
+  /** Opens the Pro tab's Auctions page. */
+  onOpenAuctions?: () => void;
 }) {
   const [query, setQuery] = useState(initialQuery ?? "");
   const [tenure, setTenure] = useState<Tenure | "All" | "None">("All");
@@ -1998,6 +2003,23 @@ function ActiveListings({
     setFullMap(false);
     if (tab !== "Listings") onExitTo?.(tab);
   }, [onExitTo]);
+
+  // Notary auctions on the map (Pro members; RLS returns nothing to others).
+  const { isPro } = usePlan();
+  const { auctions } = useAuctions();
+  const tracking = useTrackedAuctions();
+  const [showAuctions, setShowAuctions] = useState(true);
+  const [auctionId, setAuctionId] = useState<string | null>(null);
+  const auctionPins = useMemo(
+    () =>
+      showAuctions
+        ? auctions
+            .filter((a) => isLive(a) && a.lat !== null && a.lng !== null)
+            .map((a) => ({ id: a.id, lat: a.lat!, lng: a.lng!, title: a.title, tracked: tracking.byAuction.has(a.id) }))
+        : [],
+    [auctions, showAuctions, tracking.byAuction],
+  );
+  const openAuction = auctionId ? auctions.find((a) => a.id === auctionId) ?? null : null;
 
   // "Search as I move the map": the list follows the visible map area.
   const [searchAsMove, setSearchAsMove] = useState(true);
@@ -2150,7 +2172,10 @@ function ActiveListings({
   };
 
   // a pin opens the glass window on the map; Full details jumps to the row
-  const selectFromMap = (key: string) => setPopupId(key || null);
+  const selectFromMap = (key: string) => {
+    setAuctionId(null);
+    setPopupId(key || null);
+  };
   const popupGroup = popupId ? groups.find((g) => g.key === popupId) ?? null : null;
   const popupPin = popupId ? pins.find((p) => p.group_key === popupId) ?? null : null;
   const focusGroup = focusId && !groups.some((g) => g.key === focusId) ? focusId : null;
@@ -2460,14 +2485,40 @@ function ActiveListings({
           onSelect={selectFromMap}
           onHover={setHoverId}
           onViewport={onViewport}
+          auctions={isPro ? auctionPins : undefined}
+          selectedAuctionId={auctionId}
+          onAuctionSelect={(id) => {
+            setPopupId(null);
+            setAuctionId(id);
+          }}
           height={560}
         />
-        <label className="glass absolute bottom-3 left-1/2 z-[5] inline-flex -translate-x-1/2 cursor-pointer select-none items-center gap-2 whitespace-nowrap rounded-full px-3 py-1.5 text-[12px] font-semibold text-zinc-900 max-sm:bottom-auto max-sm:left-auto max-sm:right-3 max-sm:top-[50px] max-sm:translate-x-0">
-          <input type="checkbox" checked={searchAsMove} onChange={(e) => setSearchAsMove(e.target.checked)} className="size-3.5 accent-zinc-950" />
-          Search as I move the map
-        </label>
-        <ViewToggle value="normal" onChange={() => setFullMap(true)} className="absolute bottom-3 right-3 z-[5] max-sm:bottom-auto max-sm:top-[92px]" />
+        <div className="absolute bottom-3 left-1/2 z-[5] flex -translate-x-1/2 gap-1.5 max-sm:bottom-auto max-sm:left-auto max-sm:right-3 max-sm:top-[50px] max-sm:translate-x-0 max-sm:flex-col max-sm:items-end">
+          <label className="glass inline-flex cursor-pointer select-none items-center gap-2 whitespace-nowrap rounded-full px-3 py-1.5 text-[12px] font-semibold text-zinc-900">
+            <input type="checkbox" checked={searchAsMove} onChange={(e) => setSearchAsMove(e.target.checked)} className="size-3.5 accent-zinc-950" />
+            Search as I move the map
+          </label>
+          {isPro && auctions.some(isLive) && (
+            <label className="glass inline-flex cursor-pointer select-none items-center gap-2 whitespace-nowrap rounded-full px-3 py-1.5 text-[12px] font-semibold text-zinc-900">
+              <input type="checkbox" checked={showAuctions} onChange={(e) => setShowAuctions(e.target.checked)} className="size-3.5 accent-zinc-950" />
+              Auctions
+            </label>
+          )}
+        </div>
+        <ViewToggle value="normal" onChange={() => setFullMap(true)} className="absolute bottom-3 right-3 z-[5] max-sm:bottom-auto max-sm:top-[134px]" />
         <AnimatePresence>
+          {openAuction && !popupId && (
+            <AuctionPopup
+              key={`auction-${openAuction.id}`}
+              a={openAuction}
+              tracked={tracking.byAuction.has(openAuction.id)}
+              onTrack={() => tracking.track(openAuction.id)}
+              onUntrack={() => tracking.untrack(openAuction.id)}
+              onClose={() => setAuctionId(null)}
+              onDetails={() => onOpenAuctions?.()}
+              className="absolute inset-x-3 bottom-16 sm:inset-x-auto sm:right-4 sm:top-14 sm:bottom-auto sm:w-[340px]"
+            />
+          )}
           {popupId && (popupGroup || popupPin) && (
             <GroupPopup
               key={popupId}
@@ -3587,6 +3638,10 @@ function Dashboard() {
               key={listingsView.key}
               members={memberListings}
               watched={watched}
+              onOpenAuctions={() => {
+                setTab("Pro");
+                window.history.replaceState(null, "", "?tab=pro&section=auctions");
+              }}
               initialDistrict={listingsView.district}
               initialQuery={listingsView.query}
               initialOpenId={listingsView.openId}

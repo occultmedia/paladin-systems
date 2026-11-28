@@ -197,3 +197,32 @@ On land, a "Bedrooms 0" in the table is stored as null (not applicable).
    (not needed for Framer or Luxury Presence sites, whose image hosts resize by themselves).
 5. Check its robots.txt and terms first, then
    `python -m terminal_spider <agency> --dry-run --limit 3`.
+
+## Notary auctions (Baseline Pro)
+
+`terminal_spider/notary/` indexes upcoming foreclosure and voluntary auctions (and tenders) from Aruba's
+five civil-law notary offices' own sites, into `notary_auctions`:
+
+    python -m terminal_spider.notary                 # all five offices, then the alert check
+    python -m terminal_spider.notary --dry-run --out auctions.json
+    python -m terminal_spider.notary --alerts-only
+
+| Office | Source | How |
+|---|---|---|
+| Johnson Notary Services | johnsonnotary.com/auctions | cards + auction page + PDFs |
+| NewLeaf Notary | newleafaruba.com/category/auctions/ (and the home page) | list + post + PDFs |
+| Notary Yarzagaray | notarisaruba.com/auctions/ | blocks on one page (terms require written permission: confirmed by the owner 2026-11-28) |
+| Notaris Tromp | arubanotary.com | blocks on one page |
+| Notaris Helmeyer | notarishelmeyer.com WordPress API (`auction` posts) | post + PDFs; closed posts only update known auctions |
+
+- PDFs (conditions first, never bid forms or general conditions) are read in memory with `pypdf` for the
+  Land Registry number, land title, dates and bids. Their text is never stored.
+- Private bid deadline: the stated one, else the auction date minus 14 days (`private_bid_deadline_estimated`).
+- Status: `completed` once the date passed; `postponed_or_cancelled` when the notice says so or the auction
+  leaves the site before its date (only when the site loaded); `suspended_private_bid` when a private bid was accepted.
+- Pins: a Baseline listing at the same address, else Mapbox **permanent** geocoding (`MAPBOX_GEOCODING_TOKEN`,
+  billed per request; storing results needs the permanent endpoint), else near the district centre (`pin_source = district`).
+- Alerts (`alerts.py`): 3 days before the private bid deadline, 7 days and 1 day before the auction, and on date or
+  status changes, for members who track the auction. Queued in `auction_alerts`, e-mailed through Resend when
+  `RESEND_API_KEY` and `RESEND_FROM` are set.
+- Nightly: `.github/workflows/notary-auctions-nightly.yml` (02:00 AST).

@@ -7,6 +7,7 @@
  * the sections; both are empty until those Index runs start.
  */
 
+import { AuctionsView } from "./auctions";
 import { ProBadge } from "@/components/pro-badge";
 import { BedDouble, Check, Gavel, Loader2, Lock, MessageCircle } from "lucide-react";
 import { useSearchParams } from "next/navigation";
@@ -181,7 +182,13 @@ export function ProView() {
       )}
 
       <div className="mt-6">
-        {current.key === "rentals" ? <RentalIncome locked={!isPro} /> : <ListPage section={current} isPro={isPro} />}
+        {current.key === "rentals" ? (
+          <RentalIncome locked={!isPro} />
+        ) : current.key === "auctions" && isPro ? (
+          <AuctionsView />
+        ) : (
+          <ListPage section={current} isPro={isPro} />
+        )}
       </div>
     </div>
   );

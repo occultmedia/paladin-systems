@@ -7,6 +7,7 @@
  * Token: NEXT_PUBLIC_MAPBOX_TOKEN (.env.local locally, Vercel env vars in prod).
  */
 
+import { Gavel } from "lucide-react";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Map, { Marker, NavigationControl, Popup, type MapRef } from "react-map-gl/mapbox";
@@ -297,6 +298,38 @@ export default function ArubaMapMapbox(props: ArubaMapProps) {
             </Marker>
           ),
         )}
+        {/* notary auctions (Pro): a gavel pin each, above the listings */}
+        {props.mode === "pins" &&
+          props.auctions?.map((au) => {
+            const on = props.selectedAuctionId === au.id;
+            return (
+              <Marker
+                key={`auction-${au.id}`}
+                longitude={au.lng}
+                latitude={au.lat}
+                anchor="bottom"
+                style={{ zIndex: on ? 12 : 8 }}
+                onClick={(e) => {
+                  e.originalEvent.stopPropagation();
+                  props.onAuctionSelect?.(au.id);
+                }}
+              >
+                <button
+                  type="button"
+                  aria-label={`Notary auction: ${au.title}`}
+                  title={au.title}
+                  className={`relative grid size-8 place-items-center rounded-lg border-2 shadow-md transition-transform hover:scale-110 ${
+                    on ? "scale-110 border-lime bg-zinc-950 text-lime" : "border-white bg-zinc-950 text-lime"
+                  }`}
+                >
+                  <Gavel size={15} strokeWidth={2.2} />
+                  {au.tracked && <span className="absolute -right-1 -top-1 size-3 rounded-full border-2 border-white bg-lime" />}
+                  <span className="absolute -bottom-[7px] left-1/2 size-0 -translate-x-1/2 border-x-[5px] border-t-[6px] border-x-transparent border-t-zinc-950" />
+                </button>
+              </Marker>
+            );
+          })}
+
         {/* the picked or hovered listing always shows its own pin, even inside a bubble */}
         {visibleClusters
           .filter((c) => c.items.length > 1)
@@ -480,6 +513,12 @@ export default function ArubaMapMapbox(props: ArubaMapProps) {
                     <span className="size-2.5 rounded-full bg-zinc-400 ring-2 ring-lime" />
                     Several agencies
                   </span>
+                  {props.auctions && props.auctions.length > 0 && (
+                    <span className="flex items-center gap-1.5">
+                      <span className="grid size-3.5 place-items-center rounded-[4px] bg-zinc-950 text-lime"><Gavel size={9} strokeWidth={2.4} /></span>
+                      Notary auction
+                    </span>
+                  )}
                 </>
               )}
             </>

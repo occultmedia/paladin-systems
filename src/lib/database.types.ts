@@ -524,6 +524,29 @@ export type Database = {
           { foreignKeyName: "deal_desk_interest_post_id_fkey"; columns: ["post_id"]; isOneToOne: false; referencedRelation: "deal_desk_posts"; referencedColumns: ["id"] },
         ];
       };
+      // Notary auctions (Pro; supabase/migrations/20261128050000_notary_auctions.sql). Written by the notary spiders.
+      notary_auctions: {
+        Row: NotaryAuctionRow;
+        Insert: Partial<NotaryAuctionRow>; // only the service role writes (RLS)
+        Update: Partial<NotaryAuctionRow>;
+        Relationships: [];
+      };
+      tracked_auctions: {
+        Row: TrackedAuctionRow;
+        Insert: {
+          auction_id: string;
+          user_id?: string;
+          notify_private_bid_deadline?: boolean;
+          notify_7d_before?: boolean;
+          notify_24h_before?: boolean;
+          notify_status_change?: boolean;
+          user_notes?: string | null;
+        };
+        Update: Partial<Pick<TrackedAuctionRow, "notify_private_bid_deadline" | "notify_7d_before" | "notify_24h_before" | "notify_status_change" | "user_notes">>;
+        Relationships: [
+          { foreignKeyName: "tracked_auctions_auction_id_fkey"; columns: ["auction_id"]; isOneToOne: false; referencedRelation: "notary_auctions"; referencedColumns: ["id"] },
+        ];
+      };
     };
     Views: {
       v_agent_listings: {
@@ -731,6 +754,57 @@ export type TablesUpdate<T extends keyof PublicSchema["Tables"]> = PublicSchema[
 export type Views<T extends keyof PublicSchema["Views"]> = PublicSchema["Views"][T]["Row"];
 
 export type MasterMarketRow = Views<"v_master_market">;
+
+/* ── notary auctions ─────────────────────────────────────────────────── */
+
+export type AuctionStatus = "upcoming" | "suspended_private_bid" | "postponed_or_cancelled" | "completed";
+
+export type NotaryAuctionRow = {
+  id: string;
+  notary_office: "Johnson Notary Services" | "NewLeaf Notary" | "Notary Yarzagaray" | "Notaris Tromp" | "Notaris Helmeyer";
+  notary_slug: string;
+  source_url: string;
+  pdf_brochure_url: string | null;
+  documents: Array<{ label: string; url: string }>;
+  title: string;
+  address: string | null;
+  district: "Oranjestad" | "Noord" | "Santa Cruz" | "Savaneta" | "San Nicolas" | "Paradera" | null;
+  area: string | null;
+  property_type: "Residential House" | "Commercial" | "Land / Kavel" | "Condo" | null;
+  land_tenure: "Eigendom" | "Erfpacht" | null;
+  kadaster_id: string | null;
+  land_m2: number | null;
+  sale_type: "public_auction" | "voluntary_auction" | "tender";
+  auction_date: string | null;
+  auction_place: string | null;
+  private_bids_allowed: boolean | null;
+  private_bid_deadline: string | null;
+  private_bid_deadline_estimated: boolean;
+  starting_bid_awg: number | null;
+  starting_bid_usd: number | null;
+  status: AuctionStatus;
+  status_changed_at: string | null;
+  previous_auction_date: string | null;
+  auction_date_changed_at: string | null;
+  lat: number | null;
+  lng: number | null;
+  pin_source: "mapbox" | "listing" | "district" | null;
+  first_seen_at: string;
+  last_seen_at: string;
+  updated_at: string;
+};
+
+export type TrackedAuctionRow = {
+  id: string;
+  user_id: string;
+  auction_id: string;
+  notify_private_bid_deadline: boolean;
+  notify_7d_before: boolean;
+  notify_24h_before: boolean;
+  notify_status_change: boolean;
+  user_notes: string | null;
+  created_at: string;
+};
 
 /* ── grouped map and list (RPC results) ─────────────────────────────── */
 

@@ -1,0 +1,49 @@
+# Nightly notary auctions (Baseline Pro): index the five Aruba notary offices'
+# auction pages, then queue and e-mail "Track auction date" alerts.
+# Repository secrets (Settings → Secrets and variables → Actions):
+#   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY   required (the job skips without them)
+#   MAPBOX_GEOCODING_TOKEN                    optional: permanent geocoding for exact pins
+#   RESEND_API_KEY, RESEND_FROM               optional: e-mail the alerts (else they stay queued)
+name: Notary auctions (nightly)
+
+on:
+  schedule:
+    - cron: "0 6 * * *" # 02:00 in Aruba (UTC-4)
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Read the sites and print only, write nothing"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  auctions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: scraper
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      MAPBOX_GEOCODING_TOKEN: ${{ secrets.MAPBOX_GEOCODING_TOKEN }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      RESEND_FROM: ${{ secrets.RESEND_FROM }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: scraper/requirements.txt
+      - name: Install
+        run: pip install httpx[http2] beautifulsoup4 lxml supabase python-dotenv pypdf
+      - name: Index auctions and send alerts
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "Supabase secrets not set; skipping."; exit 0
+          fi
+          python -m terminal_spider.notary ${{ inputs.dry_run && '--dry-run' || '' }}
