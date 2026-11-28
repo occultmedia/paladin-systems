@@ -27,11 +27,14 @@ export function ListingPopup({
   onClose,
   onDetails,
   className = "",
+  note,
 }: {
   l: Listing;
   onClose: () => void;
   onDetails: () => void;
   className?: string;
+  /** Extra line under the sizes, e.g. the other agencies listing this home. */
+  note?: React.ReactNode;
 }) {
   const { isPinned, toggle } = useWatchlist();
   const pinned = isPinned(l.listing_id);
@@ -103,6 +106,7 @@ export function ListingPopup({
             <span key={s} className="block tabular-nums">{s}</span>
           ))}
         </p>
+        {note}
 
         <dl className="mt-2.5 grid grid-cols-3 gap-1.5 text-[11px]">
           {stats.map(([k, v, c, sub]) => (

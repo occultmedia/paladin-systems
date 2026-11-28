@@ -1137,7 +1137,8 @@ export interface IndexRun {
 }
 
 /** One summary per day, newest first. `anchor` = the latest run (the mock Index run time, or now for live data). */
-export function buildIndexRuns(listings: Listing[], rentals: VacationRental[], days = 7, anchor = INDEXED_AT): IndexRun[] {
+/** `checkedBase`: listings not in `listings` that every run checked (first seen before the window). */
+export function buildIndexRuns(listings: Listing[], rentals: VacationRental[], days = 7, anchor = INDEXED_AT, checkedBase = 0): IndexRun[] {
   const live = anchor !== INDEXED_AT;
   return Array.from({ length: days }, (_, ago) => {
     const runAt = new Date(Date.parse(anchor) - ago * DAY).toISOString();
@@ -1151,7 +1152,7 @@ export function buildIndexRuns(listings: Listing[], rentals: VacationRental[], d
     return {
       run_at: runAt,
       date,
-      listings_checked: listings.filter((l) => l.price_history[0].date <= date).length,
+      listings_checked: checkedBase + listings.filter((l) => (l.price_history[0]?.date ?? l.first_seen) <= date).length,
       rentals_checked: rentals.filter((r) => r.first_seen <= date).length,
       // a property that was already sold when first indexed is not a new listing
       new_listings: listings.filter((l) => l.price_history[0].date === date && !isClosed(l)),

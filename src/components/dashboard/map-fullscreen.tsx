@@ -14,7 +14,7 @@ import { ListingPhoto } from "@/components/listing-photo";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
-import { ArrowLeft, ChevronLeft, ChevronRight, LayoutList, Map as MapIcon, Megaphone, Pin, Plus, Search, X } from "lucide-react";
+import { ArrowLeft, LayoutList, Map as MapIcon, Megaphone, Pin, Plus, Search, X } from "lucide-react";
 import { Wordmark } from "@/components/logo";
 import { GrainField } from "@/components/landing/grain-field";
 import { PostCard, SharedNotice } from "@/components/feed/feed-view";
@@ -24,7 +24,9 @@ import { shortSize } from "@/lib/units";
 import { DEAL_TTL_DAYS, POST_KINDS, useFeed, type PostKind } from "@/lib/feed";
 import { useWatchlist } from "@/lib/watchlist";
 import { HotFlame, AgencyLogo, SIGNAL_COLOR, SIGNAL_LABEL, STATUS_PILL } from "./map-shared";
-import { ListingPopup, ViewToggle, kindOf, usdShort } from "./listing-popup";
+import { ViewToggle, kindOf, usdShort } from "./listing-popup";
+import { GroupPopup, GroupTags, groupPrice } from "./group-parts";
+import { groupKeyOf, type MapPin, type MarketGroup } from "@/lib/market-api";
 
 const ArubaMap = dynamic(() => import("./aruba-map"), {
   ssr: false,
@@ -42,9 +44,6 @@ const PANELS: Array<{ id: FullPanel; icon: typeof Pin }> = [
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
-/** Listings per page in the side panel. */
-const PANEL_PAGE = 20;
-
 export interface AgencyOption {
   key: string;
   name: string;
@@ -59,12 +58,23 @@ function Row({
   onPick,
   onHover,
   extra,
+  id,
+  title,
+  price,
+  tags,
 }: {
   l: Listing;
   on: boolean;
   onPick: () => void;
   onHover: (id: string | null) => void;
   extra?: React.ReactNode;
+  /** What hovering reports (a group key on the Listings panel). */
+  id?: string;
+  /** A project's name instead of the listing's. */
+  title?: string;
+  /** "From $1.40M" instead of the listing's price. */
+  price?: string;
+  tags?: React.ReactNode;
 }) {
   const ref = useRef<HTMLButtonElement>(null);
   useEffect(() => {
@@ -77,7 +87,7 @@ function Row({
       ref={ref}
       type="button"
       onClick={onPick}
-      onMouseEnter={() => onHover(l.listing_id)}
+      onMouseEnter={() => onHover(id ?? l.listing_id)}
       onMouseLeave={() => onHover(null)}
       className={`flex w-full items-center gap-3 rounded-xl p-2.5 text-left transition-colors ${on ? "bg-zinc-950 text-white" : "hover:bg-white/70"}`}
     >
@@ -99,8 +109,9 @@ function Row({
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-[13px] font-semibold">
-          {l.asset_name}
+          {title ?? l.asset_name}
         </span>
+        {tags && <span className="mt-0.5 flex flex-wrap gap-1">{tags}</span>}
         <span
           className={`block truncate text-[11.5px] ${on ? "text-zinc-400" : "text-zinc-500"}`}
         >
@@ -143,7 +154,7 @@ function Row({
         </span>
       </span>
       <span className="shrink-0 text-right font-display text-[14px] font-bold tabular-nums">
-        {usdShort(l.asking_price_usd)}
+        {price ?? usdShort(l.asking_price_usd)}
       </span>
     </button>
   );
@@ -351,14 +362,22 @@ function PanelTabs({
 
 export function MapFullscreen({
   open,
-  listings,
-  allListings,
+  groups,
+  pins,
+  total,
+  inView,
+  hasMore,
+  loadingMore,
+  onLoadMore,
+  onViewport,
+  members,
+  watched,
   selectedId,
   hoveredId,
   onSelect,
   onHover,
   onExit,
-  renderDetails,
+  renderGroup,
   onAddListing,
   agency,
   agencies,
@@ -368,16 +387,29 @@ export function MapFullscreen({
   onStatus,
 }: {
   open: boolean;
-  listings: Listing[];
-  allListings: Listing[];
+  /** The list, loaded a page at a time (same filters and map area as the normal view). */
+  groups: MarketGroup[];
+  /** Every pin matching the filters. */
+  pins: MapPin[];
+  total: number;
+  /** The list only holds what is in the visible map area. */
+  inView: boolean;
+  hasMore: boolean;
+  loadingMore: boolean;
+  onLoadMore: () => void;
+  onViewport: (v: { bbox: [number, number, number, number]; zoom: number; user: boolean }) => void;
+  members: Map<string, Listing>;
+  /** The member's pinned listings (Watchlist panel). */
+  watched: Listing[];
+  /** Group keys. */
   selectedId: string | null;
   hoveredId: string | null;
-  onSelect: (id: string) => void;
-  onHover: (id: string | null) => void;
+  onSelect: (key: string) => void;
+  onHover: (key: string | null) => void;
   /** Leave full screen, landing on the normal view of this tab. */
   onExit: (tab: FullPanel) => void;
-  /** The full property details, shown in a glass window over the map. */
-  renderDetails: (l: Listing) => React.ReactNode;
+  /** Everything about one group (a home, or a project's units), in a glass window over the map. */
+  renderGroup: (key: string) => React.ReactNode;
   /** Opens the Add listing form (agents adding a property by hand). */
   onAddListing?: () => void;
   /** Agency filter, shared with the normal view ("All" or an AgencyOption key). */
@@ -393,26 +425,8 @@ export function MapFullscreen({
   const [mobileView, setMobileView] = useState<"Map" | FullPanel>("Map");
   const [detailsOpen, setDetailsOpen] = useState(false);
 
-  // Side panel pages: back to the first page when the filters change, and to
-  // the page that holds a listing when it is picked on the map.
-  const [page, setPage] = useState(0);
-  const [seen, setSeen] = useState({ listings, selectedId });
-  if (seen.listings !== listings || seen.selectedId !== selectedId) {
-    const i = selectedId ? listings.findIndex((l) => l.listing_id === selectedId) : -1;
-    if (i >= 0) setPage(Math.floor(i / PANEL_PAGE));
-    else if (seen.listings !== listings) setPage(0);
-    setSeen({ listings, selectedId });
-  }
-  const pageCount = Math.max(1, Math.ceil(listings.length / PANEL_PAGE));
-  const pageIdx = Math.min(page, pageCount - 1);
-  const pageRows = listings.slice(pageIdx * PANEL_PAGE, (pageIdx + 1) * PANEL_PAGE);
   const panelRef = useRef<HTMLDivElement>(null);
   const mobilePanelRef = useRef<HTMLDivElement>(null);
-  const turnTo = (p: number) => {
-    setPage(p);
-    panelRef.current?.scrollTo({ top: 0 });
-    mobilePanelRef.current?.scrollTo({ top: 0 });
-  };
 
   useEffect(() => {
     if (!open) return;
@@ -432,7 +446,10 @@ export function MapFullscreen({
 
   // Portals only exist in the browser; wait until after hydration (the page can open in full screen).
   const mounted = useSyncExternalStore(noopSubscribe, () => true, () => false);
-  const selected = allListings.find((l) => l.listing_id === selectedId) ?? null;
+  const selectedGroup = selectedId ? groups.find((g) => g.key === selectedId) ?? null : null;
+  const selectedPin = selectedId ? pins.find((p) => p.group_key === selectedId) ?? null : null;
+  const selected = selectedId && (selectedGroup || selectedPin) ? selectedId : null;
+  const selectedTitle = selectedGroup?.title ?? selectedPin?.title ?? "";
   const showDetails = detailsOpen && selected !== null && panel !== "Market feed";
   const closeAll = () => {
     setDetailsOpen(false);
@@ -442,9 +459,13 @@ export function MapFullscreen({
     onSelect(id);
     setMobileView("Map");
   };
+  /** A listing named by its ref (Watchlist, Market feed): open the group it belongs to. */
+  const pickRef = (ref: string) => {
+    groupKeyOf(ref).then((k) => k && pick(k));
+  };
   const openFromDeal = (id: string) => {
     setPanel("Listings");
-    pick(id);
+    pickRef(id);
   };
   if (!mounted) return null;
 
@@ -486,27 +507,22 @@ export function MapFullscreen({
       </select>
     </label>
   );
-  const pageBtn =
-    "grid size-8 place-items-center rounded-full text-zinc-700 transition-colors hover:bg-zinc-100 disabled:pointer-events-none disabled:opacity-35";
-  const pager = pageCount > 1 && (
-    <nav aria-label="Listing pages" className="flex items-center justify-between gap-2 px-3 py-2">
+  // Showing 24 of 148 properties in view · Load more (cursor paging)
+  const pager = (
+    <nav aria-label="More listings" className="flex items-center justify-between gap-2 px-3 py-2">
       <p className="text-[12px] tabular-nums text-zinc-500">
-        <span className="font-semibold text-zinc-950">
-          {pageIdx * PANEL_PAGE + 1}–{Math.min(listings.length, (pageIdx + 1) * PANEL_PAGE)}
-        </span>{" "}
-        of {listings.length}
+        Showing <span className="font-semibold text-zinc-950">{groups.length}</span> of {total} {inView ? "in view" : "on Aruba"}
       </p>
-      <div className="flex items-center gap-1">
-        <button type="button" aria-label="Previous page" disabled={pageIdx === 0} onClick={() => turnTo(pageIdx - 1)} className={pageBtn}>
-          <ChevronLeft size={15} strokeWidth={2.2} />
+      {hasMore && (
+        <button
+          type="button"
+          onClick={onLoadMore}
+          disabled={loadingMore}
+          className="rounded-full bg-zinc-950 px-3 py-1.5 text-[12px] font-semibold text-lime transition-colors hover:bg-zinc-800 disabled:opacity-50"
+        >
+          {loadingMore ? "Loading…" : "Load more"}
         </button>
-        <span className="text-[12px] font-semibold tabular-nums text-zinc-950">
-          {pageIdx + 1} / {pageCount}
-        </span>
-        <button type="button" aria-label="Next page" disabled={pageIdx >= pageCount - 1} onClick={() => turnTo(pageIdx + 1)} className={pageBtn}>
-          <ChevronRight size={15} strokeWidth={2.2} />
-        </button>
-      </div>
+      )}
     </nav>
   );
 
@@ -528,16 +544,22 @@ export function MapFullscreen({
           </span>
         </button>
       )}
-      {listings.length ? (
-        pageRows.map((l) => (
-          <Row
-            key={l.listing_id}
-            l={l}
-            on={l.listing_id === selectedId}
-            onPick={() => pick(l.listing_id)}
-            onHover={onHover}
-          />
-        ))
+      {groups.length ? (
+        groups.map((g) =>
+          g.l ? (
+            <Row
+              key={g.key}
+              l={g.l}
+              id={g.key}
+              title={g.type === "project" ? g.title : undefined}
+              price={groupPrice(g)}
+              tags={g.type === "project" || g.agencyIds.length > 1 ? <GroupTags g={g} /> : undefined}
+              on={g.key === selectedId}
+              onPick={() => pick(g.key)}
+              onHover={onHover}
+            />
+          ) : null,
+        )
       ) : (
         <Empty
           title="No listings match"
@@ -547,10 +569,10 @@ export function MapFullscreen({
       </>
     ) : p === "Watchlist" ? (
       <WatchPanel
-        all={allListings}
-        selectedId={selectedId}
-        onSelect={pick}
-        onHover={onHover}
+        all={watched}
+        selectedId={null}
+        onSelect={pickRef}
+        onHover={() => {}}
       />
     ) : (
       <FeedBoard onPick={openFromDeal} onNewPost={() => onExit("Market feed")} />
@@ -580,7 +602,7 @@ export function MapFullscreen({
                   <span className="relative inline-flex size-2 rounded-full bg-lime" />
                 </span>
                 Dashboard view ·{" "}
-                <span className="text-white">{listings.length}</span> on the map
+                <span className="text-white">{pins.length}</span> on the map
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-2">
@@ -608,7 +630,7 @@ export function MapFullscreen({
               >
                 {panel !== "Market feed" && list(panel)}
               </div>
-              {panel === "Listings" && pager && <div className="shrink-0 border-t border-zinc-200 bg-white/80">{pager}</div>}
+              {panel === "Listings" && <div className="shrink-0 border-t border-zinc-200 bg-white/80">{pager}</div>}
             </aside>
 
             {/* Market feed (desktop): the board takes the whole screen, no map */}
@@ -621,21 +643,24 @@ export function MapFullscreen({
             {/* map (isolated, so its pins never paint over the Market feed) */}
             <div className={`relative isolate min-w-0 flex-1 ${panel === "Market feed" ? "lg:invisible" : ""}`}>
               <ArubaMap
-                mode="listings"
-                listings={listings}
+                mode="pins"
+                pins={pins}
                 selectedId={selectedId}
                 hoveredId={hoveredId}
                 onSelect={pick}
                 onHover={onHover}
+                onViewport={onViewport}
                 fill
               />
 
               {/* the picked listing opens as a glass window on the map */}
               <AnimatePresence>
                 {selected && !showDetails && mobileView === "Map" && panel !== "Market feed" && (
-                  <ListingPopup
-                    key={selected.listing_id}
-                    l={selected}
+                  <GroupPopup
+                    key={selected}
+                    groupKey={selected}
+                    fallback={selectedGroup?.l ?? null}
+                    members={members}
                     onClose={closeAll}
                     onDetails={() => setDetailsOpen(true)}
                     className="absolute inset-x-3 bottom-3 sm:inset-x-auto sm:right-4 sm:top-14 sm:bottom-auto sm:w-[360px]"
@@ -650,7 +675,7 @@ export function MapFullscreen({
                 <motion.div
                   key="details"
                   role="dialog"
-                  aria-label={`${selected.asset_name}, full details`}
+                  aria-label={`${selectedTitle}, full details`}
                   initial={{ opacity: 0, y: 16, scale: 0.985 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 12, scale: 0.99 }}
@@ -665,7 +690,7 @@ export function MapFullscreen({
                     >
                       <ArrowLeft size={14} /> Back to map
                     </button>
-                    <p className="min-w-0 truncate font-display text-[15px] text-zinc-950">{selected.asset_name}</p>
+                    <p className="min-w-0 truncate font-display text-[15px] text-zinc-950">{selectedTitle}</p>
                     <button
                       type="button"
                       onClick={closeAll}
@@ -676,7 +701,7 @@ export function MapFullscreen({
                     </button>
                   </div>
                   <div data-lenis-prevent className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 sm:p-4">
-                    {renderDetails(selected)}
+                    {renderGroup(selected)}
                   </div>
                 </motion.div>
               )}

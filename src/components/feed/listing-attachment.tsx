@@ -8,10 +8,11 @@
 
 import { ListingPhoto } from "@/components/listing-photo";
 import { ArrowUpRight, Building2, Search, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { isClosed, isScored, type Listing } from "@/lib/aruba-data";
 import { shortSize } from "@/lib/units";
 import { useListingById, useMarketListings } from "@/lib/live-market";
+import { searchListings } from "@/lib/market-api";
 import { HotFlame, SIGNAL_COLOR, SIGNAL_LABEL, STATUS_PILL } from "@/components/dashboard/map-shared";
 
 
@@ -95,11 +96,24 @@ export function ListingPicker({ value, onChange }: { value: string | null; onCha
   const [focused, setFocused] = useState(false);
   const picked = useListingById(value);
   const all = useMarketListings();
+  // Search the whole market (it is not loaded in the browser); members' own listings come from what the page holds.
+  const deferredQ = useDeferredValue(q.trim());
+  const [found, setFound] = useState<{ q: string; rows: Listing[] } | null>(null);
+  useEffect(() => {
+    let live = true;
+    const t = window.setTimeout(() => {
+      searchListings(deferredQ, { limit: 6 }).then((rows) => live && setFound({ q: deferredQ, rows }), () => {});
+    }, 200);
+    return () => {
+      live = false;
+      window.clearTimeout(t);
+    };
+  }, [deferredQ]);
   const matches = useMemo(() => {
-    const t = q.trim().toLowerCase();
-    if (!t) return all.slice(0, 6);
-    return all.filter((l) => `${l.asset_name} ${l.listing_id} ${l.district} ${l.agency.name}`.toLowerCase().includes(t)).slice(0, 6);
-  }, [q, all]);
+    const t = deferredQ.toLowerCase();
+    const mine = all.filter((l) => l.member && (!t || `${l.asset_name} ${l.listing_id} ${l.district}`.toLowerCase().includes(t)));
+    return [...mine, ...(found?.rows ?? [])].slice(0, 6);
+  }, [deferredQ, all, found]);
 
   if (picked)
     return (

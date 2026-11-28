@@ -123,7 +123,7 @@ export function UpgradeButton({ className = "", billing }: { className?: string;
   );
 }
 
-export function ProView({ listings }: { listings: Listing[] }) {
+export function ProView() {
   const { isPro, billing } = usePlan();
   const params = useSearchParams();
   const [section, setSectionState] = useState<SectionKey>(() => sectionOf(params.get("section")));
@@ -181,7 +181,7 @@ export function ProView({ listings }: { listings: Listing[] }) {
       )}
 
       <div className="mt-6">
-        {current.key === "rentals" ? <RentalIncome listings={listings} locked={!isPro} /> : <ListPage section={current} isPro={isPro} />}
+        {current.key === "rentals" ? <RentalIncome locked={!isPro} /> : <ListPage section={current} isPro={isPro} />}
       </div>
     </div>
   );

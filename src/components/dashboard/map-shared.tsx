@@ -4,6 +4,7 @@
 
 import { ListingPhoto } from "@/components/listing-photo";
 import { pricePerM2, sizeLines } from "@/lib/units";
+import type { MapPin } from "@/lib/market-api";
 import { PLATFORM_LABEL, TENURE_NOT_STATED, isClosed, isScored, type Agency, type DistrictStats, type Listing, type RentalPlatform, type Signal, type VacationRental } from "@/lib/aruba-data";
 
 export const SIGNAL_COLOR: Record<Signal, string> = {
@@ -117,6 +118,99 @@ export function ClusterList({ items, onPick }: { items: Listing[]; onPick: (id: 
   );
 }
 
+/** "$1.40M" / "$650k" */
+export const priceShort = (n: number) => (n >= 1e6 ? `$${(n / 1e6).toFixed(2)}M` : `$${Math.round(n / 1000)}k`);
+
+/** A pin's price line: one price, or "From $X" for a project with several prices. */
+export const pinPriceLine = (p: Pick<MapPin, "group_type" | "min_price" | "max_price" | "unit_count">) =>
+  p.group_type === "project" && p.unit_count > 1 && Number(p.max_price) > Number(p.min_price)
+    ? `From ${priceShort(Number(p.min_price))}`
+    : priceShort(Number(p.min_price));
+
+/** "5 units · 2 agencies" (empty for a single home with one agency). */
+export function groupCounts(p: Pick<MapPin, "group_type" | "unit_count" | "agency_count">) {
+  const parts: string[] = [];
+  if (p.group_type === "project") parts.push(`${p.unit_count} unit${p.unit_count === 1 ? "" : "s"}`);
+  if (p.agency_count > 1) parts.push(`${p.agency_count} agencies`);
+  return parts.join(" · ");
+}
+
+/** Pins sharing a spot at this zoom (grouped pins from get_map_pins). */
+export function PinClusterList({ items, onPick }: { items: MapPin[]; onPick: (key: string) => void }) {
+  return (
+    <div style={{ width: 260 }}>
+      <p className="border-b border-zinc-200 px-3 py-2 text-[11px] font-semibold text-zinc-500">{items.length} places at this spot</p>
+      <ul data-lenis-prevent className="max-h-[230px] overflow-y-auto overscroll-contain p-1">
+        {items.map((p) => (
+          <li key={p.group_key}>
+            <button
+              type="button"
+              onClick={() => onPick(p.group_key)}
+              className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-zinc-100"
+            >
+              <span className="size-2 shrink-0 rounded-full" style={{ background: SIGNAL_COLOR[p.signal] }} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[12px] font-medium text-zinc-900">{p.title}</span>
+                {groupCounts(p) && <span className="block text-[10.5px] text-zinc-500">{groupCounts(p)}</span>}
+              </span>
+              <span className="shrink-0 text-[12px] font-semibold tabular-nums text-zinc-950">{pinPriceLine(p)}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** Quick look on hover, from the pin alone (the full listing loads on click). */
+export function PinHoverCard({ p }: { p: MapPin }) {
+  const facts =
+    p.category === "Property"
+      ? [p.bedrooms != null && `${p.bedrooms} beds`, p.bathrooms != null && `${Number(p.bathrooms)} baths`].filter(Boolean).join(" · ")
+      : p.category;
+  const counts = groupCounts(p);
+  return (
+    <div style={{ width: 250 }}>
+      {p.thumbnail_url && (
+        <ListingPhoto
+          src={p.thumbnail_url}
+          alt=""
+          w={250}
+          h={135}
+          style={{ display: "block", width: 250, height: 135, objectFit: "cover", background: "#F4F4F5" }}
+        />
+      )}
+      <div style={{ padding: "10px 12px 12px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "baseline" }}>
+          <span style={{ fontWeight: 600, fontSize: 13, color: "#09090B", lineHeight: 1.25 }}>{p.title}</span>
+          {p.is_new && (
+            <span style={{ background: "#0A0A0A", color: "#ACFA68", fontSize: 9, fontWeight: 700, borderRadius: 4, padding: "2px 6px", flexShrink: 0 }}>NEW</span>
+          )}
+        </div>
+        <div style={{ color: "#71717A", fontSize: 11, marginTop: 2 }}>
+          {p.district}
+          {p.group_type !== "project" && facts ? ` · ${facts}` : ""}
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, marginTop: 8 }}>
+          <span style={{ fontWeight: 700, fontSize: 16, color: "#09090B", fontVariantNumeric: "tabular-nums" }}>{pinPriceLine(p)}</span>
+          {counts && <span style={{ fontSize: 11, fontWeight: 600, color: "#09090B" }}>{counts}</span>}
+        </div>
+        {p.group_type !== "project" && p.signal !== "NO_SIGNAL" && (
+          <div style={{ color: SIGNAL_COLOR[p.signal], fontSize: 11, fontWeight: 600, marginTop: 6 }}>
+            ● {SIGNAL_LABEL[p.signal]} {p.signal === "UNDERVALUED" && <HotFlame size={11} />}
+          </div>
+        )}
+        {Number(p.price_change_pct) < 0 && (
+          <div style={{ color: priceColor(-1), fontSize: 11, fontWeight: 600, marginTop: 4 }}>↓ {Math.abs(Number(p.price_change_pct)).toFixed(1)}% since listed</div>
+        )}
+        <div style={{ color: "#A1A1AA", fontSize: 10, marginTop: 8 }}>
+          {p.group_type === "project" ? "Click for every unit and agency" : p.agency_count > 1 ? "Click to compare the agencies' prices" : "Click the pin for full details"}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function HoverCard({ l }: { l: Listing }) {
   const color = SIGNAL_COLOR[l.signal];
   const facts =
@@ -206,6 +300,23 @@ export function HoverCard({ l }: { l: Listing }) {
 }
 
 export type ArubaMapProps =
+  | {
+      /** Grouped pins (get_map_pins): one per project, home or member listing. Ids are group keys. */
+      mode: "pins";
+      pins: MapPin[];
+      selectedId?: string | null;
+      hoveredId?: string | null;
+      onSelect?: (key: string) => void;
+      onHover?: (key: string | null) => void;
+      /**
+       * The visible area, 300 ms after the map stops moving: [west, south, east, north].
+       * `user` is false when the map moved by itself (fitting the pins, flying to a pick).
+       */
+      onViewport?: (v: { bbox: [number, number, number, number]; zoom: number; user: boolean }) => void;
+      height?: number;
+      fill?: boolean;
+      interactive?: boolean;
+    }
   | {
       mode: "listings";
       listings: Listing[];

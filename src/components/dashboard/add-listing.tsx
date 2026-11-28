@@ -30,6 +30,7 @@ import { DuplicateListingError, VISIBILITY_HINT, VISIBILITY_LABEL, type AgentLis
 import type { AgentListingViewRow, AgentListingStatus, AgentListingVisibility } from "@/lib/database.types";
 import { DUP_LIKELY, findDuplicates, parsePin, type MatchFields } from "@/lib/duplicates";
 import { resizeCover } from "@/lib/images";
+import { useDistrictListings } from "@/lib/market-api";
 
 type Category = "Property" | "Land" | "Commercial";
 const CATEGORY_LABEL: Record<Category, string> = { Property: "Home / condo", Land: "Land", Commercial: "Commercial" };
@@ -182,8 +183,14 @@ function ListingForm({
   const pin = parsePin(d.pin);
   const pinBad = Boolean(d.pin.trim()) && !pin;
 
-  // Duplicate watch, live as the agent types.
+  // Duplicate watch, live as the agent types: what the page holds plus every listing in the district.
   const deferred = useDeferredValue(d);
+  const nearby = useDistrictListings(deferred.district, deferred.category);
+  const pool = useMemo(() => {
+    const m = new Map(listings.map((l) => [l.listing_id, l]));
+    for (const l of nearby) if (!m.has(l.listing_id)) m.set(l.listing_id, l);
+    return [...m.values()];
+  }, [listings, nearby]);
   const matches = useMemo(() => {
     const x = deferred;
     if (!x.district || !toNum(x.price)) return [];
@@ -199,8 +206,8 @@ function ListingForm({
       asking_price_usd: toNum(x.price) ?? 0,
       name: x.address.trim() || x.name,
     };
-    return findDuplicates(candidate, listings, editing?.ref);
-  }, [deferred, listings, editing?.ref]);
+    return findDuplicates(candidate, pool, editing?.ref);
+  }, [deferred, pool, editing?.ref]);
   const likely = matches.filter((m) => m.score >= DUP_LIKELY);
   const needsAck = (likely.length > 0 || serverMatch !== null) && !ack;
 

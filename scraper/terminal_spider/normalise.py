@@ -49,6 +49,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
+from .colisting import same_home, why_not
 from .parsing import clean, parse_number
 
 log = logging.getLogger("terminal_spider.normalise")
@@ -467,7 +468,7 @@ def match_score(a: dict[str, Any], b: dict[str, Any]) -> int:
 
 # ── database work ─────────────────────────────────────────────────────────
 
-MATCH_COLS = "id,listing_id,agency_id,source_url,asset_class,property_type,lat,lng,district,bedrooms,built_sqft,lot_sqft,asking_price_usd,asset_name,address"
+MATCH_COLS = "id,listing_id,agency_id,source_url,asset_class,property_type,lat,lng,district,bedrooms,bathrooms,built_sqft,lot_sqft,asking_price_usd,asset_name,address"
 RAW_COLS = (
     "id,agency_id,source_url,raw_title,raw_price,raw_currency,raw_beds,raw_baths,raw_built_area,raw_lot_area,"
     "raw_property_type,raw_status,raw_address,raw_district,raw_description,raw_agent,raw_photos,raw_lat,raw_lng,"
@@ -520,9 +521,12 @@ class Normaliser:
         if agent and not self.dry_run:
             self.db.table("listing_agents").upsert(agent, on_conflict="id").execute()
 
-    def _mark(self, raw_id: int, property_id: str | None, error: str | None = None) -> None:
+    def _mark(self, raw_id: int, property_id: str | None, error: str | None = None, price_usd: float | None = None) -> None:
         if not self.dry_run:
-            self.db.rpc("mark_raw_processed", {"p_raw_id": raw_id, "p_property_id": property_id, "p_error": error}).execute()
+            args = {"p_raw_id": raw_id, "p_property_id": property_id, "p_error": error}
+            if price_usd:
+                args["p_price_usd"] = round(float(price_usd), 2)  # this agency's own asking price (offers)
+            self.db.rpc("mark_raw_processed", args).execute()
 
     def process_queue(self) -> None:
         source = "raw_listings" if self.everything else "raw_listing_deltas"
@@ -590,13 +594,18 @@ class Normaliser:
                         if abs(theirs - ours) > 0.15 * max(theirs, ours):
                             log.info("no merge of %s into %s (score %s): no pin and the prices differ", raw["source_url"], best[1]["listing_id"], best[0])
                             best = (0, None)
+                    # Both must agree: the score above and the co-listing check (colisting.py).
+                    if best[0] >= DUP_LIKELY and not same_home(f.row, best[1], pins_exact=f.pin_exact and best[1]["id"] in exact):
+                        log.info("no merge of %s into %s (score %s): co-listing check says %s", raw["source_url"], best[1]["listing_id"], best[0],
+                                 why_not(f.row, best[1], pins_exact=f.pin_exact and best[1]["id"] in exact))
+                        best = (0, None)
                     if best[0] >= DUP_LIKELY:
                         master = best[1]
                         self.stats["merged"] += 1
                         log.info("merge %s into %s (score %s)", raw["source_url"], master["listing_id"], best[0])
                         self.planned.append({"action": "merge", "into": master["listing_id"], **f.row})
                         held.add((master["id"], raw["agency_id"]))
-                        self._mark(raw["id"], master["id"])
+                        self._mark(raw["id"], master["id"], price_usd=f.row["asking_price_usd"])
                         continue
 
                 self._upsert_agent(f.agent)
@@ -608,7 +617,7 @@ class Normaliser:
                         if not self.dry_run:
                             self.db.table("property_master").update(f.row).eq("id", pid).execute()
                         self.stats["updated"] += 1
-                    self._mark(raw["id"], pid)
+                    self._mark(raw["id"], pid, price_usd=f.row["asking_price_usd"])
                 else:
                     ref = self._new_ref(raw["source_url"], taken)
                     taken.add(ref)
@@ -624,7 +633,7 @@ class Normaliser:
                     by_id[new_id] = m
                     if f.pin_exact:
                         exact.add(new_id)
-                    self._mark(raw["id"], None if self.dry_run else new_id)
+                    self._mark(raw["id"], None if self.dry_run else new_id, price_usd=f.row["asking_price_usd"])
                 log.info("%s  %s | %s %s | %s | USD %s", ref if not (master or pid) else "update", f.row["asset_name"], f.row["asset_class"], f.row["property_type"], f.row["district"], f"{f.row['asking_price_usd']:,.0f}")
             except Exception as exc:  # noqa: BLE001
                 self.stats["failed"] += 1
@@ -653,8 +662,12 @@ class Normaliser:
                     self.db.table("property_master").update({**upd, "signal_updated_at": now}).eq("id", r["id"]).execute()
 
     def run(self) -> dict[str, int]:
+        from . import projects
+
         self.process_queue()
         self.comps_pass()
+        if not self.dry_run:
+            projects.run(self.db)  # group flats into building projects (projects.py)
         log.info("normaliser: %s", ", ".join(f"{k} {v}" for k, v in self.stats.items()))
         return self.stats
 

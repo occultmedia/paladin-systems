@@ -19,14 +19,14 @@ import { ListingPhoto } from "@/components/listing-photo";
 import { fmtArea, fmtPerArea, fmtSqft, perM2, pricePerM2, shortSize, toM2, toSqft } from "@/lib/units";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
-import { ListingPopup, ViewToggle } from "@/components/dashboard/listing-popup";
+import { ViewToggle } from "@/components/dashboard/listing-popup";
 import { Wordmark } from "@/components/logo";
 import { FeedView } from "@/components/feed/feed-view";
 import { SettingsView } from "@/components/settings/settings-view";
 import { GrainField } from "@/components/landing/grain-field";
 import { useProfile } from "@/lib/profile";
 import { Dialog } from "@/components/feed/profile-dialog";
-import { MapFullscreen, type FullPanel } from "@/components/dashboard/map-fullscreen";
+import { MapFullscreen, type AgencyOption, type FullPanel } from "@/components/dashboard/map-fullscreen";
 import { AddListingDialog } from "@/components/dashboard/add-listing";
 import { VISIBILITY_HINT, VISIBILITY_LABEL, agentRowToListing, useAgentListings } from "@/lib/agent-listings";
 import { BAND_COLOR, CONFIDENCE_RULES, confidenceBand, scoreConfidence } from "@/lib/confidence";
@@ -53,7 +53,6 @@ import {
   TENURE_HINT,
   ZONINGS,
   type Listing,
-  type ListingSignal,
   type ListingStatus,
   type Pool,
   type PriceEvent,
@@ -62,7 +61,20 @@ import {
   TENURE_NOT_STATED,
   type Tenure,
 } from "@/lib/aruba-data";
-import { publishMarket, useMasterMarket } from "@/lib/live-market";
+import { publishMarket } from "@/lib/live-market";
+import {
+  PAGE_SIZE,
+  fetchAllGroups,
+  groupKeyOf,
+  useListingPages,
+  useListingsByRef,
+  useMapPins,
+  useMarketFacets,
+  useRecentActivity,
+  type MarketFilters,
+  type SortKey,
+} from "@/lib/market-api";
+import { GroupDetails, GroupPopup, GroupTags, groupPrice } from "@/components/dashboard/group-parts";
 import { HotFlame, AgencyLogo } from "@/components/dashboard/map-shared";
 import { Inter } from "next/font/google";
 import {
@@ -72,8 +84,6 @@ import {
   ArrowUp,
   Bell,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   Flag,
   Info,
   Lock,
@@ -99,6 +109,7 @@ import {
   SlidersHorizontal,
   Sparkles,
   User,
+  X,
 } from "lucide-react";
 import {
   CartesianGrid,
@@ -431,58 +442,6 @@ function scrollToRow(key: string, block: ScrollLogicalPosition = "center") {
   el?.scrollIntoView({ behavior: "smooth", block });
 }
 
-const PAGE_SIZE = 25;
-
-/** Listings of one company, whether indexed from its site or added by its agents. */
-const agencyKey = (l: Listing) => l.agency.name.trim().toLowerCase();
-
-/** Page numbers to show: first, last, and a window around the current page. */
-function pageList(page: number, count: number): Array<number | "gap"> {
-  const out: Array<number | "gap"> = [];
-  for (let i = 0; i < count; i++) {
-    if (i === 0 || i === count - 1 || Math.abs(i - page) <= 1) out.push(i);
-    else if (out[out.length - 1] !== "gap") out.push("gap");
-  }
-  return out;
-}
-
-function Pager({ page, count, total, onPage }: { page: number; count: number; total: number; onPage: (p: number) => void }) {
-  if (count <= 1) return null;
-  const from = page * PAGE_SIZE + 1;
-  const to = Math.min(total, (page + 1) * PAGE_SIZE);
-  const btn = "grid h-9 min-w-9 place-items-center rounded-full px-2 text-[12.5px] font-semibold tabular-nums transition-[background-color,color,transform] duration-150 active:scale-[0.94]";
-  return (
-    <nav aria-label="Listing pages" className="mt-5 flex flex-wrap items-center justify-between gap-3">
-      <p className="text-[12px] tabular-nums text-zinc-500">
-        Showing <span className="font-semibold text-zinc-900">{from}–{to}</span> of {total.toLocaleString("en-US")}
-      </p>
-      <div className="glass inline-flex items-center gap-0.5 rounded-full p-1">
-        <button type="button" onClick={() => onPage(page - 1)} disabled={page === 0} aria-label="Previous page" className={`${btn} text-zinc-700 hover:bg-white/80 disabled:pointer-events-none disabled:opacity-35`}>
-          <ChevronLeft size={15} strokeWidth={2.2} />
-        </button>
-        {pageList(page, count).map((p, i) =>
-          p === "gap" ? (
-            <span key={`gap-${i}`} className="px-1 text-[12px] text-zinc-400">…</span>
-          ) : (
-            <button
-              key={p}
-              type="button"
-              onClick={() => onPage(p)}
-              aria-current={p === page ? "page" : undefined}
-              className={`${btn} ${p === page ? "bg-zinc-950 text-lime" : "text-zinc-700 hover:bg-white/80"}`}
-            >
-              {p + 1}
-            </button>
-          ),
-        )}
-        <button type="button" onClick={() => onPage(page + 1)} disabled={page >= count - 1} aria-label="Next page" className={`${btn} text-zinc-700 hover:bg-white/80 disabled:pointer-events-none disabled:opacity-35`}>
-          <ChevronRight size={15} strokeWidth={2.2} />
-        </button>
-      </div>
-    </nav>
-  );
-}
-
 function Skeleton({ className = "" }: { className?: string }) {
   return <div className={`animate-pulse bg-zinc-100 ${className}`} />;
 }
@@ -517,10 +476,10 @@ function SignalBadge({ signal }: { signal: Signal }) {
  * ──────────────────────────────────────────────────────────────────────── */
 
 type Category = "All" | "Property" | "Land" | "Commercial";
-type SortKey = "name" | "district" | "beds" | "baths" | "built" | "lot" | "asking" | "psf" | "vsDistrict" | "listed" | "status" | "confidence";
 
 /** Sort choices for the phone layout (no column headers there). */
 const MOBILE_SORTS: Array<[SortKey, "asc" | "desc", string]> = [
+  ["activity", "desc", "Newest & price drops"],
   ["listed", "asc", "Newest"],
   ["asking", "desc", "Price: high to low"],
   ["asking", "asc", "Price: low to high"],
@@ -531,21 +490,6 @@ const MOBILE_SORTS: Array<[SortKey, "asc" | "desc", string]> = [
   ["lot", "desc", "Largest lot"],
   ["confidence", "desc", "Most reliable first"],
 ];
-
-const SORT_VALUE: Record<SortKey, (l: Listing) => number | string | null> = {
-  name: (l) => l.asset_name,
-  district: (l) => l.district,
-  beds: (l) => (l.category === "Property" ? l.bedrooms : null),
-  baths: (l) => (l.category === "Property" ? l.bathrooms : null),
-  built: (l) => (l.category === "Land" ? null : l.built_sqft),
-  lot: (l) => l.lot_sqft ?? null,
-  status: (l) => LISTING_STATUSES.indexOf(l.status),
-  confidence: (l) => l.confidence_score,
-  asking: (l) => l.asking_price_usd,
-  psf: (l) => l.price_per_sqft_usd,
-  vsDistrict: (l) => (isScored(l) && l.category === "Property" ? l.price_vs_comps_pct : null),
-  listed: (l) => l.days_on_market,
-};
 
 const CATEGORY_FILTERS: Array<{ value: Category; label: string }> = [
   { value: "All", label: "All" },
@@ -570,22 +514,8 @@ const TYPE_LABEL: Record<Category, string> = { All: "Type", Property: "Home type
 const PRICE_STEPS = [250_000, 500_000, 750_000, 1_000_000, 2_000_000, 3_000_000, 5_000_000, 7_500_000, 10_000_000, 15_000_000];
 const SIZE_STEPS = [75, 100, 150, 200, 300, 500, 1_000, 2_500, 5_000]; // m²
 
-/** The value a listing's type chip compares against, given the category view. */
-function subtypeOf(l: Listing, category: Category): string {
-  if (category === "All") return l.property_type;
-  if (l.category === "Land") return l.zoning;
-  if (l.category === "Commercial") return l.commercial_use;
-  return l.property_type;
-}
 const typeLine = (l: Listing) =>
   l.category === "Land" ? `Land · ${l.zoning}` : l.category === "Commercial" ? `Commercial · ${l.commercial_use}` : l.property_type;
-
-const median = (xs: number[]) => {
-  if (!xs.length) return 0;
-  const s = [...xs].sort((a, b) => a - b);
-  const m = Math.floor(s.length / 2);
-  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
-};
 
 const fmtDate = (iso: string) =>
   new Date(iso.length === 10 ? `${iso}T00:00:00Z` : iso).toLocaleDateString("en-US", {
@@ -1992,33 +1922,35 @@ function EmptyMarket({ onAdd }: { onAdd?: () => void }) {
   );
 }
 
+/** Is the whole island on screen? Then the list is not limited to the map area. */
+const ISLAND: [number, number, number, number] = [-70.07, 12.41, -69.865, 12.63];
+const coversIsland = ([w, s, e, n]: [number, number, number, number]) => w <= ISLAND[0] && s <= ISLAND[1] && e >= ISLAND[2] && n >= ISLAND[3];
+
 function ActiveListings({
-  listings,
+  members,
   initialDistrict,
   initialQuery,
   initialOpenId,
   initialNewToday,
   onExitTo,
+  watched,
 }: {
-  listings?: Listing[];
+  /** Members' own listings (Off-market and Only me), already loaded by the dashboard. */
+  members: Listing[];
   initialDistrict?: string;
   initialQuery?: string;
+  /** A listing ref to open (links from the Watchlist, updates board and Market feed). */
   initialOpenId?: string;
   initialNewToday?: boolean;
   /** Leaving full-screen mode from the Watchlist or Market feed panel opens that tab. */
   onExitTo?: (tab: FullPanel) => void;
+  /** Pinned listings, for the Watchlist panel in full-screen mode. */
+  watched: Listing[];
 }) {
   const [query, setQuery] = useState(initialQuery ?? "");
   const [tenure, setTenure] = useState<Tenure | "All" | "None">("All");
   // Available, Under contract and Sold are tabs: only one shows at a time
   const [status, setStatus] = useState<ListingStatus>("For sale");
-  const [revealId, setRevealId] = useState(initialOpenId ?? null);
-  if (revealId && listings) {
-    // a linked listing opens on the tab it belongs to
-    const l = listings.find((x) => x.listing_id === revealId);
-    if (l) setStatus(l.status);
-    setRevealId(null);
-  }
   const [pool, setPool] = useState<"Any" | "Has pool" | Pool>("Any");
   const [newToday, setNewToday] = useState(Boolean(initialNewToday));
   const [offMarket, setOffMarket] = useState(false);
@@ -2036,16 +1968,29 @@ function ActiveListings({
   const [dropsOnly, setDropsOnly] = useState(false);
   const [reliableOnly, setReliableOnly] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
-  const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "listed", dir: "asc" });
-  const [openId, setOpenId] = useState<string | null>(initialOpenId ?? null);
+  // Newest & recent price drops first: what moved, not 10,000 rows in no order.
+  const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "activity", dir: "desc" });
+  // Rows, pins and the map card all use group keys ("p:…" project, "h:…" home, "m:…" member listing).
+  const [openId, setOpenId] = useState<string | null>(null);
   const [hoverId, setHoverId] = useState<string | null>(null);
   const [popupId, setPopupId] = useState<string | null>(null);
+  // A group opened from the map or a link that is not among the rows loaded so far.
+  const [focusId, setFocusId] = useState<string | null>(null);
   // Baseline opens in Normal view; the switch on the map opens Dashboard view (full screen).
   const [fullMap, setFullMap] = useState(false);
   const closeFullMap = useCallback((tab: FullPanel = "Listings") => {
     setFullMap(false);
     if (tab !== "Listings") onExitTo?.(tab);
   }, [onExitTo]);
+
+  // "Search as I move the map": the list follows the visible map area.
+  const [searchAsMove, setSearchAsMove] = useState(true);
+  const [viewport, setViewport] = useState<[number, number, number, number] | null>(null);
+  // Only the member's own moves narrow the list; when the map fits the pins or flies to a
+  // pick by itself, the list stays on the whole island until the member moves it again.
+  const onViewport = useCallback((v: { bbox: [number, number, number, number]; user: boolean }) => {
+    if (v.user) setViewport(v.bbox);
+  }, []);
 
   // The table scrolls sideways on narrower screens. An open listing's details
   // are pinned to the visible width so nothing is cut off on the right.
@@ -2071,126 +2016,83 @@ function ActiveListings({
     };
   }, []);
 
-  useEffect(() => {
-    if (!initialOpenId || !listings) return;
-    const t = window.setTimeout(
-      () => scrollToRow(`row-${initialOpenId}`),
-      150,
-    );
-    return () => window.clearTimeout(t);
-  }, [initialOpenId, listings]);
-
   const landOnly = category === "Land";
   const commercialOnly = category === "Commercial";
   const nonResidential = landOnly || commercialOnly;
 
-  const districts = useMemo(
-    () => ["All", ...Array.from(new Set((listings ?? []).map((l) => l.district))).sort()],
-    [listings],
-  );
-
-  const agencies = useMemo(() => {
-    const byKey = new Map<string, { key: string; name: string; count: number }>();
-    for (const l of listings ?? []) {
-      const key = agencyKey(l);
-      const n = l.status === status ? 1 : 0;
-      const a = byKey.get(key);
-      if (a) a.count += n;
-      else byKey.set(key, { key, name: l.agency.name.trim(), count: n });
-    }
-    return [...byKey.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
-  }, [listings, status]);
-
+  /* ── the data: asked for in pieces (lib/market-api.ts) ───────────── */
+  const membersByRef = useMemo(() => new Map(members.map((l) => [l.listing_id, l])), [members]);
   const deferredQuery = useDeferredValue(query);
-  // Everything the filters match, over all the status tabs.
-  const matched = useMemo(() => {
-    if (!listings) return [];
-    const q = deferredQuery.trim().toLowerCase();
-    return listings.filter((l) => {
-      const size = l.category === "Land" ? l.lot_sqft : l.built_sqft;
-      return (
-        (category === "All" || l.category === category) &&
-        (!subtypes.length || subtypes.includes(subtypeOf(l, category))) &&
-        (district === "All" || l.district === district) &&
-        (agency === "All" || agencyKey(l) === agency) &&
-        (signal === "ALL" || isClosed(l) || l.signal === signal) &&
-        (tenure === "All" || (tenure === "None" ? !l.tenure : l.tenure === tenure)) &&
-        (pool === "Any" || (pool === "Has pool" ? l.pool === "Private pool" || l.pool === "Shared pool" : l.pool === pool)) &&
-        (!newToday || l.is_new) &&
-        (!offMarket || Boolean(l.member)) &&
-        (!priceMin || l.asking_price_usd >= priceMin) &&
-        (!priceMax || l.asking_price_usd <= priceMax) &&
-        (!bedsMin || (l.category === "Property" && l.bedrooms >= bedsMin)) &&
-        (!sizeMin || (size ? toM2(size) : 0) >= sizeMin) &&
-        (!newOnly || l.days_on_market <= 7) &&
-        (!dropsOnly || l.price_change_pct < 0) &&
-        (!reliableOnly || l.confidence_score >= 80) &&
-        (!q || `${l.asset_name} ${l.district} ${l.listing_id} ${l.source} ${typeLine(l)} ${l.tenure ?? TENURE_NOT_STATED}`.toLowerCase().includes(q))
-      );
-    });
-  }, [listings, deferredQuery, category, subtypes, district, agency, signal, priceMin, priceMax, bedsMin, sizeMin, newOnly, dropsOnly, reliableOnly, tenure, newToday, offMarket, pool]);
+  const filters = useMemo<MarketFilters>(
+    () => ({
+      status,
+      category: category === "All" ? undefined : category,
+      subtypes,
+      district: district === "All" ? undefined : district,
+      agency: agency === "All" ? undefined : agency,
+      signal: signal === "ALL" || signal === "NO_SIGNAL" ? undefined : signal,
+      tenure: tenure === "All" ? undefined : tenure,
+      pool: pool === "Any" ? undefined : pool,
+      new_today: newToday,
+      off_market: offMarket,
+      price_min: priceMin,
+      price_max: priceMax,
+      beds_min: bedsMin,
+      size_min_m2: sizeMin,
+      new_7d: newOnly,
+      drops: dropsOnly,
+      reliable: reliableOnly,
+      q: deferredQuery.trim(),
+    }),
+    [status, category, subtypes, district, agency, signal, tenure, pool, newToday, offMarket, priceMin, priceMax, bedsMin, sizeMin, newOnly, dropsOnly, reliableOnly, deferredQuery],
+  );
+  const [filtersSeen, setFiltersSeen] = useState(filters);
+  if (filtersSeen !== filters) {
+    setFiltersSeen(filters);
+    setViewport(null);
+  }
+  const inView = searchAsMove && viewport !== null && !coversIsland(viewport);
+  const listFilters = useMemo(() => ({ ...filters, bbox: inView ? viewport! : undefined }), [filters, inView, viewport]);
+  const { flags } = useFlags();
+  const { pins: allPins, error: pinsError } = useMapPins(filters);
+  const pins = useMemo(() => allPins.filter((p) => !flags[p.rep_ref]), [allPins, flags]);
+  const page = useListingPages(listFilters, sort, membersByRef);
+  const groups = useMemo(() => page.groups.filter((g) => g.l && !flags[g.l.listing_id]), [page.groups, flags]);
+  const { facets } = useMarketFacets(listFilters);
+  const loaded = !page.loading || groups.length > 0;
+  useEffect(() => publishMarket(groups.map((g) => g.l!).filter(Boolean)), [groups]);
+
   const statusCounts = useMemo(() => {
     const n: Record<ListingStatus, number> = { "For sale": 0, "Under contract": 0, Sold: 0, "De-listed": 0 };
-    for (const l of matched) n[l.status]++;
+    for (const st of LISTING_STATUSES) n[st] = facets?.status_counts[st] ?? 0;
     return n;
-  }, [matched]);
-  const rows = useMemo(() => {
-    const filtered = matched.filter((l) => l.status === status);
-    const dir = sort.dir === "asc" ? 1 : -1;
-    const get = SORT_VALUE[sort.key];
-    return filtered.sort((a, b) => {
-      const x = get(a);
-      const y = get(b);
-      if (x === null && y === null) return 0;
-      if (x === null) return 1; // N/A always last
-      if (y === null) return -1;
-      return (typeof x === "string" ? x.localeCompare(y as string) : x - (y as number)) * dir;
+  }, [facets]);
+  const otherTabs = LISTING_STATUSES.filter((st) => st !== status).reduce((a, st) => a + statusCounts[st], 0);
+  const districts = useMemo(() => ["All", ...(facets?.districts ?? [])], [facets]);
+  const agencies: AgencyOption[] = useMemo(() => (facets?.agencies ?? []).map((a) => ({ key: a.id, name: a.name.trim(), count: a.count })), [facets]);
+
+  // A link that names a listing: open its group (it may be on no page loaded yet).
+  useEffect(() => {
+    if (!initialOpenId) return;
+    let live = true;
+    groupKeyOf(initialOpenId).then((k) => {
+      if (!live || !k) return;
+      setFocusId(k);
+      setOpenId(k);
+      window.setTimeout(() => scrollToRow(`row-${k}`, "start"), 200);
     });
-  }, [matched, status, sort]);
-
-  // 25 per page; back to page 1 whenever filters or sort change the result set
-  const [page, setPage] = useState(0);
-  const [pagedRows, setPagedRows] = useState(rows);
-  const [deepLink, setDeepLink] = useState(initialOpenId ?? null);
-  if (pagedRows !== rows) {
-    setPagedRows(rows);
-    // a ?open= link lands on the page that holds that listing
-    const i = deepLink ? rows.findIndex((r) => r.listing_id === deepLink) : -1;
-    setPage(i >= 0 ? Math.floor(i / PAGE_SIZE) : 0);
-    if (i >= 0) setDeepLink(null);
-  }
-  const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
-  const pageIdx = Math.min(page, pageCount - 1);
-  const pageRows = useMemo(() => rows.slice(pageIdx * PAGE_SIZE, (pageIdx + 1) * PAGE_SIZE), [rows, pageIdx]);
-  const listTopRef = useRef<HTMLDivElement>(null);
-  const goToPage = (p: number) => {
-    setPage(Math.max(0, Math.min(pageCount - 1, p)));
-    setOpenId(null);
-    listTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
-  /** Flip to the page holding a listing, so it can be opened and scrolled to. */
-  const showListing = (id: string) => {
-    const l = listings?.find((x) => x.listing_id === id);
-    if (l && l.status !== status) {
-      setStatus(l.status); // it lives in another tab
-      setDeepLink(id);
-      return;
-    }
-    const i = rows.findIndex((r) => r.listing_id === id);
-    if (i >= 0) setPage(Math.floor(i / PAGE_SIZE));
-  };
-
-  const stats = useMemo(() => {
-    const props = rows.filter((r): r is ListingSignal => r.category === "Property");
-    return {
-      count: rows.length,
-      residential: props.length,
-      land: rows.filter((r) => r.category === "Land").length,
-      commercial: rows.filter((r) => r.category === "Commercial").length,
-      medianAsk: median(rows.map((r) => r.asking_price_usd)),
-      belowMarket: rows.filter((r) => r.signal === "UNDERVALUED").length,
+    return () => {
+      live = false;
     };
-  }, [rows]);
+  }, [initialOpenId]);
+
+  const listTopRef = useRef<HTMLDivElement>(null);
+  /** Open a group's details in the list: its row if loaded, else the "Selected" card above the list. */
+  const showGroup = (key: string) => {
+    if (!groups.some((g) => g.key === key)) setFocusId(key);
+    setOpenId(key);
+    window.setTimeout(() => scrollToRow(`row-${key}`, "start"), 60);
+  };
 
   const onSort = (key: SortKey) =>
     setSort((s) =>
@@ -2203,9 +2105,9 @@ function ActiveListings({
     setCategory(c);
     setSubtypes([]);
     if (c !== "All" && c !== "Property") setBedsMin(0);
-    if (c === "Property" && sort.key === "vsDistrict") setSort({ key: "listed", dir: "asc" });
+    if (c === "Property" && sort.key === "vsDistrict") setSort({ key: "activity", dir: "desc" });
     if ((c === "Land" || c === "Commercial") && (sort.key === "beds" || sort.key === "baths" || (c === "Land" && sort.key === "built")))
-      setSort({ key: "listed", dir: "asc" });
+      setSort({ key: "activity", dir: "desc" });
   };
   const toggleSubtype = (t: string) => setSubtypes((xs) => (xs.includes(t) ? xs.filter((x) => x !== t) : [...xs, t]));
 
@@ -2232,8 +2134,25 @@ function ActiveListings({
   };
 
   // a pin opens the glass window on the map; Full details jumps to the row
-  const selectFromMap = (id: string) => setPopupId(id || null);
-  const popupListing = popupId ? rows.find((l) => l.listing_id === popupId) ?? null : null;
+  const selectFromMap = (key: string) => setPopupId(key || null);
+  const popupGroup = popupId ? groups.find((g) => g.key === popupId) ?? null : null;
+  const popupPin = popupId ? pins.find((p) => p.group_key === popupId) ?? null : null;
+  const focusGroup = focusId && !groups.some((g) => g.key === focusId) ? focusId : null;
+  const focusPin = focusGroup ? pins.find((p) => p.group_key === focusGroup) ?? null : null;
+  const renderGroup = (key: string, fallback: Listing | null = null) => (
+    <GroupDetails groupKey={key} fallback={fallback} members={membersByRef} renderDetails={(l) => <ListingDetails l={l} />} />
+  );
+
+  const [exporting, setExporting] = useState(false);
+  const exportCsv = async () => {
+    setExporting(true);
+    try {
+      const all = await fetchAllGroups(listFilters, sort, membersByRef);
+      downloadCsv(all.map((g) => g.l).filter((l): l is Listing => Boolean(l)));
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const selectCls = `${MONO} rounded-md border border-zinc-300 bg-white px-3 py-2 text-[12px] text-zinc-800 outline-none transition-colors hover:border-zinc-500 focus:border-zinc-950`;
   const segBtn = (on: boolean) =>
@@ -2250,6 +2169,24 @@ function ActiveListings({
   const num = `${td} ${MONO} text-right text-[13px] text-zinc-800`;
   // listing, district, status, asking, $/sqft, signal, listed, chevron + the category-dependent columns
   const colCount = 9 + 1 + (landOnly ? 1 : 2) + 1;
+  const marketEmpty = loaded && facets !== null && !filtersActive && !inView && facets.listings === 0 && otherTabs === 0;
+  const countLine = `Showing ${int.format(groups.length)} of ${int.format(page.total)} ${page.total === 1 ? "property" : "properties"} ${inView ? "in view" : "on Aruba"}`;
+
+  const loadMoreBar = (
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-zinc-200 py-4">
+      <p className="text-[12px] tabular-nums text-zinc-500">{loaded ? countLine : "Loading…"}</p>
+      {page.hasMore && (
+        <button
+          type="button"
+          onClick={page.loadMore}
+          disabled={page.loadingMore}
+          className="inline-flex items-center gap-2 rounded-full bg-zinc-950 px-5 py-2 text-[12.5px] font-semibold text-lime transition-colors hover:bg-zinc-800 disabled:opacity-50"
+        >
+          {page.loadingMore ? "Loading…" : `Load ${Math.min(PAGE_SIZE, page.total - groups.length)} more`}
+        </button>
+      )}
+    </div>
+  );
 
   return (
     <>
@@ -2263,7 +2200,7 @@ function ActiveListings({
           <p className="mt-1 max-w-[72ch] text-[13px] leading-relaxed text-zinc-400">
             {status === "Sold"
               ? "Properties the agencies marked sold. Prices are the last asking price; the price it sold for is not published."
-              : "Homes, condos, land and commercial property from Aruba's agencies. Hover a pin for a quick look, click it for full details in the list below."}
+              : "Homes, condos, land and commercial property from Aruba's agencies. One pin per building project or home, however many agencies list it. Hover a pin for a quick look, click it for every unit and agency."}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -2279,12 +2216,12 @@ function ActiveListings({
           )}
           <button
             type="button"
-            onClick={() => downloadCsv(rows)}
-            disabled={!rows.length}
+            onClick={exportCsv}
+            disabled={!page.total || exporting}
             className="inline-flex items-center gap-2 rounded-full border border-white/25 px-4 py-2 text-[12px] font-semibold tracking-wide text-white transition-colors hover:border-white disabled:opacity-40"
           >
             <Download size={13} strokeWidth={1.5} />
-            Export CSV
+            {exporting ? "Preparing…" : "Export CSV"}
           </button>
         </div>
       </div>
@@ -2292,12 +2229,12 @@ function ActiveListings({
       {/* summary */}
       <div className="grid grid-cols-3 gap-x-4 lg:grid-cols-6 lg:gap-x-0">
         {[
-          ["Listings shown", listings ? int.format(stats.count) : "—", undefined],
-          ["Residential", listings ? int.format(stats.residential) : "—", undefined],
-          ["Land", listings ? int.format(stats.land) : "—", undefined],
-          ["Commercial", listings ? int.format(stats.commercial) : "—", undefined],
-          [isClosed({ status }) ? "Median last asking" : "Median asking", listings && stats.count ? fmtUsdCompact(stats.medianAsk) : "—", undefined],
-          ["Below market", listings && !isClosed({ status }) ? int.format(stats.belowMarket) : "—", listings && !isClosed({ status }) ? "#7FD3A0" : undefined],
+          [inView ? "Listings in view" : "Listings shown", facets ? int.format(facets.listings) : "—", undefined],
+          ["Residential", facets ? int.format(facets.residential) : "—", undefined],
+          ["Land", facets ? int.format(facets.land) : "—", undefined],
+          ["Commercial", facets ? int.format(facets.commercial) : "—", undefined],
+          [isClosed({ status }) ? "Median last asking" : "Median asking", facets?.median_price ? fmtUsdCompact(facets.median_price) : "—", undefined],
+          ["Below market", facets && !isClosed({ status }) ? int.format(facets.below_market) : "—", facets && !isClosed({ status }) ? "#7FD3A0" : undefined],
         ].map(([label, value, color], i) => (
           <div key={label} className={`py-3 sm:py-6 ${i > 0 ? "lg:border-l lg:border-white/10 lg:pl-6" : ""}`}>
             <p className="truncate text-[9px] uppercase tracking-[0.12em] text-zinc-500 sm:text-[10px] sm:tracking-[0.14em]">{label}</p>
@@ -2329,7 +2266,7 @@ function ActiveListings({
               }`}
             >
               {STATUS_TAB[st]}
-              <span className={`${MONO} text-[12px] ${status === st ? "text-lime/70" : "text-zinc-400"}`}>{listings ? int.format(statusCounts[st]) : "—"}</span>
+              <span className={`${MONO} text-[12px] ${status === st ? "text-lime/70" : "text-zinc-400"}`}>{facets ? int.format(statusCounts[st]) : "—"}</span>
             </button>
           ))}
         </div>
@@ -2347,7 +2284,7 @@ function ActiveListings({
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search name, district, ID"
+              placeholder="Search name, project, district, ID"
               className={`${selectCls} w-full pl-8 placeholder:text-zinc-400 sm:w-56`}
             />
           </label>
@@ -2389,9 +2326,9 @@ function ActiveListings({
           </div>
           <button type="button" onClick={() => setNewToday((v) => !v)} aria-pressed={newToday} className={toggleCls(newToday)}>
             New today
-            {listings && (
+            {facets && (
               <span className={`${MONO} rounded-full px-1.5 text-[10px] ${newToday ? "bg-lime text-zinc-950" : "bg-zinc-950 text-lime"}`}>
-                {listings.filter((l) => l.is_new && l.status === status).length}
+                {facets.new_today}
               </span>
             )}
           </button>
@@ -2403,9 +2340,9 @@ function ActiveListings({
             title="Listings agents added by hand, not on public sites"
           >
             Off-market
-            {listings && (
+            {facets && (
               <span className={`${MONO} rounded-full px-1.5 text-[10px] ${offMarket ? "bg-lime text-zinc-950" : "bg-zinc-950 text-lime"}`}>
-                {listings.filter((l) => l.member && l.status === status).length}
+                {facets.off_market}
               </span>
             )}
           </button>
@@ -2500,45 +2437,59 @@ function ActiveListings({
       <div className="relative rounded-2xl">
         <RunLine speed={10} />
         <ArubaMap
-          mode="listings"
-          listings={rows}
+          mode="pins"
+          pins={pins}
           selectedId={popupId ?? openId}
           hoveredId={hoverId}
           onSelect={selectFromMap}
           onHover={setHoverId}
+          onViewport={onViewport}
           height={560}
         />
-        <ViewToggle value="normal" onChange={() => setFullMap(true)} className="absolute bottom-3 right-3 z-[5] max-sm:bottom-auto max-sm:top-[50px]" />
+        <label className="glass absolute bottom-3 left-1/2 z-[5] inline-flex -translate-x-1/2 cursor-pointer select-none items-center gap-2 whitespace-nowrap rounded-full px-3 py-1.5 text-[12px] font-semibold text-zinc-900 max-sm:bottom-auto max-sm:left-auto max-sm:right-3 max-sm:top-[50px] max-sm:translate-x-0">
+          <input type="checkbox" checked={searchAsMove} onChange={(e) => setSearchAsMove(e.target.checked)} className="size-3.5 accent-zinc-950" />
+          Search as I move the map
+        </label>
+        <ViewToggle value="normal" onChange={() => setFullMap(true)} className="absolute bottom-3 right-3 z-[5] max-sm:bottom-auto max-sm:top-[92px]" />
         <AnimatePresence>
-          {popupListing && (
-            <ListingPopup
-              key={popupListing.listing_id}
-              l={popupListing}
+          {popupId && (popupGroup || popupPin) && (
+            <GroupPopup
+              key={popupId}
+              groupKey={popupId}
+              fallback={popupGroup?.l ?? null}
+              members={membersByRef}
               onClose={() => setPopupId(null)}
               onDetails={() => {
+                const k = popupId;
                 setPopupId(null);
-                showListing(popupListing.listing_id);
-                setOpenId(popupListing.listing_id);
-                window.setTimeout(() => scrollToRow(`row-${popupListing.listing_id}`, "start"), 50);
+                showGroup(k);
               }}
               className="absolute inset-x-3 bottom-16 sm:inset-x-auto sm:right-4 sm:top-14 sm:bottom-auto sm:w-[360px]"
             />
           )}
         </AnimatePresence>
+        {pinsError && (
+          <p className="absolute inset-x-3 top-3 z-[5] rounded-lg bg-white/95 px-3 py-2 text-[12px] text-[#D64545] shadow">Map unavailable: {pinsError}</p>
+        )}
       </div>
       <MapFullscreen
         open={fullMap}
-        listings={rows}
-        allListings={listings ?? []}
+        groups={groups}
+        pins={pins}
+        total={page.total}
+        inView={inView}
+        hasMore={page.hasMore}
+        loadingMore={page.loadingMore}
+        onLoadMore={page.loadMore}
+        onViewport={onViewport}
+        members={membersByRef}
+        watched={watched}
         selectedId={openId}
         hoveredId={hoverId}
-        onSelect={(id) => {
-          if (id) showListing(id);
-          setOpenId(id || null);
-        }}
+        onSelect={(key) => setOpenId(key || null)}
         onHover={setHoverId}
         onExit={closeFullMap}
-        renderDetails={(l) => <ListingDetails l={l} />}
+        renderGroup={(key) => renderGroup(key, groups.find((g) => g.key === key)?.l ?? null)}
         onAddListing={actions?.add}
         agency={agency}
         agencies={agencies}
@@ -2551,12 +2502,29 @@ function ActiveListings({
         }}
       />
 
+      {/* a group picked on the map or linked to, before its row is loaded */}
+      {focusGroup && (
+        <section id={`row-${focusGroup}`} data-row={`row-${focusGroup}`} className="mt-8 scroll-mt-24 rounded-2xl border border-zinc-950 bg-mint-soft p-3 sm:p-4">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
+              Selected{focusPin ? ` · ${focusPin.title}` : ""}
+            </p>
+            <button type="button" onClick={() => setFocusId(null)} aria-label="Close" className="grid size-7 place-items-center rounded-full text-zinc-600 hover:bg-white hover:text-zinc-950">
+              <X size={14} />
+            </button>
+          </div>
+          {renderGroup(focusGroup)}
+        </section>
+      )}
+
       {/* list */}
       <div ref={listTopRef} className="mt-8 flex scroll-mt-24 flex-wrap items-center justify-between gap-3">
-        <p className="font-display text-[18px] font-bold text-zinc-950">
-          {listings ? `${int.format(stats.count)} listing${stats.count === 1 ? "" : "s"}` : "Loading listings…"}
+        <p className="font-display text-[18px] font-bold text-zinc-950" aria-live="polite">
+          {loaded ? countLine : "Loading listings…"}
         </p>
-        <p className="hidden text-[12px] text-zinc-500 md:block">Click a row or a pin for full details · click a column to sort</p>
+        <p className="hidden text-[12px] text-zinc-500 md:block">
+          {inView ? "The list follows the map · " : ""}Click a row or a pin for full details · click a column to sort
+        </p>
         <label className="flex items-center gap-2 text-[12px] text-zinc-500 md:hidden">
           Sort
           <select
@@ -2576,96 +2544,104 @@ function ActiveListings({
 
       {/* phones: cards */}
       <ul className="mt-3 divide-y divide-zinc-200 border-t border-zinc-950 md:hidden">
-        {!listings &&
+        {!loaded &&
           Array.from({ length: 5 }).map((_, i) => (
             <li key={i} className="py-4">
               <Skeleton className="h-20 w-full" />
             </li>
           ))}
-        {listings && !listings.length && (
+        {marketEmpty && (
           <li className="py-12 text-center">
             <EmptyMarket onAdd={actions?.add} />
           </li>
         )}
-        {listings && listings.length > 0 && !rows.length && (
+        {loaded && !marketEmpty && !groups.length && (
           <li className="py-12 text-center text-[13px] text-zinc-500">
-            No listings match these filters in this tab. {matched.length > 0 && `${int.format(matched.length)} in the other tabs. `}
+            {inView ? "Nothing matches in this part of the map. Zoom out or move the map. " : "No listings match these filters in this tab. "}
+            {otherTabs > 0 && `${int.format(otherTabs)} in the other tabs. `}
             <button type="button" onClick={clearAll} className="underline underline-offset-4">
               Clear all
             </button>
           </li>
         )}
-        {pageRows.map((l) => {
-          const open = openId === l.listing_id;
+        {groups.map((g) => {
+          const l = g.l!;
+          const open = openId === g.key;
+          const project = g.type === "project";
           return (
-            <li key={l.listing_id} data-row={`row-${l.listing_id}`} className={`relative scroll-mt-24 ${open ? "bg-mint-soft" : ""}`}>
-              <span className="glass absolute left-1 top-5 z-10 rounded-full">
-                <WatchButton l={l} variant="icon" />
-              </span>
+            <li key={g.key} data-row={`row-${g.key}`} className={`relative scroll-mt-24 ${open ? "bg-mint-soft" : ""}`}>
+              {!project && (
+                <span className="glass absolute left-1 top-5 z-10 rounded-full">
+                  <WatchButton l={l} variant="icon" />
+                </span>
+              )}
               <button
                 type="button"
-                onClick={() => setOpenId(open ? null : l.listing_id)}
+                onClick={() => setOpenId(open ? null : g.key)}
                 aria-expanded={open}
                 className="flex w-full gap-3 py-4 text-left transition-colors active:bg-mint-soft"
               >
                 <span className="relative shrink-0">
-                  <Thumb src={l.photo_url} alt={l.asset_name} w={96} h={72} />
+                  <Thumb src={l.photo_url} alt={g.title} w={96} h={72} />
                   <span className="absolute -bottom-1.5 -right-1.5 rounded-[5px] ring-2 ring-white">
                     <AgencyLogo agency={l.agency} size={20} rounded={4} />
                   </span>
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="flex items-start justify-between gap-2">
-                    <span className="text-[14px] font-medium leading-snug text-zinc-950">{l.asset_name}</span>
+                    <span className="text-[14px] font-medium leading-snug text-zinc-950">{g.title}</span>
                     <ChevronDown size={15} strokeWidth={1.5} className={`mt-0.5 shrink-0 text-zinc-400 transition-transform ${open ? "rotate-180" : ""}`} />
                   </span>
                   <span className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-500">
-                    {l.district} · {typeLine(l)}
+                    {l.district} · {project ? "Building project" : typeLine(l)}
                   </span>
-                  <span className="mt-0.5 block text-[11.5px] tabular-nums text-zinc-700">{shortSize(l)}</span>
+                  {!project && <span className="mt-0.5 block text-[11.5px] tabular-nums text-zinc-700">{shortSize(l)}</span>}
                   <span className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                    <IndexTags l={l} />
-                    <TenureTag l={l} />
-                    <PoolTag pool={l.pool} />
-                    <ClientCount id={l.listing_id} />
+                    <GroupTags g={g} />
+                    {!project && (
+                      <>
+                        <IndexTags l={l} />
+                        <TenureTag l={l} />
+                        <PoolTag pool={l.pool} />
+                        <ClientCount id={l.listing_id} />
+                      </>
+                    )}
                   </span>
                   <span className="mt-2.5 flex items-end justify-between gap-2">
                     <span>
-                      <span className={`${MONO} block font-display text-[16px] font-bold text-zinc-950`}>{fmtUsdCompact(l.asking_price_usd)}</span>
-                      <span className="text-[11px]">
-                        <PriceMove pct={l.price_change_pct} size={11} />
-                      </span>
-                    </span>
-                    <span className="flex flex-col items-end gap-1">
-                      <StatusBadge l={l} align="end" />
-                      {!isClosed(l) && (
-                        <>
-                          <SignalBadge signal={l.signal} />
-                          <ConfidenceBadge l={l} />
-                        </>
+                      <span className={`${MONO} block font-display text-[16px] font-bold text-zinc-950`}>{groupPrice(g)}</span>
+                      {!project && (
+                        <span className="text-[11px]">
+                          <PriceMove pct={l.price_change_pct} size={11} />
+                        </span>
                       )}
                     </span>
+                    {!project && (
+                      <span className="flex flex-col items-end gap-1">
+                        <StatusBadge l={l} align="end" />
+                        {!isClosed(l) && (
+                          <>
+                            <SignalBadge signal={l.signal} />
+                            <ConfidenceBadge l={l} />
+                          </>
+                        )}
+                      </span>
+                    )}
                   </span>
                   <span className="mt-2 block truncate text-[11px] text-zinc-500">
-                    {l.agency.name}
-                    {l.agent && <> · {l.agent.name}</>}
+                    {g.agencyIds.length > 1 ? `${g.agencyIds.length} agencies` : l.agency.name}
+                    {!project && l.agent && <> · {l.agent.name}</>}
                     {" · "}
                     {l.is_new ? "Listed today" : `${l.days_on_market}d listed`}
                   </span>
                 </span>
               </button>
-              {open && (
-                <div className="pb-6">
-                  <ListingDetails l={l}  />
-                </div>
-              )}
+              {open && <div className="pb-6">{renderGroup(g.key, l)}</div>}
             </li>
           );
         })}
       </ul>
-      <div className="md:hidden">
-        <Pager page={pageIdx} count={pageCount} total={rows.length} onPage={goToPage} />
-      </div>
+      <div className="md:hidden">{loaded && groups.length > 0 && loadMoreBar}</div>
 
       <div className="relative mt-3 hidden md:block">
       <div aria-hidden className={`pointer-events-none absolute inset-y-0 left-0 z-20 w-4 bg-gradient-to-r from-white to-transparent transition-opacity ${edge.left ? "opacity-100" : "opacity-0"}`} />
@@ -2702,12 +2678,12 @@ function ActiveListings({
                 }
               />
               <PlainHeader label="Value" />
-              <SortHeader label="Listed" k="listed" sort={sort} onSort={onSort} />
+              <SortHeader label="Activity" k="activity" sort={sort} onSort={onSort} />
               <th className="w-14 border-b border-zinc-300 pr-3" aria-label="Watch and details" />
             </tr>
           </thead>
           <tbody>
-            {!listings &&
+            {!loaded &&
               Array.from({ length: 8 }).map((_, i) => (
                 <tr key={i}>
                   <td colSpan={colCount} className="border-b border-zinc-200 py-3">
@@ -2715,62 +2691,68 @@ function ActiveListings({
                   </td>
                 </tr>
               ))}
-            {listings && !listings.length && (
+            {marketEmpty && (
               <tr>
                 <td colSpan={colCount} className="py-16 text-center">
                   <EmptyMarket onAdd={actions?.add} />
                 </td>
               </tr>
             )}
-            {listings && listings.length > 0 && !rows.length && (
+            {loaded && !marketEmpty && !groups.length && (
               <tr>
                 <td colSpan={colCount} className="py-16 text-center text-[13px] text-zinc-500">
-                  No listings match these filters in this tab. {matched.length > 0 && `${int.format(matched.length)} in the other tabs. `}
+                  {inView ? "Nothing matches in this part of the map. Zoom out or move the map. " : "No listings match these filters in this tab. "}
+                  {otherTabs > 0 && `${int.format(otherTabs)} in the other tabs. `}
                   <button type="button" onClick={clearAll} className="underline underline-offset-4 hover:text-zinc-950">
                     Clear all
                   </button>
                 </td>
               </tr>
             )}
-            {pageRows.map((l) => {
-              const open = openId === l.listing_id;
-              const hot = hoverId === l.listing_id;
+            {groups.map((g) => {
+              const l = g.l!;
+              const open = openId === g.key;
+              const hot = hoverId === g.key;
+              const project = g.type === "project";
               const vsPct = l.category === "Property" ? l.price_vs_comps_pct : 0;
               const compsPsf = isScored(l) && l.category === "Property" ? l.comps_psf_usd : 0;
               return (
-                <Fragment key={l.listing_id}>
+                <Fragment key={g.key}>
                   <tr
-                    id={`row-${l.listing_id}`}
-                    data-row={`row-${l.listing_id}`}
-                    onClick={() => setOpenId(open ? null : l.listing_id)}
-                    onMouseEnter={() => setHoverId(l.listing_id)}
+                    id={`row-${g.key}`}
+                    data-row={`row-${g.key}`}
+                    onClick={() => setOpenId(open ? null : g.key)}
+                    onMouseEnter={() => setHoverId(g.key)}
                     onMouseLeave={() => setHoverId(null)}
                     className={`cursor-pointer scroll-mt-24 transition-colors hover:bg-mint-soft ${open || hot ? "bg-mint-soft" : ""}`}
                   >
                     <td className={`${td} min-w-[250px] pl-4`}>
                       <div className="flex items-start gap-3">
-                        <span className="relative shrink-0" title={`Listed by ${l.agency.name}`}>
-                          <Thumb src={l.photo_url} alt={l.asset_name} />
+                        <span className="relative shrink-0" title={project ? "Building project" : `Listed by ${l.agency.name}`}>
+                          <Thumb src={l.photo_url} alt={g.title} />
                           <span className="absolute -bottom-1.5 -right-1.5 rounded-[5px] ring-2 ring-white">
                             <AgencyLogo agency={l.agency} size={20} rounded={4} />
                           </span>
                         </span>
-                        <div className="min-w-0 max-w-[210px]">
+                        <div className="min-w-0 max-w-[230px]">
                           <p className="flex flex-wrap items-center gap-1.5 text-[13px] font-medium text-zinc-950">
-                            {l.asset_name}
-                            <IndexTags l={l} />
+                            {g.title}
+                            {!project && <IndexTags l={l} />}
                           </p>
                           <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-500">
-                            {l.listing_id} · {typeLine(l)}
-                            <TenureTag l={l} />
-                            <PoolTag pool={l.pool} />
+                            {project ? "Building project" : <>{l.listing_id} · {typeLine(l)}</>}
+                            {!project && <TenureTag l={l} />}
+                            {!project && <PoolTag pool={l.pool} />}
                           </p>
                           <p className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-zinc-500">
-                            <span className="truncate">
-                              {l.agency.name}
-                              {l.agent && <> · Agent <span className="text-zinc-800">{l.agent.name}</span></>}
-                            </span>
-                            <ClientCount id={l.listing_id} />
+                            <GroupTags g={g} />
+                            {g.agencyIds.length <= 1 && (
+                              <span className="truncate">
+                                {l.agency.name}
+                                {l.agent && <> · Agent <span className="text-zinc-800">{l.agent.name}</span></>}
+                              </span>
+                            )}
+                            {!project && <ClientCount id={l.listing_id} />}
                           </p>
                         </div>
                       </div>
@@ -2782,7 +2764,7 @@ function ActiveListings({
                       <td className={`${td} text-right text-[13px] text-zinc-700`}>{l.category === "Commercial" ? l.commercial_use : DASH}</td>
                     ) : (
                       <td className={num}>
-                        {l.category === "Property" ? (
+                        {!project && l.category === "Property" ? (
                           <>
                             {l.bedrooms}
                             <span className="text-zinc-400"> / </span>
@@ -2793,16 +2775,20 @@ function ActiveListings({
                         )}
                       </td>
                     )}
-                    {!landOnly && <td className={num}>{l.category === "Land" || !l.built_sqft ? DASH : <BothAreas sqft={l.built_sqft} />}</td>}
-                    <td className={num}>{l.lot_sqft ? <BothAreas sqft={l.lot_sqft} /> : DASH}</td>
+                    {!landOnly && <td className={num}>{project || l.category === "Land" || !l.built_sqft ? DASH : <BothAreas sqft={l.built_sqft} />}</td>}
+                    <td className={num}>{!project && l.lot_sqft ? <BothAreas sqft={l.lot_sqft} /> : DASH}</td>
                     <td className={`${num} text-zinc-950`}>
-                      {fmtUsdCompact(l.asking_price_usd)}
+                      {project ? groupPrice(g) : fmtUsdCompact(l.asking_price_usd)}
                       <p className="mt-1 text-[11px]">
-                        <PriceMove pct={l.price_change_pct} size={11} />
+                        {project ? (
+                          g.maxPrice > g.minPrice && <span className="text-zinc-500">to {fmtUsdCompact(g.maxPrice)}</span>
+                        ) : (
+                          <PriceMove pct={l.price_change_pct} size={11} />
+                        )}
                       </p>
                     </td>
                     <td className={num}>
-                      {l.price_per_sqft_usd > 0 ? (
+                      {!project && l.price_per_sqft_usd > 0 ? (
                         <>
                           {fmtUsd(pricePerM2(l))}
                           <p className="mt-1 whitespace-nowrap text-[11px] text-zinc-500">{fmtUsd(l.price_per_sqft_usd)} /ft²</p>
@@ -2812,7 +2798,7 @@ function ActiveListings({
                       )}
                     </td>
                     <td className={`${td} ${MONO} text-right`}>
-                      {l.price_per_sqft_usd > 0 && compsPsf > 0 ? (
+                      {!project && l.price_per_sqft_usd > 0 && compsPsf > 0 ? (
                         <>
                           <p className="text-[13px]" style={{ color: l.signal === "AT_MARKET" ? C.slate300 : deltaColor(-vsPct) }} title="Average of the two price checks. Coloured only when both agree.">
                             {fmtDelta(vsPct)}
@@ -2826,12 +2812,22 @@ function ActiveListings({
                     <td className={`${td} text-right`}>
                       <StatusBadge l={l} align="end" />
                     </td>
-                    <td className={`${td} text-right`}>{isClosed(l) ? DASH : <ConfidenceBadge l={l} />}</td>
-                    <td className={`${td} text-right`}>{isClosed(l) ? DASH : <SignalBadge signal={l.signal} />}</td>
-                    <td className={num}>{l.is_new ? <span className="font-semibold text-zinc-950">Today</span> : `${l.days_on_market}d`}</td>
+                    <td className={`${td} text-right`}>{project || isClosed(l) ? DASH : <ConfidenceBadge l={l} />}</td>
+                    <td className={`${td} text-right`}>{project || isClosed(l) ? DASH : <SignalBadge signal={l.signal} />}</td>
+                    <td className={num}>
+                      {l.is_new ? (
+                        <span className="font-semibold text-zinc-950">Today</span>
+                      ) : !project && l.last_price_change && l.last_price_change.event === "Price drop" ? (
+                        <span title={`Price drop on ${fmtDate(l.last_price_change.date)}`} style={{ color: PRICE_DOWN }}>
+                          ↓ {fmtDate(l.last_price_change.date).replace(/, \d{4}$/, "")}
+                        </span>
+                      ) : (
+                        `${l.days_on_market}d`
+                      )}
+                    </td>
                     <td className={`${td} pr-3 text-right`}>
                       <span className="flex items-center justify-end gap-1">
-                        <WatchButton l={l} variant="icon" />
+                        {!project && <WatchButton l={l} variant="icon" />}
                         <ChevronDown size={14} strokeWidth={1.5} className={`text-zinc-400 transition-transform ${open ? "rotate-180" : ""}`} />
                       </span>
                     </td>
@@ -2840,7 +2836,7 @@ function ActiveListings({
                     <tr className="bg-mint-soft">
                       <td colSpan={colCount} className="border-b border-zinc-300 p-0">
                         <div className="sticky left-0 px-4 pb-6 pt-1" style={paneW ? { width: paneW } : undefined}>
-                          <ListingDetails l={l}  />
+                          {renderGroup(g.key, l)}
                         </div>
                       </td>
                     </tr>
@@ -2851,9 +2847,14 @@ function ActiveListings({
           </tbody>
         </table>
       </div>
-      <Pager page={pageIdx} count={pageCount} total={rows.length} onPage={goToPage} />
+      {loaded && groups.length > 0 && loadMoreBar}
       </div>
+      {page.error && <p className="mt-3 text-[12px] text-[#D64545]">Could not load more listings: {page.error}</p>}
       <div className="mt-4 space-y-1 text-[11px] leading-relaxed text-zinc-500">
+        <p>
+          <span className="text-zinc-700">One pin, one row per property.</span> A building project&apos;s units, and a home listed by
+          several agencies, are shown together; open them to see every unit and each agency&apos;s own price and page.
+        </p>
         <p>
           <span className="text-zinc-700">Homes and condos for sale</span> get two separate checks: the nearest homes of similar
           size, and a price model (size, plot, bedrooms, pool, land title, district). Below market or Above market means both
@@ -3197,13 +3198,17 @@ function runMessages(run: IndexRun): BoardMessage[] {
 function TerminalUpdates({
   runs,
   allListings,
+  marketSize,
   open,
   onToggle,
   onOpenListing,
   onShowNew,
 }: {
   runs: IndexRun[];
+  /** Listings it may name (recent, pinned, members'). */
   allListings: Listing[];
+  /** How many listings the market holds (0 before the first Index). */
+  marketSize: number;
   open: boolean;
   onToggle: () => void;
   onOpenListing: (id: string) => void;
@@ -3211,7 +3216,7 @@ function TerminalUpdates({
 }) {
   const latest = runs[0];
   // Re-brief when the market changes; nothing to brief before the first listing.
-  const version = allListings.length ? `${allListings.length}:${latest.date}:${latest.new_listings.length}:${latest.price_changes.length}:${latest.status_changes.length}` : null;
+  const version = marketSize ? `${marketSize}:${latest.date}:${latest.new_listings.length}:${latest.price_changes.length}:${latest.status_changes.length}` : null;
   const brief = useMarketBrief(version);
   const drops = latest.price_changes.filter((c) => c.change.event === "Price drop").length;
   const ups = latest.price_changes.length - drops;
@@ -3252,7 +3257,7 @@ function TerminalUpdates({
           AI Signal
         </span>
         <span className="min-w-0 flex-1 basis-[260px] truncate text-zinc-200">
-          {!allListings.length ? (
+          {!marketSize ? (
             <span className="text-zinc-400">No listings yet. AI Signal starts reading the market with the first Index run.</span>
           ) : brief.data ? (
             brief.data.headline
@@ -3296,10 +3301,10 @@ function TerminalUpdates({
             <div className="flex items-center justify-between gap-2">
               <AIMark dark />
               <span className="text-[11px] text-zinc-500">
-                {allListings.length ? `${fmtRunDay(latest, 0)} · ${fmtRunTime(latest.run_at)} AST` : "Waiting for the first Index run"}
+                {marketSize ? `${fmtRunDay(latest, 0)} · ${fmtRunTime(latest.run_at)} AST` : "Waiting for the first Index run"}
               </span>
             </div>
-            {!allListings.length && (
+            {!marketSize && (
               <p className="mt-3 text-[13px] leading-relaxed text-zinc-300">
                 No listings yet. Once the daily Index of Aruba&rsquo;s agency sites starts, AI Signal briefs you here every morning: what&rsquo;s new,
                 price cuts, status changes and the listings worth a look.
@@ -3357,7 +3362,7 @@ function TerminalUpdates({
               </>
             )}
           </section>
-          {allListings.length > 0 && (
+          {marketSize > 0 && (
           <div role="log" aria-label="Index log">
             <p className="px-4 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-950 sm:px-5">Index log</p>
             {runs.map((run, i) => (
@@ -3474,31 +3479,42 @@ function Dashboard() {
   });
   const [boardOpen, setBoardOpen] = useState(false);
   const toggleBoard = useCallback(() => setBoardOpen((o) => !o), []);
-  // Live Master Market from Supabase (empty until the Index runs).
-  const { listings: indexed, error } = useMasterMarket();
-  // Master Market view: flagged (archived) and zero-confidence listings are gone for everyone.
-  const { flags } = useFlags();
+  // The market is asked for in pieces (lib/market-api.ts): the Listings tab loads its own
+  // pins and pages; here only what the other parts need.
+  const { recent, error } = useRecentActivity(7);
   const me = useProfile();
   // Listings agents added by hand: Off-market ones for every member, Only me ones for their agent.
   const agentListings = useAgentListings(me.profile);
   const memberListings = useMemo(
-    () => (indexed ? agentListings.rows.map((r) => agentRowToListing(r, agentListings.myId)) : []),
-    [indexed, agentListings.rows, agentListings.myId],
+    () => agentListings.rows.map((r) => agentRowToListing(r, agentListings.myId)),
+    [agentListings.rows, agentListings.myId],
   );
-  const market = useMemo(
-    () => (indexed && !agentListings.loading ? [...memberListings, ...indexed.filter((l) => l.confidence_score > 0 && !flags[l.listing_id])] : undefined),
-    [indexed, agentListings.loading, flags, memberListings],
+  const { entries: watchEntries } = useWatchlist();
+  const watchRefs = useMemo(() => watchEntries.map((e) => e.id), [watchEntries]);
+  const { byRef: watchedById, loading: watchedLoading } = useListingsByRef(watchRefs);
+  const watched = useMemo(() => {
+    const members = new Map(memberListings.map((l) => [l.listing_id, l]));
+    return watchRefs.map((r) => watchedById.get(r) ?? members.get(r)).filter((l): l is Listing => Boolean(l));
+  }, [watchRefs, watchedById, memberListings]);
+  // Every listing this page knows about: what the updates board, the Watchlist, the Market feed and the flag notice may name.
+  const known = useMemo(() => {
+    const m = new Map<string, Listing>();
+    for (const l of [...(recent?.listings ?? []), ...watched, ...memberListings]) m.set(l.listing_id, l);
+    return [...m.values()];
+  }, [recent, watched, memberListings]);
+  useEffect(() => publishMarket(known, "dashboard"), [known]);
+  const updatedAt = recent?.updatedAt ?? null;
+  const marketSize = (recent?.total ?? 0) + memberListings.length;
+  // Daily summaries (new, price moves, status changes) for the last 7 days. Listings outside
+  // `recent` were all first seen before the window, so they count as checked every day.
+  const runs = useMemo(
+    () =>
+      buildIndexRuns(recent?.listings ?? [], [], 7, updatedAt ?? new Date().toISOString(), Math.max(0, (recent?.total ?? 0) - (recent?.listings.length ?? 0))),
+    [recent, updatedAt],
   );
-  useEffect(() => publishMarket(market ?? []), [market]);
-  // Daily summaries (new, price moves, status changes) for the last 7 days, from the live listings.
-  const updatedAt = useMemo(() => {
-    const times = (indexed ?? []).map((l) => l.last_scraped).filter(Boolean).sort();
-    return times.length ? times[times.length - 1] : null;
-  }, [indexed]);
-  const runs = useMemo(() => buildIndexRuns(market ?? [], [], 7, updatedAt ?? new Date().toISOString()), [market, updatedAt]);
   const updatesToday = runs[0].new_listings.length + runs[0].price_changes.length + runs[0].status_changes.length;
   const [listingDialog, setListingDialog] = useState<{ open: boolean; id?: string }>({ open: false });
-  const watchCount = useWatchlist().entries.length;
+  const watchCount = watchEntries.length;
   const setTab = useCallback((t: Tab) => {
     setTabState(t);
     window.history.replaceState(null, "", `?tab=${TAB_SLUG[t]}`);
@@ -3550,10 +3566,11 @@ function Dashboard() {
           </div>
         ) : tab === "Listings" ? (
           <>
-            <TerminalUpdates runs={runs} allListings={market ?? []} open={boardOpen} onToggle={toggleBoard} onOpenListing={openListing} onShowNew={showNewToday} />
+            <TerminalUpdates runs={runs} allListings={known} marketSize={marketSize} open={boardOpen} onToggle={toggleBoard} onOpenListing={openListing} onShowNew={showNewToday} />
             <ActiveListings
               key={listingsView.key}
-              listings={market}
+              members={memberListings}
+              watched={watched}
               initialDistrict={listingsView.district}
               initialQuery={listingsView.query}
               initialOpenId={listingsView.openId}
@@ -3564,21 +3581,21 @@ function Dashboard() {
         ) : tab === "Market feed" ? (
           <FeedView profile={me.profile} profileLoading={me.loading} shared={me.shared} onEditProfile={openProfile} onOpenListing={openListing} />
         ) : tab === "Pro" ? (
-          <ProView listings={market ?? []} />
+          <ProView />
         ) : tab === "Settings" ? (
           <SettingsView profile={{ draft: me.draft, loading: me.loading }} onSaveProfile={me.save} shared={me.shared} />
         ) : (
-          <Watchlist listings={market} runs={runs} onOpenListing={openListing} onBrowse={() => setTab("Listings")} />
+          <Watchlist listings={watchedLoading && !watched.length && watchRefs.length ? undefined : watched} runs={runs} onOpenListing={openListing} onBrowse={() => setTab("Listings")} />
         )}
       </main>
 
-      <FlagToast listings={indexed} />
+      <FlagToast listings={known} />
 
       <AddListingDialog
         open={listingDialog.open}
         onClose={() => setListingDialog({ open: false })}
         editing={listingDialog.id ? agentListings.byId.get(listingDialog.id) : undefined}
-        listings={market ?? []}
+        listings={known}
         onSave={agentListings.save}
         onDelete={agentListings.remove}
         onOpenListing={openListing}
@@ -3586,7 +3603,7 @@ function Dashboard() {
 
       <footer className="border-t border-zinc-200">
         <div className={`${MONO} mx-auto flex max-w-[1400px] flex-wrap justify-between gap-2 px-6 py-5 text-[10px] tracking-wider text-zinc-500`}>
-          <span>© 2026 TERMINAL · POWERED BY SEQUENCE DATA · PROPRIETARY & CONFIDENTIAL</span>
+          <span>© 2026 BASELINE · POWERED BY SEQUENCE DATA · PROPRIETARY & CONFIDENTIAL</span>
           <span>NOT INVESTMENT ADVICE · FOR LICENSED SUBSCRIBERS ONLY</span>
         </div>
       </footer>

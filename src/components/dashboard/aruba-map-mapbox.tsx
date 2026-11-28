@@ -11,7 +11,8 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Map, { Marker, NavigationControl, Popup, type MapRef } from "react-map-gl/mapbox";
 import type { Listing, Signal } from "@/lib/aruba-data";
-import { ClusterList, HotFlame, HoverCard, PLATFORM_COLOR, RentalHoverCard, SIGNAL_COLOR, SIGNAL_LABEL, pinPrice, type ArubaMapProps } from "./map-shared";
+import { ClusterList, HotFlame, HoverCard, PLATFORM_COLOR, PinClusterList, PinHoverCard, RentalHoverCard, SIGNAL_COLOR, SIGNAL_LABEL, pinPrice, type ArubaMapProps } from "./map-shared";
+import type { MapPin } from "@/lib/market-api";
 import { PLATFORM_LABEL, type RentalPlatform } from "@/lib/aruba-data";
 import { CLUSTER_MAX_ZOOM, canSplit, clusterPoints, clusterSize, type Cluster } from "@/lib/cluster";
 
@@ -55,7 +56,12 @@ function boundsOf(points: Array<[number, number]>): [[number, number], [number, 
   ];
 }
 
-const shapeOf = (l: Listing) => (l.category === "Land" ? "square" : l.category === "Commercial" ? "diamond" : "circle");
+/** A grouped pin, with its group key as the id the clustering uses. */
+type PinPoint = MapPin & { listing_id: string };
+type Item = Listing | PinPoint;
+const isPin = (x: Item): x is PinPoint => "group_key" in x;
+
+const shapeOf = (l: Item) => (l.category === "Land" ? "square" : l.category === "Commercial" ? "diamond" : "circle");
 
 /** Room to leave around the pins. In Dashboard view the side panel covers the left of the map on desktop. */
 const fitPadding = (fill: boolean, edge: number) => ({
@@ -71,7 +77,7 @@ const interactiveHeight = (h: number) => `min(${h}px, 70svh)`;
 export default function ArubaMapMapbox(props: ArubaMapProps) {
   const height = props.height ?? 520;
   const interactive = props.interactive ?? true;
-  const fill = props.mode === "listings" && Boolean(props.fill);
+  const fill = (props.mode === "listings" || props.mode === "pins") && Boolean(props.fill);
   const mapRef = useRef<MapRef>(null);
   const [loaded, setLoaded] = useState(false);
   const [localHover, setLocalHover] = useState<string | null>(null);
@@ -79,7 +85,24 @@ export default function ArubaMapMapbox(props: ArubaMapProps) {
 
   // Zoom (in half steps) and visible area: what the clusters are worked out for.
   const [view, setView] = useState<{ zoom: number; box: [number, number, number, number] } | null>(null);
-  const [openCluster, setOpenCluster] = useState<Cluster<Listing> | null>(null);
+  const [openCluster, setOpenCluster] = useState<Cluster<Item> | null>(null);
+  // Pins mode: tell the page what is on screen, once the map has been still for 300 ms.
+  const viewportTimer = useRef<number | undefined>(undefined);
+  const onViewport = props.mode === "pins" ? props.onViewport : undefined;
+  // Did the member move the map during this gesture (drag, scroll, pinch, buttons)?
+  const userMoved = useRef(false);
+  const reportViewport = (map: ReturnType<MapRef["getMap"]>, user: boolean) => {
+    if (!onViewport) return;
+    if (user) userMoved.current = true;
+    window.clearTimeout(viewportTimer.current);
+    viewportTimer.current = window.setTimeout(() => {
+      const b = map.getBounds();
+      const u = userMoved.current;
+      userMoved.current = false;
+      if (b) onViewport({ bbox: [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()], zoom: map.getZoom(), user: u });
+    }, 300);
+  };
+  useEffect(() => () => window.clearTimeout(viewportTimer.current), []);
   const syncView = (map: ReturnType<MapRef["getMap"]>, moved: boolean) => {
     const zoom = Math.round(map.getZoom() * 2) / 2;
     const b = map.getBounds();
@@ -89,18 +112,21 @@ export default function ArubaMapMapbox(props: ArubaMapProps) {
     setView((v) => (!moved && v?.zoom === zoom ? v : { zoom, box: [w - px, s - py, e + px, n + py] }));
   };
 
-  const source = props.mode === "listings" ? props.listings : props.mode === "rentals" ? props.rentals : props.districts;
+  const source =
+    props.mode === "listings" ? props.listings : props.mode === "pins" ? props.pins : props.mode === "rentals" ? props.rentals : props.districts;
   const points: Array<[number, number]> = useMemo(
     () => source.map((x) => [x.lat, x.lng] as [number, number]),
     [source],
   );
   const pointsKey = points.map((p) => p.join(",")).join("|");
 
-  const listings = props.mode === "listings" ? props.listings : null;
+  const pinSource = props.mode === "pins" ? props.pins : null;
+  const pinPoints = useMemo(() => pinSource?.map((p): PinPoint => ({ ...p, listing_id: p.group_key })) ?? null, [pinSource]);
+  const listings: Item[] | null = props.mode === "listings" ? props.listings : pinPoints;
   // Interactive maps group overlapping listings; the decorative homepage map shows every pin.
   const clusters = useMemo(() => {
     if (!listings) return [];
-    if (!interactive) return listings.map((l): Cluster<Listing> => ({ id: l.listing_id, lat: l.lat, lng: l.lng, items: [l] }));
+    if (!interactive) return listings.map((l): Cluster<Item> => ({ id: l.listing_id, lat: l.lat, lng: l.lng, items: [l] }));
     return view ? clusterPoints(listings, view.zoom) : [];
   }, [listings, interactive, view]);
   const visibleClusters = useMemo(() => {
@@ -131,10 +157,7 @@ export default function ArubaMapMapbox(props: ArubaMapProps) {
   useEffect(() => {
     const map = mapRef.current;
     if (!loaded || !map || !selectedId || props.mode === "districts") return;
-    const l =
-      props.mode === "listings"
-        ? props.listings.find((x) => x.listing_id === selectedId)
-        : props.rentals.find((x) => x.rental_id === selectedId);
+    const l = props.mode === "rentals" ? props.rentals.find((x) => x.rental_id === selectedId) : listings?.find((x) => x.listing_id === selectedId);
     if (!l) return;
     map.flyTo({ center: [l.lng, l.lat], zoom: 16.6, pitch: 62, bearing: -24, duration: 1800, essential: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -158,15 +181,15 @@ export default function ArubaMapMapbox(props: ArubaMapProps) {
     setLocalHover(id);
     if (props.mode !== "districts") props.onHover?.(id);
   };
-  const hoveredListing = props.mode === "listings" ? props.listings.find((l) => l.listing_id === hoveredId) : undefined;
+  const hoveredListing = listings?.find((l) => l.listing_id === hoveredId);
   const hoveredRental = props.mode === "rentals" ? props.rentals.find((r) => r.rental_id === hoveredId) : undefined;
   const hoveredDistrict = props.mode === "districts" ? props.districts.find((d) => d.district === localHover) : undefined;
 
   const pickListing = (id: string) => {
     setOpenCluster(null);
-    if (props.mode === "listings") props.onSelect?.(id);
+    if (props.mode === "listings" || props.mode === "pins") props.onSelect?.(id);
   };
-  const clickCluster = (c: Cluster<Listing>) => {
+  const clickCluster = (c: Cluster<Item>) => {
     const map = mapRef.current;
     if (!map) return;
     setHover(null);
@@ -176,8 +199,8 @@ export default function ArubaMapMapbox(props: ArubaMapProps) {
       map.fitBounds(b, { padding: fitPadding(fill, 70), maxZoom: CLUSTER_MAX_ZOOM + 0.4, duration: 700 });
     } else setOpenCluster(c);
   };
-  /** One listing: coloured by signal, shaped by category. */
-  const pin = (l: Listing) => {
+  /** One listing: coloured by signal, shaped by category. A project shows its unit count; a home listed by several agencies gets a ring. */
+  const pin = (l: Item) => {
     const active = selectedId === l.listing_id || hoveredId === l.listing_id;
     return (
       <Marker
@@ -196,7 +219,16 @@ export default function ArubaMapMapbox(props: ArubaMapProps) {
           onMouseEnter={() => interactive && setHover(l.listing_id)}
           onMouseLeave={() => interactive && setHover(null)}
         >
-          <span className={`sd-pin sd-pin-${shapeOf(l)}${active ? " sd-pin-active" : ""}`} style={{ background: SIGNAL_COLOR[l.signal] }} />
+          {isPin(l) && l.group_type === "project" ? (
+            <span className={`sd-pin-project${active ? " sd-pin-active" : ""}${l.agency_count > 1 ? " sd-pin-multi" : ""}`} style={{ background: "#0A0A0A", color: "#ACFA68" }}>
+              {l.unit_count}
+            </span>
+          ) : (
+            <span
+              className={`sd-pin sd-pin-${shapeOf(l)}${active ? " sd-pin-active" : ""}${isPin(l) && l.agency_count > 1 ? " sd-pin-multi" : ""}`}
+              style={{ background: SIGNAL_COLOR[l.signal] }}
+            />
+          )}
           {l.signal === "UNDERVALUED" && <HotFlame size={11} className="pointer-events-none absolute -right-1.5 -top-2 drop-shadow-[0_1px_1px_rgb(0_0_0/0.35)]" />}
         </span>
       </Marker>
@@ -227,9 +259,14 @@ export default function ArubaMapMapbox(props: ArubaMapProps) {
           configure(e.target);
           syncView(e.target, true);
           setLoaded(true);
+          reportViewport(e.target, false);
         }}
         onZoom={(e) => syncView(e.target, false)}
-        onMoveEnd={(e) => syncView(e.target, true)}
+        onMoveEnd={(e) => {
+          syncView(e.target, true);
+          // Mapbox sets originalEvent only for moves made by hand
+          reportViewport(e.target, Boolean((e as { originalEvent?: unknown }).originalEvent));
+        }}
         onPitchEnd={(e) => setIs3d(e.target.getPitch() > 10)}
       >
         {interactive && <NavigationControl position={fill ? "bottom-right" : "top-left"} visualizePitch />}
@@ -276,7 +313,11 @@ export default function ArubaMapMapbox(props: ArubaMapProps) {
             className="sd-popup"
             onClose={() => setOpenCluster(null)}
           >
-            <ClusterList items={openCluster.items} onPick={pickListing} />
+            {isPin(openCluster.items[0]) ? (
+              <PinClusterList items={openCluster.items as PinPoint[]} onPick={pickListing} />
+            ) : (
+              <ClusterList items={openCluster.items as Listing[]} onPick={pickListing} />
+            )}
           </Popup>
         )}
 
@@ -290,7 +331,7 @@ export default function ArubaMapMapbox(props: ArubaMapProps) {
             maxWidth="none"
             className="sd-popup"
           >
-            <HoverCard l={hoveredListing} />
+            {isPin(hoveredListing) ? <PinHoverCard p={hoveredListing} /> : <HoverCard l={hoveredListing} />}
           </Popup>
         )}
 
@@ -415,7 +456,7 @@ export default function ArubaMapMapbox(props: ArubaMapProps) {
               <span className="text-zinc-300">|</span>
               <span>Pins show the price per night</span>
             </>
-          ) : props.mode === "listings" ? (
+          ) : props.mode === "listings" || props.mode === "pins" ? (
             <>
               {(Object.keys(SIGNAL_COLOR) as Signal[]).map((s) => (
                 <span key={s} className="flex items-center gap-1.5">
@@ -428,6 +469,19 @@ export default function ArubaMapMapbox(props: ArubaMapProps) {
               <span className="flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-zinc-400" />Residential</span>
               <span className="flex items-center gap-1.5"><span className="size-2.5 bg-zinc-400" />Land</span>
               <span className="flex items-center gap-1.5"><span className="size-2 rotate-45 bg-zinc-400" />Commercial</span>
+              {props.mode === "pins" && (
+                <>
+                  <span className="text-zinc-300">|</span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="grid h-3.5 min-w-[18px] place-items-center rounded-[4px] bg-zinc-950 px-0.5 text-[8px] font-bold text-lime">5</span>
+                    Project, units
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="size-2.5 rounded-full bg-zinc-400 ring-2 ring-lime" />
+                    Several agencies
+                  </span>
+                </>
+              )}
             </>
           ) : (
             <>

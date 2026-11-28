@@ -15,7 +15,8 @@ import L, { type LatLngBoundsExpression, type LatLngExpression } from "leaflet";
 import { CircleMarker, MapContainer, Marker, Popup, TileLayer, Tooltip, useMap, useMapEvents } from "react-leaflet";
 import type { Listing, Signal } from "@/lib/aruba-data";
 import { canSplit, clusterPoints, clusterSize, type Cluster } from "@/lib/cluster";
-import { ClusterList, HotFlame, HoverCard, PLATFORM_COLOR, RentalHoverCard, SIGNAL_COLOR, SIGNAL_LABEL, pinPrice, type ArubaMapProps } from "./map-shared";
+import { ClusterList, HotFlame, HoverCard, PLATFORM_COLOR, PinHoverCard, RentalHoverCard, SIGNAL_COLOR, SIGNAL_LABEL, pinPrice, type ArubaMapProps } from "./map-shared";
+import type { MapPin } from "@/lib/market-api";
 
 const ARUBA_CENTER: LatLngExpression = [12.53, -70.0];
 const ARUBA_BOUNDS: LatLngBoundsExpression = [
@@ -156,14 +157,91 @@ function ListingPins({
   );
 }
 
+/**
+ * Grouped pins (fallback when no Mapbox token is set): one marker per group,
+ * no bubbles. Projects show their unit count. Reports the visible area like
+ * the Mapbox map does.
+ */
+function GroupPins({
+  pins,
+  selectedId,
+  hoveredId,
+  onSelect,
+  onHover,
+  onViewport,
+}: {
+  pins: MapPin[];
+  selectedId?: string | null;
+  hoveredId?: string | null;
+  onSelect?: (key: string) => void;
+  onHover?: (key: string | null) => void;
+  onViewport?: (v: { bbox: [number, number, number, number]; zoom: number; user: boolean }) => void;
+}) {
+  const map = useMap();
+  useEffect(() => {
+    let t: number | undefined;
+    let user = false;
+    const touched = () => (user = true);
+    const report = () => {
+      window.clearTimeout(t);
+      t = window.setTimeout(() => {
+        const b = map.getBounds();
+        onViewport?.({ bbox: [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()], zoom: map.getZoom() + 1, user });
+        user = false;
+      }, 300);
+    };
+    report();
+    map.on("moveend", report);
+    map.on("dragstart", touched);
+    map.getContainer().addEventListener("wheel", touched, { passive: true });
+    return () => {
+      window.clearTimeout(t);
+      map.off("moveend", report);
+      map.off("dragstart", touched);
+      map.getContainer().removeEventListener("wheel", touched);
+    };
+  }, [map, onViewport]);
+  return (
+    <>
+      {pins.map((p) => {
+        const active = selectedId === p.group_key || hoveredId === p.group_key;
+        const project = p.group_type === "project";
+        const shape = p.category === "Land" ? "square" : p.category === "Commercial" ? "diamond" : "circle";
+        const ring = p.agency_count > 1 ? " sd-pin-multi" : "";
+        const html = project
+          ? `<span class="sd-pin-project${active ? " sd-pin-active" : ""}${ring}" style="background:#0A0A0A;color:#ACFA68">${p.unit_count}</span>`
+          : `<span class="sd-pin sd-pin-${shape}${active ? " sd-pin-active" : ""}${ring}" style="background:${SIGNAL_COLOR[p.signal]}"></span>`;
+        return (
+          <Marker
+            key={p.group_key}
+            position={[p.lat, p.lng]}
+            icon={L.divIcon({ className: "sd-pin-wrap", html, iconSize: [24, 22], iconAnchor: [12, 11] })}
+            zIndexOffset={active ? 1000 : project ? 200 : 0}
+            eventHandlers={{
+              click: () => onSelect?.(p.group_key),
+              mouseover: () => onHover?.(p.group_key),
+              mouseout: () => onHover?.(null),
+            }}
+          >
+            <Tooltip direction="top" offset={[0, -12]} opacity={1} className="sd-tooltip">
+              <PinHoverCard p={p} />
+            </Tooltip>
+          </Marker>
+        );
+      })}
+    </>
+  );
+}
+
 /** Phones get a map that never fills more than ~70% of the screen. */
 const interactiveHeight = (h: number) => `min(${h}px, 70svh)`;
 
 export default function ArubaMapLeaflet(props: ArubaMapProps) {
   const height = props.height ?? 520;
   const interactive = props.interactive ?? true;
-  const fill = props.mode === "listings" && Boolean(props.fill);
-  const source = props.mode === "listings" ? props.listings : props.mode === "rentals" ? props.rentals : props.districts;
+  const fill = (props.mode === "listings" || props.mode === "pins") && Boolean(props.fill);
+  const source =
+    props.mode === "listings" ? props.listings : props.mode === "pins" ? props.pins : props.mode === "rentals" ? props.rentals : props.districts;
   const points: Array<[number, number]> = useMemo(() => source.map((x) => [x.lat, x.lng] as [number, number]), [source]);
 
   return (
@@ -207,6 +285,17 @@ export default function ArubaMapLeaflet(props: ArubaMapProps) {
             hoveredId={props.hoveredId}
             onSelect={props.onSelect}
             onHover={props.onHover}
+          />
+        )}
+
+        {props.mode === "pins" && (
+          <GroupPins
+            pins={props.pins}
+            selectedId={props.selectedId}
+            hoveredId={props.hoveredId}
+            onSelect={props.onSelect}
+            onHover={props.onHover}
+            onViewport={props.onViewport}
           />
         )}
 
@@ -270,7 +359,7 @@ export default function ArubaMapLeaflet(props: ArubaMapProps) {
         <div className="pointer-events-none absolute bottom-3 left-3 z-[400] flex flex-wrap gap-3 rounded-lg border border-zinc-200 bg-white/95 px-3 py-2 text-[11px] text-zinc-600">
           {props.mode === "rentals" ? (
             <span>Pins show the price per night (red Airbnb · blue Vrbo · black direct)</span>
-          ) : props.mode === "listings" ? (
+          ) : props.mode === "listings" || props.mode === "pins" ? (
             <>
               {(Object.keys(SIGNAL_COLOR) as Signal[]).map((s) => (
                 <span key={s} className="flex items-center gap-1.5">

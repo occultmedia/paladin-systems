@@ -548,6 +548,19 @@ export type Database = {
         };
         Relationships: [];
       };
+      v_market_items: {
+        // one row per visible listing (indexed and members'); see the grouping migration. Only the columns the app reads.
+        Row: {
+          ref: string;
+          kind: "indexed" | "member";
+          group_key: string;
+          group_type: GroupType;
+          property_id: string | null;
+          project_id: string | null;
+          status: ListingStatusDb;
+        };
+        Relationships: [];
+      };
       v_master_market: {
         Row: {
           property_id: string;
@@ -693,7 +706,15 @@ export type Database = {
       };
       flag_delisted: { Args: { p_listing_id: string; p_reason: FlagType; p_note?: string | null }; Returns: undefined };
       undo_flag: { Args: { p_listing_id: string }; Returns: undefined };
-      mark_raw_processed: { Args: { p_raw_id: number; p_property_id: string | null; p_error?: string | null }; Returns: undefined };
+      mark_raw_processed: { Args: { p_raw_id: number; p_property_id: string | null; p_error?: string | null; p_price_usd?: number | null }; Returns: undefined };
+      // Grouped map and list (supabase/migrations/20261128000000_grouping_map_rpcs.sql). `f`: see MarketFilters in lib/market-api.ts.
+      get_map_pins: { Args: { f: Record<string, unknown> }; Returns: MapPinRow[] };
+      get_listing_page: {
+        Args: { f: Record<string, unknown>; p_sort: string; p_dir: "asc" | "desc"; p_cursor: Record<string, unknown> | null; p_limit: number };
+        Returns: ListingPageRow;
+      };
+      get_market_facets: { Args: { f: Record<string, unknown> }; Returns: MarketFacetsRow };
+      get_group_detail: { Args: { p_group_key: string }; Returns: GroupDetailRow };
       purge_expired_deal_desk_posts: { Args: Record<PropertyKey, never>; Returns: number };
       deal_post_open_for_interest: { Args: { p_post_id: string }; Returns: boolean };
       aruba_today: { Args: Record<PropertyKey, never>; Returns: string };
@@ -710,5 +731,91 @@ export type TablesUpdate<T extends keyof PublicSchema["Tables"]> = PublicSchema[
 export type Views<T extends keyof PublicSchema["Views"]> = PublicSchema["Views"][T]["Row"];
 
 export type MasterMarketRow = Views<"v_master_market">;
+
+/* ── grouped map and list (RPC results) ─────────────────────────────── */
+
+/** 'project' = a building or development (p:<id>), 'property' = one home, maybe listed by several agencies (h:<id>), 'member' = a member's own listing (m:<id>). */
+export type GroupType = "project" | "property" | "member";
+
+export interface MapPinRow {
+  group_key: string;
+  group_type: GroupType;
+  title: string;
+  lat: number;
+  lng: number;
+  min_price: number;
+  max_price: number;
+  unit_count: number;
+  agency_count: number;
+  agency_ids: string[];
+  rep_ref: string;
+  category: AssetClass;
+  signal: SignalDb | "NO_SIGNAL";
+  district: string;
+  bedrooms: number | null;
+  bathrooms: number | null;
+  size_sqft: number | null;
+  is_new: boolean;
+  price_change_pct: number | null;
+  thumbnail_url: string | null;
+}
+
+export interface ListingGroupRow {
+  group_key: string;
+  group_type: GroupType;
+  title: string;
+  lat: number;
+  lng: number;
+  min_price: number;
+  max_price: number;
+  unit_count: number;
+  agency_ids: string[];
+  agency_count: number;
+  rep_ref: string;
+  rep_kind: "indexed" | "member";
+  /** The group's cheapest matching listing, as v_master_market (null for a member's listing). */
+  rep: MasterMarketRow | null;
+}
+
+export interface ListingPageRow {
+  total: number;
+  items: ListingGroupRow[];
+  next_cursor: { n: number; t: string; k: string } | null;
+}
+
+export interface MarketFacetsRow {
+  status_counts: Partial<Record<ListingStatusDb, number>>;
+  groups: number;
+  listings: number;
+  residential: number;
+  land: number;
+  commercial: number;
+  median_price: number | null;
+  below_market: number;
+  new_today: number;
+  off_market: number;
+  agencies: Array<{ id: string; name: string; logo_url: string | null; count: number }>;
+  districts: string[];
+  updated_at: string | null;
+}
+
+/** One agency's own listing of a home: its price and its page. */
+export interface OfferRow {
+  agency_id: string;
+  agency: string;
+  logo_url: string | null;
+  website: string | null;
+  price_usd: number | null;
+  source_url: string | null;
+  last_seen: string | null;
+  primary: boolean;
+}
+
+export interface GroupDetailRow {
+  group_key: string;
+  group_type: GroupType | null;
+  project: { id: string; name: string; district: string | null; lat: number | null; lng: number | null } | null;
+  units: Array<{ ref: string; kind: "indexed" | "member"; listing: MasterMarketRow | null; offers: OfferRow[] | null }>;
+}
 export type DealDeskFeedRow = Views<"deal_desk_feed">;
 export type DealInterestRow = Views<"v_deal_desk_interest">;

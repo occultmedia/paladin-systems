@@ -10,7 +10,8 @@
  */
 
 import { BedDouble, Calculator, Lock } from "lucide-react";
-import { useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
+import { searchListings } from "@/lib/market-api";
 import { isClosed, type Listing, type ListingSignal } from "@/lib/aruba-data";
 
 const usd = (n: number) => (Number.isFinite(n) ? `$${Math.round(n).toLocaleString("en-US")}` : "—");
@@ -79,18 +80,30 @@ function Result({ label, value, strong = false, hint }: { label: string; value: 
   );
 }
 
-export function RentalIncome({ listings, locked }: { listings: Listing[]; locked: boolean }) {
+export function RentalIncome({ locked }: { locked: boolean }) {
   const [v, setV] = useState<Inputs>(EXAMPLE);
   const [from, setFrom] = useState("");
   const set = (k: keyof Inputs) => (n: number) => setV((x) => ({ ...x, [k]: n }));
   const r = rentalIncome(v);
-  const homes = useMemo(
-    () =>
-      listings
-        .filter((l): l is ListingSignal => l.category === "Property" && !isClosed(l))
-        .sort((a, b) => a.asset_name.localeCompare(b.asset_name)),
-    [listings],
-  );
+  // Homes for sale matching what is typed (searched on the server; the market is not loaded whole).
+  const [q, setQ] = useState("");
+  const [listings, setListings] = useState<Listing[]>([]);
+  const [chosen, setChosen] = useState<ListingSignal | null>(null);
+  useEffect(() => {
+    if (locked) return;
+    let live = true;
+    const t = window.setTimeout(() => {
+      searchListings(q, { category: "Property", status: "For sale", limit: 25 }).then((rows) => live && setListings(rows), () => {});
+    }, 200);
+    return () => {
+      live = false;
+      window.clearTimeout(t);
+    };
+  }, [q, locked]);
+  const homes = useMemo(() => {
+    const found = listings.filter((l): l is ListingSignal => l.category === "Property" && !isClosed(l));
+    return chosen && !found.some((l) => l.listing_id === chosen.listing_id) ? [chosen, ...found] : found;
+  }, [listings, chosen]);
   const picked = homes.find((l) => l.listing_id === from);
 
   return (
@@ -155,12 +168,20 @@ export function RentalIncome({ listings, locked }: { listings: Listing[]; locked
             <label htmlFor="rent-from" className="mb-1 block text-[12px] font-medium text-zinc-700">
               Start from a listing (optional)
             </label>
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search homes for sale: name, district, ID"
+              aria-label="Search homes for sale"
+              className="mb-1.5 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-[13px] text-zinc-950 outline-none placeholder:text-zinc-400 focus:border-zinc-950"
+            />
             <select
               id="rent-from"
               value={from}
               onChange={(e) => {
                 setFrom(e.target.value);
                 const l = homes.find((h) => h.listing_id === e.target.value);
+                setChosen(l ?? null);
                 if (l) setV((x) => ({ ...x, price: l.asking_price_usd }));
               }}
               className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-[13.5px] text-zinc-950 outline-none focus:border-zinc-950"

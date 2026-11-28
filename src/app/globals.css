@@ -321,6 +321,39 @@ body {
   display: none;
 }
 
+/* A project (several units of one building or development): a tag with the unit count */
+.sd-pin-project {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  min-width: 24px;
+  height: 21px;
+  padding: 0 5px;
+  transform: translate(-50%, -50%);
+  border: 2px solid #ffffff;
+  border-radius: 7px;
+  color: #ffffff;
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 17px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.35);
+  transition: transform 120ms ease, box-shadow 120ms ease;
+  cursor: pointer;
+}
+.sd-pin-project:hover,
+.sd-pin-project.sd-pin-active {
+  transform: translate(-50%, -50%) scale(1.2);
+  border-color: #0a0a0a;
+  box-shadow: 0 0 0 4px rgb(221 229 220 / 0.9), 0 2px 8px rgb(0 0 0 / 0.35);
+}
+/* Listed by several agencies: a lime ring around the pin */
+.sd-pin-multi {
+  box-shadow: 0 0 0 2.5px #acfa68, 0 1px 4px rgb(0 0 0 / 0.35);
+}
+
 /* Numbered bubble for listings that overlap at this zoom */
 .sd-cluster {
   display: grid;
