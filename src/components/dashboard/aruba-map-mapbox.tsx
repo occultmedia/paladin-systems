@@ -163,6 +163,16 @@ export default function ArubaMapMapbox(props: ArubaMapProps) {
     map.flyTo({ center: [l.lng, l.lat], zoom: 16.6, pitch: 62, bearing: -24, duration: 1800, essential: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId, loaded]);
+  // The same for a notary auction (Pro) picked on the map or in a list.
+  const selectedAuctionId = props.mode === "pins" ? props.selectedAuctionId : null;
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!loaded || !map || !selectedAuctionId || props.mode !== "pins") return;
+    const au = props.auctions?.find((a) => a.id === selectedAuctionId);
+    if (!au) return;
+    map.flyTo({ center: [au.lng, au.lat], zoom: 16.2, pitch: 62, bearing: -24, duration: 1800, essential: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAuctionId, loaded]);
 
   const toggle3d = () => {
     const map = mapRef.current;

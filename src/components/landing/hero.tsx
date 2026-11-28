@@ -2,10 +2,12 @@
 
 /*
  * Landing hero. Calm and product-first: what Baseline is in one headline
- * and one sentence, two small actions, then the real Baseline in a light
- * browser window over an Aruba photograph. The window is live: the 3D map
- * tours today's market events, the feed follows it, the numbers count up.
- * Motion stops for prefers-reduced-motion and while the hero is off screen.
+ * and one sentence, two small actions, then Baseline itself in a light
+ * browser window. The window shows what members get today: the AI Signal
+ * line, the market numbers, Available / Under contract / Sold, grouped map
+ * pins (a home listed by several agencies is one pin), Pro notary auctions
+ * and the day's moves, which the map tours. Sample data, and never an agency
+ * or agent name. Motion stops for prefers-reduced-motion and off screen.
  */
 
 import { RunLine } from "@/components/run-line";
@@ -14,17 +16,20 @@ import Link from "next/link";
 import { BaselineLogo } from "@/components/logo";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
-import { LayoutList, Megaphone, Pin, Search, Settings, Sparkles } from "lucide-react";
+import { Crown, Gavel, LayoutList, Megaphone, Pin, Search, Settings, Sparkles } from "lucide-react";
+import { ProBadge } from "@/components/pro-badge";
+import type { MapPin } from "@/lib/market-api";
 import { CountUp } from "@/components/motion/reveal";
 import { GrainField } from "./grain-field";
-import type { Listing } from "@/lib/aruba-data";
 
 const ArubaMap = dynamic(() => import("@/components/dashboard/aruba-map"), {
   ssr: false,
   loading: () => <div className="h-full w-full animate-pulse bg-zinc-100" />,
 });
 
-export type HeroEvent = { id: string; listingId: string; kind: string; tone: "up" | "down" | "warn" | "mint"; title: string; detail: string; value: string };
+export type HeroEvent = { id: string; listingId: string; auctionId?: string; kind: string; tone: "up" | "down" | "warn" | "mint"; title: string; detail: string; value: string };
+export type HeroAuction = { id: string; lat: number; lng: number; title: string; tracked: boolean };
+export type HeroStatuses = { available: number; contract: number; sold: number };
 export type HeroKpi = { label: string; value: number; prefix?: string; suffix?: string; decimals?: number };
 
 const EASE = [0.22, 1, 0.36, 1] as const;
@@ -34,29 +39,34 @@ const TABS = [
   { label: "Listings", icon: LayoutList },
   { label: "Watchlist", icon: Pin },
   { label: "Market feed", icon: Megaphone },
+  { label: "Pro", icon: Crown },
   { label: "Settings", icon: Settings },
 ];
 
 /* ── Baseline inside the window ──────────────────────────────────── */
 
 function TerminalWindow({
-  listings,
+  pins,
+  auctions,
   events,
   step,
   onStep,
   running,
   kpis,
-  brief,
+  statuses,
+  signal,
   runTime,
   total,
 }: {
-  listings: Listing[];
+  pins: MapPin[];
+  auctions: HeroAuction[];
   events: HeroEvent[];
   step: number;
   onStep: (n: number) => void;
   running: boolean;
   kpis: HeroKpi[];
-  brief: string;
+  statuses: HeroStatuses;
+  signal: string;
   runTime: string;
   total: number;
 }) {
@@ -81,31 +91,36 @@ function TerminalWindow({
         <BaselineLogo size={11} />
         <nav className="ml-3 hidden items-center gap-0.5 md:flex" aria-hidden>
           {TABS.map(({ label, icon: Icon }, i) => (
-            <span key={label} className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[12px] font-medium ${i === 0 ? "bg-zinc-100 text-zinc-950" : "text-zinc-500"}`}>
+            <span key={label} className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-2 py-1 text-[12px] font-medium lg:px-2.5 ${i === 0 ? "bg-zinc-100 text-zinc-950" : "text-zinc-500"}`}>
               <Icon size={13} strokeWidth={1.8} />
               {label}
             </span>
           ))}
         </nav>
-        <span className="ml-auto hidden items-center gap-2 rounded-md px-2.5 py-1 text-[12px] text-zinc-400 ring-1 ring-zinc-200 lg:inline-flex">
+        <span className="ml-auto hidden items-center gap-2 whitespace-nowrap rounded-md px-2.5 py-1 text-[12px] text-zinc-400 ring-1 ring-zinc-200 xl:inline-flex">
           <Search size={12} /> Search {total} listings
           <kbd className="ml-3 rounded border border-zinc-200 px-1 text-[10px]">⌘K</kbd>
         </span>
-        <span className="ml-auto inline-flex items-center gap-1.5 text-[11.5px] text-zinc-500 lg:ml-0">
+        <span className="ml-auto inline-flex items-center gap-1.5 whitespace-nowrap text-[11.5px] text-zinc-500 xl:ml-0">
           <span className="size-1.5 rounded-full bg-[#4CA30D]" />
-          Updated {runTime}
+          Updated today {runTime}
         </span>
+        <ProBadge size="xs" className="hidden sm:inline-flex" />
+      </div>
+
+      {/* the AI Signal line, as at the top of the dashboard */}
+      <div className="flex h-9 shrink-0 items-center gap-2 border-b border-zinc-200 bg-zinc-50/60 px-3 text-[12px] sm:px-4">
+        <span className="size-1.5 shrink-0 rounded-full bg-[#4CA30D]" />
+        <span className="inline-flex shrink-0 items-center gap-1 font-semibold text-zinc-950">
+          <Sparkles size={12} /> AI Signal
+        </span>
+        <span className="min-w-0 truncate text-zinc-600">Market steady: {signal}</span>
+        <span className="ml-auto hidden shrink-0 font-medium text-zinc-950 sm:inline">Today&apos;s briefing</span>
       </div>
 
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] md:grid-cols-[290px_minmax(0,1fr)] lg:grid-cols-[320px_minmax(0,1fr)]">
         {/* left: brief, numbers, today's moves */}
         <aside className="hidden min-h-0 flex-col border-r border-zinc-200 md:flex">
-          <div className="border-b border-zinc-200 p-4">
-            <p className="flex items-center gap-1.5 text-[11.5px] font-medium text-zinc-500">
-              <Sparkles size={12} className="text-zinc-950" /> Today&apos;s brief
-            </p>
-            <p className="mt-1.5 text-[13px] font-medium leading-snug text-zinc-950">{brief}</p>
-          </div>
           <div className="grid grid-cols-2 border-b border-zinc-200">
             {kpis.map((k, i) => (
               <div key={k.label} className={`p-3.5 ${i % 2 ? "border-l border-zinc-200" : ""} ${i > 1 ? "border-t border-zinc-200" : ""}`}>
@@ -115,6 +130,17 @@ function TerminalWindow({
                 </p>
               </div>
             ))}
+          </div>
+          <div className="flex gap-1.5 border-b border-zinc-200 px-3 py-2.5 text-[11.5px]">
+            <span className="rounded-full bg-zinc-950 px-2.5 py-1 font-semibold text-white">
+              Available <span className="ml-0.5 text-lime">{statuses.available}</span>
+            </span>
+            <span className="rounded-full px-2.5 py-1 font-medium text-zinc-700 ring-1 ring-zinc-200">
+              Under contract <span className="text-zinc-400">{statuses.contract}</span>
+            </span>
+            <span className="rounded-full px-2.5 py-1 font-medium text-zinc-700 ring-1 ring-zinc-200">
+              Sold <span className="text-zinc-400">{statuses.sold}</span>
+            </span>
           </div>
           <p className="px-4 pb-1.5 pt-3 text-[11.5px] font-medium text-zinc-500">Today&apos;s market moves</p>
           <ul className="min-h-0 flex-1 overflow-hidden px-2 pb-2">
@@ -127,7 +153,13 @@ function TerminalWindow({
                     onClick={() => onStep(i)}
                     className={`relative flex w-full items-center gap-2.5 overflow-hidden rounded-lg px-2.5 py-2 text-left transition-colors ${on ? "bg-zinc-100" : "hover:bg-zinc-50"}`}
                   >
-                    <span className="size-1.5 shrink-0 rounded-full" style={{ background: DOT[e.tone] }} />
+                    {e.auctionId ? (
+                      <span className="grid size-3.5 shrink-0 place-items-center rounded-[4px] bg-zinc-950 text-lime">
+                        <Gavel size={9} strokeWidth={2.4} />
+                      </span>
+                    ) : (
+                      <span className="size-1.5 shrink-0 rounded-full" style={{ background: DOT[e.tone] }} />
+                    )}
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[12.5px] font-medium text-zinc-950">{e.title}</span>
                       <span className="block truncate text-[11px] text-zinc-500">{e.kind}</span>
@@ -152,7 +184,31 @@ function TerminalWindow({
 
         {/* right: the live 3D map */}
         <div className="relative min-h-0 min-w-0">
-          <ArubaMap mode="listings" listings={listings} selectedId={event?.listingId ?? null} interactive={false} fill />
+          <ArubaMap
+            mode="pins"
+            pins={pins}
+            auctions={auctions}
+            selectedId={event && !event.auctionId ? event.listingId : null}
+            selectedAuctionId={event?.auctionId ?? null}
+            interactive={false}
+            fill
+          />
+          <div className="pointer-events-none absolute left-3 right-3 top-3 hidden flex-wrap items-center gap-x-3 gap-y-1 rounded-full px-3 py-1.5 text-[10.5px] font-medium text-zinc-700 glass sm:flex sm:right-auto" aria-hidden>
+            <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-[#3F7A55]" />Below market</span>
+            <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-[#3F3F46]" />At Market</span>
+            <span className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-[#A05A5D]" />Above market</span>
+            <span className="flex items-center gap-1.5"><span className="size-2.5 rounded-full bg-zinc-400 ring-2 ring-lime" />Several agencies</span>
+            {auctions.length > 0 && (
+              <span className="flex items-center gap-1.5">
+                <span className="grid size-3.5 place-items-center rounded-[4px] bg-zinc-950 text-lime"><Gavel size={9} strokeWidth={2.4} /></span>
+                Notary auction
+              </span>
+            )}
+          </div>
+          <span className="pointer-events-none absolute bottom-4 right-4 hidden items-center gap-2 rounded-full px-3 py-1.5 text-[11.5px] font-semibold text-zinc-900 glass lg:inline-flex" aria-hidden>
+            <span className="grid size-3.5 place-items-center rounded-[3px] bg-zinc-950 text-[9px] text-white">✓</span>
+            Search as I move the map
+          </span>
           <AnimatePresence mode="wait">
             {event && (
               <motion.div
@@ -164,7 +220,7 @@ function TerminalWindow({
                 className="pointer-events-none absolute bottom-4 left-4 right-4 max-w-[300px] rounded-xl p-3.5 glass"
               >
                 <p className="flex items-center gap-1.5 text-[11.5px] font-medium text-zinc-500">
-                  <span className="size-1.5 rounded-full" style={{ background: DOT[event.tone] }} />
+                  {event.auctionId ? <Gavel size={11} className="text-zinc-950" /> : <span className="size-1.5 rounded-full" style={{ background: DOT[event.tone] }} />}
                   {event.kind}
                 </p>
                 <p className="mt-1.5 truncate text-[14px] font-semibold text-zinc-950">{event.title}</p>
@@ -182,18 +238,22 @@ function TerminalWindow({
 /* ── hero ────────────────────────────────────────────────────────────── */
 
 export function Hero({
-  listings,
+  pins,
+  auctions,
   events,
   kpis,
-  brief,
+  statuses,
+  signal,
   runTime,
   total,
 }: {
-  listings: Listing[];
+  pins: MapPin[];
+  auctions: HeroAuction[];
   events: HeroEvent[];
   kpis: HeroKpi[];
-  brief: string;
-  runLabel?: string;
+  statuses: HeroStatuses;
+  signal: string;
+  brief?: string;
   runTime: string;
   total: number;
 }) {
@@ -257,7 +317,7 @@ export function Hero({
           <RunLine speed={10} width={1.5} glow={8} />
           <div className="relative px-3 pt-10 sm:px-12 sm:pt-16 lg:px-20 lg:pt-20">
             <div className="h-[440px] sm:h-[560px] lg:h-[620px]">
-              <TerminalWindow listings={listings} events={events} step={step} onStep={setStep} running={running} kpis={kpis} brief={brief} runTime={runTime} total={total} />
+              <TerminalWindow pins={pins} auctions={auctions} events={events} step={step} onStep={setStep} running={running} kpis={kpis} statuses={statuses} signal={signal} runTime={runTime} total={total} />
             </div>
           </div>
         </motion.div>

@@ -6,6 +6,7 @@ import { SequenceLockup, Wordmark } from "@/components/logo";
 import { BillingToggle, PlanPrice } from "@/components/landing/plan-price";
 import { AIBadge } from "@/components/ai/ai-visuals";
 import { Hero, type HeroEvent, type HeroKpi } from "@/components/landing/hero";
+import type { MapPin } from "@/lib/market-api";
 import { SiteHeader } from "@/components/landing/site-header";
 import { GrainField } from "@/components/landing/grain-field";
 import { AgentMorningCard, AiCapabilities, BrokerBoardCard, InvestorPostCard, type AgentMorning, type AiExamples, type BrokerExample, type InvestorExample } from "@/components/landing/sell-sections";
@@ -198,38 +199,93 @@ function previewData(): PreviewData {
 const PREVIEW = previewData();
 const BRIEF = marketBrief();
 
-/* ── hero: real pins, real events from today's read, live figures ─────── */
+/* ── hero: the Baseline map and feed as members see them ────────────────
+ * Sample data (aruba-data.ts), shown the way the live app shows it: grouped
+ * pins, a home listed by several agencies, a Pro notary auction, the AI
+ * Signal. No agency or agent names anywhere in the hero.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+/** "Villa · 3 bd" / "Land · 1,200 m²" / "Commercial": what a listing is, never who lists it. */
+function whatItIs(l: Listing): string {
+  if (l.category === "Property") return `${l.property_type} · ${l.bedrooms} bd`;
+  if (l.category === "Land") return `Land${l.lot_sqft ? ` · ${Math.round(l.lot_sqft / 10.7639).toLocaleString("en-US")} m²` : ""}`;
+  return "Commercial";
+}
 
 function heroData() {
   const at = (l: Listing) => ({ listingId: l.listing_id });
+  const live = ALL_LISTINGS.filter((l) => l.status !== "De-listed");
   const fresh = RUN.new_listings.filter((l) => l.category === "Property").slice(0, 2);
   const moves = RUN.price_changes.slice(0, 2);
-  const status = RUN.status_changes.slice(0, 1);
+  const status = RUN.status_changes.filter((l) => l.status === "Under contract" || l.status === "Sold").slice(0, 1);
   const doubt = [...ALL_LISTINGS].sort((a, b) => a.confidence_score - b.confidence_score)[0];
-  const best = ALL_LISTINGS.filter((l): l is ListingSignal => l.category === "Property" && l.status === "For sale").sort(
-    (a, b) => a.price_vs_comps_pct - b.price_vs_comps_pct,
-  )[0];
+  const homes = ALL_LISTINGS.filter((l): l is ListingSignal => l.category === "Property" && l.status === "For sale");
+  const best = [...homes].filter((l) => !fresh.some((f) => f.listing_id === l.listing_id)).sort((a, b) => a.price_vs_comps_pct - b.price_vs_comps_pct)[0];
+  // a home that several agencies list: one pin, every agency's asking price side by side
+  const used = new Set([...fresh, ...moves.map((m) => m.listing), ...status, best, doubt].filter(Boolean).map((l) => l!.listing_id));
+  const shared = homes.find((l) => !used.has(l.listing_id) && l.asking_price_usd > 600_000) ?? null;
+  // a notary auction (Pro): a sample house in the south, auctioned next Thursday
+  const south = ALL_LISTINGS.find((l) => l.category === "Property" && /Savaneta|San Nicolas/.test(l.district) && !used.has(l.listing_id));
+  const auction = south
+    ? { id: "hero-auction", lat: south.lat + 0.004, lng: south.lng - 0.006, title: `House in ${south.district}`, tracked: false, district: south.district }
+    : null;
+
   const events: HeroEvent[] = [];
-  if (fresh[0]) events.push({ ...at(fresh[0]), id: `new-${fresh[0].listing_id}`, kind: "New listing", tone: "mint", title: fresh[0].asset_name, detail: `${fresh[0].district} · ${fresh[0].agency.name}`, value: `${usdM(fresh[0].asking_price_usd)} · ${SIGNAL[fresh[0].signal].label}` });
+  if (fresh[0]) events.push({ ...at(fresh[0]), id: `new-${fresh[0].listing_id}`, kind: "New listing", tone: "mint", title: fresh[0].asset_name, detail: `${fresh[0].district} · ${whatItIs(fresh[0])}`, value: `${usdM(fresh[0].asking_price_usd)} · ${SIGNAL[fresh[0].signal].label}` });
   moves.forEach((c, i) => {
     const p = c.change.change_pct ?? 0;
-    events.push({ ...at(c.listing), id: `px-${c.listing.listing_id}-${i}`, kind: p < 0 ? "Price cut" : "Price raised", tone: p < 0 ? "down" : "up", title: c.listing.asset_name, detail: `${c.listing.district} · ${c.listing.agency.name}`, value: `${pct(p)} → ${usdM(c.change.price_usd)}` });
+    events.push({ ...at(c.listing), id: `px-${c.listing.listing_id}-${i}`, kind: p < 0 ? "Price cut" : "Price raised", tone: p < 0 ? "down" : "up", title: c.listing.asset_name, detail: `${c.listing.district} · ${whatItIs(c.listing)}`, value: `${pct(p)} → ${usdM(c.change.price_usd)}` });
   });
   if (best)
-    events.push({ ...at(best), id: `ai-${best.listing_id}`, kind: "AI Signal", tone: "up", title: best.asset_name, detail: `${usd(perM2(best.price_per_sqft_usd))}/m² vs ${usd(perM2(best.comps_psf_usd))} for ${best.comps_count} comps`, value: `${pct(best.price_vs_comps_pct)} vs comps · Below market 🔥` });
-  status.forEach((l) => events.push({ ...at(l), id: `st-${l.listing_id}`, kind: l.status, tone: "warn", title: l.asset_name, detail: `${l.district} · ${l.agency.name}`, value: `Was ${usdM(l.asking_price_usd)}` }));
-  if (fresh[1]) events.push({ ...at(fresh[1]), id: `new-${fresh[1].listing_id}`, kind: "New listing", tone: "mint", title: fresh[1].asset_name, detail: `${fresh[1].district} · ${fresh[1].agency.name}`, value: usdM(fresh[1].asking_price_usd) });
+    events.push({ ...at(best), id: `ai-${best.listing_id}`, kind: "AI Signal", tone: "up", title: best.asset_name, detail: `${usd(perM2(best.price_per_sqft_usd))}/m² vs ${usd(perM2(best.comps_psf_usd))} for ${best.comps_count} similar homes`, value: `${pct(best.price_vs_comps_pct)} vs similar · Below market 🔥` });
+  if (shared)
+    events.push({ ...at(shared), id: `multi-${shared.listing_id}`, kind: "Listed by 3 agencies", tone: "mint", title: shared.asset_name, detail: "One pin, every agency's asking price side by side", value: `From ${usdM(shared.asking_price_usd)} · 3 offers` });
+  status.forEach((l) => events.push({ ...at(l), id: `st-${l.listing_id}`, kind: l.status, tone: "warn", title: l.asset_name, detail: `${l.district} · ${whatItIs(l)}`, value: `Was ${usdM(l.asking_price_usd)}` }));
+  if (auction)
+    events.push({ listingId: "", auctionId: auction.id, id: "auction", kind: "Notary auction · Pro", tone: "warn", title: auction.title, detail: "Next Thursday · 10:00 · from the notaries' public notices", value: "Track auction date → calendar" });
   if (doubt && doubt.confidence_score < 80)
     events.push({ ...at(doubt), id: `cf-${doubt.listing_id}`, kind: `Confidence ${doubt.confidence_score}%`, tone: "warn", title: doubt.asset_name, detail: "Missing from the agency site, price unchanged", value: "Possible ghost listing" });
 
+  // the map: one grouped pin per home, as get_map_pins returns them
+  const pins: MapPin[] = live.map((l) => ({
+    group_key: l.listing_id,
+    group_type: "property",
+    title: l.asset_name,
+    lat: l.lat,
+    lng: l.lng,
+    min_price: l.asking_price_usd,
+    max_price: l.asking_price_usd,
+    unit_count: 1,
+    agency_count: shared && l.listing_id === shared.listing_id ? 3 : 1,
+    agency_ids: [],
+    rep_ref: l.listing_id,
+    category: l.category,
+    signal: l.category === "Property" ? l.signal : "NO_SIGNAL",
+    district: l.district,
+    bedrooms: l.category === "Property" ? l.bedrooms : null,
+    bathrooms: l.category === "Property" ? l.bathrooms : null,
+    size_sqft: l.category === "Property" ? l.built_sqft : l.lot_sqft ?? null,
+    is_new: RUN.new_listings.some((n) => n.listing_id === l.listing_id),
+    price_change_pct: null,
+    thumbnail_url: null,
+  }));
+
   const belowMarket = ALL_LISTINGS.filter((l) => l.signal === "UNDERVALUED");
   const kpis: HeroKpi[] = [
-    { label: "Listings", value: ALL_LISTINGS.length },
+    { label: "Listings", value: live.length },
     { label: "New today", value: RUN.new_listings.length },
     { label: "Price moves", value: RUN.price_changes.length },
     { label: "Below market", value: belowMarket.length },
   ];
-  return { events, kpis, runLabel: `Read ${PREVIEW.run.time} · ${ALL_LISTINGS.length} listings · ${RUN.new_listings.length} new` };
+  const statuses = {
+    available: live.filter((l) => l.status === "For sale").length,
+    contract: live.filter((l) => l.status === "Under contract").length,
+    sold: live.filter((l) => l.status === "Sold").length,
+  };
+  const cuts = RUN.price_changes.filter((c) => (c.change.change_pct ?? 0) < 0).length;
+  const ups = RUN.price_changes.length - cuts;
+  const signal = `${RUN.new_listings.length} new, ${cuts} ${cuts === 1 ? "cut" : "cuts"}, ${ups} ${ups === 1 ? "increase" : "increases"} today.`;
+  return { events, kpis, pins, auctions: auction ? [auction] : [], statuses, signal, runLabel: `Read ${PREVIEW.run.time} · ${live.length} listings · ${RUN.new_listings.length} new` };
 }
 
 const HERO = heroData();
@@ -483,7 +539,7 @@ export default function Home() {
       <SiteHeader />
 
       <main id="main">
-        <Hero listings={ALL_LISTINGS} events={HERO.events} kpis={HERO.kpis} brief={BRIEF.headline} runLabel={HERO.runLabel} runTime={PREVIEW.run.time} total={ALL_LISTINGS.length} />
+        <Hero pins={HERO.pins} auctions={HERO.auctions} events={HERO.events} kpis={HERO.kpis} statuses={HERO.statuses} signal={HERO.signal} brief={BRIEF.headline} runTime={PREVIEW.run.time} total={HERO.pins.length} />
 
         {/* numbers */}
         <section aria-label="Today in numbers" className="border-y border-zinc-200 bg-white">
