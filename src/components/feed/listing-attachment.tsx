@@ -1,9 +1,9 @@
 "use client";
 
 /*
- * A Terminal listing attached to a Market feed post: the picker in the New post form
+ * A Baseline listing attached to a Market feed post: the picker in the New post form
  * and the card shown on the post. The card carries the listing's own data
- * (photo, price, AI Signal, price vs comps) and opens it in the Terminal.
+ * (photo, price, AI Signal, price vs comps) and opens it in Baseline.
  */
 
 import { ListingPhoto } from "@/components/listing-photo";
@@ -41,7 +41,7 @@ export function AttachedListing({ id, onOpen, compact = false }: { id: string | 
       <Thumb l={l} size={compact ? "sm" : "md"} />
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-400">
-          Listing on Terminal · {l.listing_id}
+          Listing on Baseline · {l.listing_id}
         </span>
         <span className="mt-0.5 block truncate text-[13.5px] font-semibold text-zinc-950">{l.asset_name}</span>
         <span className="block truncate text-[11.5px] text-zinc-500">

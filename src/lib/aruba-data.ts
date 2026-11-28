@@ -8,7 +8,7 @@
 import { scoreConfidence } from "./confidence";
 
 /**
- * The Terminal (dashboard, Watchlist, Market feed) reads only live Supabase data:
+ * Baseline (dashboard, Watchlist, Market feed) reads only live Supabase data:
  * `v_master_market` (indexed) and `v_agent_listings` (added by agents).
  * The mock data below is kept only to illustrate the landing, login and
  * sign-up pages.
@@ -231,7 +231,7 @@ export interface ListingBase {
   member?: MemberListingMeta;
 }
 
-/** Extra details of a listing an agent uploaded to the Terminal. */
+/** Extra details of a listing an agent uploaded to Baseline. */
 export interface MemberListingMeta {
   id: string; // agent_listings.id
   visibility: "members" | "private"; // Off-market for every member, or only the agent
@@ -1116,7 +1116,7 @@ export function estimateRevenue(input: EstimateInput): Estimate {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
- * Terminal updates (table: scrape_runs) — one entry per daily index:
+ * Baseline updates (table: scrape_runs) — one entry per daily index:
  * what was checked, what is new, which prices moved.
  * ──────────────────────────────────────────────────────────────────────── */
 

@@ -3,7 +3,7 @@
 /*
  * Add / edit a listing by hand. Agents choose Off-market (every member sees
  * it) or Only me. While they type, the duplicate watch compares it with every
- * listing on the Terminal; a likely duplicate has to be confirmed as a
+ * listing on Baseline; a likely duplicate has to be confirmed as a
  * different property before it can be saved (the database checks again).
  */
 
@@ -140,7 +140,7 @@ export function AddListingDialog({
   onClose: () => void;
   /** Edit this listing instead of adding one. */
   editing?: AgentListingViewRow;
-  /** Everything on the Terminal (market + member listings), for the duplicate watch. */
+  /** Everything on Baseline (market + member listings), for the duplicate watch. */
   listings: Listing[];
   onSave: (input: AgentListingInput, id?: string) => Promise<void>;
   onDelete?: (id: string) => Promise<void>;
@@ -230,7 +230,7 @@ function ListingForm({
     if (isHome && !digits(d.beds)) return setError("Add the number of bedrooms.");
     if (isHome && !(Number(d.baths) >= 0 && d.baths.trim())) return setError("Add the number of bathrooms.");
     if (pinBad) return setError("We couldn't read a location in Aruba from the map pin. Paste a Google Maps link or coordinates like 12.5512, -70.0478, or leave it empty.");
-    if (needsAck) return setError("This looks like a listing already on the Terminal. Confirm it is a different property to save it.");
+    if (needsAck) return setError("This looks like a listing already on Baseline. Confirm it is a different property to save it.");
 
     const input: AgentListingInput = {
       visibility: d.visibility,
@@ -273,7 +273,7 @@ function ListingForm({
 
   const remove = async () => {
     if (!editing || !onDelete) return;
-    if (!window.confirm(`Delete ${editing.asset_name}? This removes it from the Terminal for everyone.`)) return;
+    if (!window.confirm(`Delete ${editing.asset_name}? This removes it from Baseline for everyone.`)) return;
     setBusy(true);
     try {
       await onDelete(editing.id);
@@ -525,7 +525,7 @@ function ListingForm({
         <div className={`rounded-xl border p-3.5 ${likely.length || serverMatch ? "border-amber-300 bg-amber-50" : "border-zinc-200 bg-zinc-50"}`}>
           <p className="flex items-center gap-2 text-[13px] font-semibold text-zinc-950">
             <AlertTriangle size={14} className="text-amber-600" />
-            {likely.length || serverMatch ? "This may already be on the Terminal" : "Similar listings on the Terminal"}
+            {likely.length || serverMatch ? "This may already be on Baseline" : "Similar listings on Baseline"}
           </p>
           <ul className="mt-2 space-y-1.5">
             {serverMatch && !matches.some((m) => m.listing.listing_id === serverMatch.ref) && (

@@ -55,7 +55,7 @@ export interface FeedPost {
   budget_min: number | null; // bid: low end of the budget
   budget_max: number | null; // bid: ceiling / ask: asking price, rent or capital needed
   district: string | null;
-  listing_id?: string | null; // public ref of an attached Terminal listing ('AW-0388')
+  listing_id?: string | null; // public ref of an attached Baseline listing ('AW-0388')
   blind: boolean; // poster hidden: only the role shows
   author: FeedAuthor; // on blind posts only `role` is real
   mine?: boolean;

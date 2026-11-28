@@ -4,8 +4,8 @@ import { MARKET_TOTAL, marketBrief, scanRows } from "@/lib/scan-data";
 import { billingOf, planOf } from "@/lib/site";
 
 export const metadata: Metadata = {
-  title: "Create your account | Terminal",
-  description: "Sign up for Terminal: Aruba real estate market intelligence, read by AI every morning.",
+  title: "Create your account | Baseline",
+  description: "Sign up for Baseline: Aruba real estate market intelligence, read by AI every morning.",
 };
 
 export default async function SignupPage({ searchParams }: { searchParams: Promise<{ plan?: string; billing?: string }> }) {

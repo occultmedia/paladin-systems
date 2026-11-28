@@ -35,7 +35,7 @@ export function SiteHeader() {
       }`}
     >
       <div className="mx-auto flex h-16 max-w-[1240px] items-center justify-between px-5 sm:px-6">
-        <Link href="/" aria-label="Terminal home">
+        <Link href="/" aria-label="Baseline home">
           <Wordmark />
         </Link>
         <nav className="hidden items-center gap-8 lg:flex">

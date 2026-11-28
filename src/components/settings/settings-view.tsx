@@ -148,7 +148,7 @@ function ProfileForm({ initial, onSave, shared }: { initial: Profile; onSave: (p
       <div className={`${dirty ? "sticky" : ""} bottom-4 z-20`}>
         <div className={`flex flex-col gap-3 rounded-2xl px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between ${dirty ? "bg-zinc-950 text-white shadow-2xl" : "border border-zinc-200 bg-white"}`}>
           <p className={`text-[12.5px] ${dirty ? "text-zinc-300" : "text-zinc-500"}`}>
-            {error ? <span className="text-[#F28B82]">{error}</span> : dirty ? "You have unsaved changes." : shared ? "Visible to every Terminal member." : "Saved on this device until your account is live."}
+            {error ? <span className="text-[#F28B82]">{error}</span> : dirty ? "You have unsaved changes." : shared ? "Visible to every Baseline member." : "Saved on this device until your account is live."}
           </p>
           <div className="flex items-center gap-3">
             <Saved show={saved && !dirty} />
@@ -249,7 +249,7 @@ function PlanCard() {
           <UpgradeButton billing={billing} />
         </div>
       ) : (
-        <p className="border-t border-zinc-100 pt-4 text-[11.5px] text-zinc-500">You have everything in Terminal: auctions, social media listings and Airbnb rental income included.</p>
+        <p className="border-t border-zinc-100 pt-4 text-[11.5px] text-zinc-500">You have everything in Baseline: auctions, social media listings and Airbnb rental income included.</p>
       )}
     </Card>
   );
@@ -303,7 +303,7 @@ function BillingForm({ initial, onSave, shared }: { initial: BillingPrefs; onSav
             ))}
           </div>
           <p className="mt-2 text-[11.5px] leading-relaxed text-zinc-500">
-            You are not charged yet. When billing opens, card details are entered on the payment provider&apos;s secure checkout; Terminal never stores card or bank numbers.
+            You are not charged yet. When billing opens, card details are entered on the payment provider&apos;s secure checkout; Baseline never stores card or bank numbers.
           </p>
         </fieldset>
 

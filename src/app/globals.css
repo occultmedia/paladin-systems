@@ -438,7 +438,7 @@ body {
   }
 }
 
-/* ── Terminal "deck": the black band at the top of the dashboard ───────── */
+/* ── Baseline "deck": the black band at the top of the dashboard ───────── */
 /* Breaks a block out of the centered container to full width. Pair with
    overflow-x: clip on the page root so 100vw never adds a scrollbar. */
 @utility bleed {
@@ -452,12 +452,6 @@ body {
   background-size: 22px 22px;
   background-attachment: fixed;
   color: #fff;
-}
-
-/* Terminal wordmark cursor */
-@keyframes st-cursor {
-  0%, 55% { opacity: 1; }
-  56%, 100% { opacity: 0; }
 }
 
 /* Landing hero: scan sweep over the island and the pin it lights */

@@ -249,7 +249,7 @@ export function ProfileDialog({ open, onClose, initial, onSave, shared }: { open
         {error && <p className="rounded-lg bg-[#FBE9E9] px-3 py-2 text-[12.5px] text-[#B23A3A]">{error}</p>}
 
         <div className="flex flex-col-reverse gap-3 border-t border-zinc-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-[11.5px] text-zinc-500">{shared ? "Visible to every Terminal member." : "Saved on this device until accounts open."}</p>
+          <p className="text-[11.5px] text-zinc-500">{shared ? "Visible to every Baseline member." : "Saved on this device until accounts open."}</p>
           <button
             type="submit"
             disabled={saving}

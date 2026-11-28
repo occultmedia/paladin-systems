@@ -1,8 +1,8 @@
 "use client";
 
 /*
- * Landing hero. Calm and product-first: what Terminal is in one headline
- * and one sentence, two small actions, then the real Terminal in a light
+ * Landing hero. Calm and product-first: what Baseline is in one headline
+ * and one sentence, two small actions, then the real Baseline in a light
  * browser window over an Aruba photograph. The window is live: the 3D map
  * tours today's market events, the feed follows it, the numbers count up.
  * Motion stops for prefers-reduced-motion and while the hero is off screen.
@@ -11,6 +11,7 @@
 import { RunLine } from "@/components/run-line";
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { BaselineMark } from "@/components/logo";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { LayoutList, Megaphone, Pin, Search, Settings, Sparkles } from "lucide-react";
@@ -36,7 +37,7 @@ const TABS = [
   { label: "Settings", icon: Settings },
 ];
 
-/* ── the Terminal inside the window ──────────────────────────────────── */
+/* ── Baseline inside the window ──────────────────────────────────── */
 
 function TerminalWindow({
   listings,
@@ -71,15 +72,15 @@ function TerminalWindow({
           <span className="size-2.5 rounded-full bg-zinc-300" />
           <span className="size-2.5 rounded-full bg-zinc-300" />
         </span>
-        <span className="mx-auto truncate rounded-md bg-white px-3 py-0.5 text-[11px] text-zinc-500 ring-1 ring-zinc-200">terminal.sequencedata.aw / listings</span>
+        <span className="mx-auto truncate rounded-md bg-white px-3 py-0.5 text-[11px] text-zinc-500 ring-1 ring-zinc-200">baseline.sequencedata.aw / listings</span>
         <span className="w-[42px]" aria-hidden />
       </div>
 
-      {/* Terminal app bar */}
+      {/* Baseline app bar */}
       <div className="flex h-11 shrink-0 items-center gap-3 border-b border-zinc-200 px-3 sm:px-4">
-        <span className="flex items-end whitespace-nowrap font-display text-[12.5px] uppercase tracking-[0.22em] text-zinc-950">
-          Terminal
-          <span className="mb-[2px] ml-[2px] inline-block h-[2px] w-[7px] bg-zinc-950" />
+        <span className="flex items-end gap-1.5 whitespace-nowrap font-display text-[12.5px] uppercase tracking-[0.2em] text-zinc-950">
+          <BaselineMark className="h-[12px] w-auto" />
+          Baseline
         </span>
         <nav className="ml-3 hidden items-center gap-0.5 md:flex" aria-hidden>
           {TABS.map(({ label, icon: Icon }, i) => (
@@ -221,7 +222,7 @@ export function Hero({
   const fade = (delay: number) => ({ initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.7, ease: EASE, delay } });
 
   return (
-    <section ref={ref} className="relative w-full bg-white" aria-label="Terminal: Aruba real estate market intelligence">
+    <section ref={ref} className="relative w-full bg-white" aria-label="Baseline: Aruba real estate market intelligence">
       <div className="mx-auto flex max-w-[1240px] flex-col items-center px-5 pb-16 pt-32 text-center sm:pb-20 sm:pt-40">
         <motion.h1 {...fade(0.08)} className="font-display text-[clamp(40px,6vw,72px)] leading-[1.02] tracking-[-0.035em] text-[#15171C]">
           Aruba Real Estate <br className="hidden sm:block" />
@@ -229,7 +230,7 @@ export function Hero({
         </motion.h1>
 
         <motion.p {...fade(0.16)} className="mt-6 max-w-[34rem] text-[16.5px] leading-relaxed text-zinc-500 sm:text-[17.5px]">
-          Terminal tracks listings from Aruba&rsquo;s real estate agencies and follows their prices. AI then analyzes the data, comparing each listing with similar properties, so agents, brokers and investors can read the market at a glance.
+          Baseline tracks listings from Aruba&rsquo;s real estate agencies and follows their prices. AI then analyzes the data, comparing each listing with similar properties, so agents, brokers and investors can read the market at a glance.
         </motion.p>
 
         <motion.div {...fade(0.24)} className="mt-8 flex items-center gap-2.5">

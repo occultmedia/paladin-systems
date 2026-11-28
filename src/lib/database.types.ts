@@ -1,5 +1,5 @@
 /*
- * Supabase database types for Terminal, in the shape `supabase gen types
+ * Supabase database types for Baseline, in the shape `supabase gen types
  * typescript` produces. Mirrors:
  *   supabase/migrations/20261121000000_profiles_feed.sql
  *   supabase/migrations/20261122000000_delta_pipeline.sql
@@ -638,7 +638,7 @@ export type Database = {
           notes: string;
           budget_min: number | null;
           budget_max: number | null;
-          /** public listing ref ('AW-0388') of an attached Terminal listing */
+          /** public listing ref ('AW-0388') of an attached Baseline listing */
           listing_ref: string | null;
           is_blind: boolean;
           created_at: string;

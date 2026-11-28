@@ -180,13 +180,13 @@ class WeichertArubaSpider(BaseSpider):
         # Before the first listing page: one request for the first photo of every listing.
         if self.items and not self.media and "/property/" in url:
             self.media[0] = ""  # only once
-            ids = sorted({i for it in self.items.values() if (i := self._first_photo_id(it))})
+            ids = sorted({i for it in self.items.values() for i in (self._first_photo_id(it), it.get("featured_media")) if i})
             for n in range(0, len(ids), 100):
                 chunk = ",".join(map(str, ids[n : n + 100]))
                 page = await super().load(f"{API}/media?include={chunk}&per_page=100&_fields=id,source_url,media_details")
                 for m in self._json(page) if page else []:
                     sizes = (m.get("media_details") or {}).get("sizes") or {}
-                    self.media[m["id"]] = (sizes.get("large") or sizes.get("full") or {}).get("source_url") or m.get("source_url") or ""
+                    self.media[m["id"]] = (sizes.get("medium_large") or sizes.get("large") or sizes.get("full") or {}).get("source_url") or m.get("source_url") or ""  # 768 px wide
         return await super().load(url)
 
     def parse_detail(self, page: Doc, card: dict[str, Any]) -> dict[str, Any]:
@@ -233,8 +233,13 @@ class WeichertArubaSpider(BaseSpider):
             self._miss("agent")
 
         photo = page.attr('meta[property="og:image"]', "content")
+        resized = self.media.get(it.get("featured_media") or 0) or self.media.get(self._first_photo_id(it) or 0) or None
         if not photo or photo.endswith("Weichert-favicon.png"):
-            photo = self.media.get(self._first_photo_id(it) or 0) or None
+            photo = resized
+        elif not re.search(r"-\d+x\d+(-\d+)?\.\w+$", photo) and resized:
+            # an original upload (one was 6.8 MB): WordPress's own 768 px copy instead.
+            # (The site's Cloudflare refuses Vercel's image resizer, so this is the only resizing.)
+            photo = resized
         if not photo:
             self._miss("photo")
         return {

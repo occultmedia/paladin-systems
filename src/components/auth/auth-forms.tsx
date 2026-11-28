@@ -32,7 +32,7 @@ export function AuthShell({
     <div className="grid min-h-dvh grid-cols-[minmax(0,1fr)] bg-white font-sans text-zinc-800 antialiased lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
       <div className="flex flex-col px-5 py-5 sm:px-10">
         <div className="flex items-center justify-between">
-          <Link href="/" aria-label="Terminal home">
+          <Link href="/" aria-label="Baseline home">
             <Wordmark />
           </Link>
           <Link href="/" className="group inline-flex items-center gap-1.5 text-[13px] font-medium text-zinc-500 transition-colors hover:text-zinc-950">
@@ -49,7 +49,7 @@ export function AuthShell({
         >
           {children}
         </motion.main>
-        <p className="text-center text-[11.5px] text-zinc-400 lg:text-left">© 2026 Terminal by Sequence Data · Aruba</p>
+        <p className="text-center text-[11.5px] text-zinc-400 lg:text-left">© 2026 Baseline by Sequence Data · Aruba</p>
       </div>
 
       <Spotlight className="relative hidden overflow-hidden border-l border-zinc-200 bg-zinc-50 lg:sticky lg:top-0 lg:block lg:h-dvh">
@@ -60,7 +60,7 @@ export function AuthShell({
         <div className="relative flex h-full flex-col justify-center px-12 py-16 xl:px-20">
           <AIBadge />
           <h2 className="mt-6 max-w-[18ch] font-display text-[34px] font-bold leading-[1.08] tracking-tight text-zinc-950 xl:text-[40px]">
-            Terminal read {total} Aruba listings this morning.
+            Baseline read {total} Aruba listings this morning.
           </h2>
           <p className="mt-4 max-w-[46ch] text-[15px] leading-relaxed text-zinc-600">
             Every listing is checked against its comps, its price history and its status, then explained in plain English.
@@ -192,7 +192,7 @@ function Notice({ result }: { result: AuthResult | null }) {
           {result.error === "not-configured" ? (
             <p className="mt-4 rounded-xl border border-mint-deep bg-mint-soft px-4 py-3 text-[13px] leading-relaxed text-zinc-800">
               Accounts open very soon. For early access, email{" "}
-              <a className="font-semibold underline underline-offset-2" href={`mailto:${CONTACT_EMAIL}?subject=Terminal%20early%20access`}>
+              <a className="font-semibold underline underline-offset-2" href={`mailto:${CONTACT_EMAIL}?subject=Baseline%20early%20access`}>
                 {CONTACT_EMAIL}
               </a>
               .
@@ -264,7 +264,7 @@ export function LoginForm() {
         <Notice result={result} />
       </form>
       <p className="mt-8 text-center text-[14px] text-zinc-500">
-        New to Terminal?{" "}
+        New to Baseline?{" "}
         <Link href="/signup" className="font-semibold text-zinc-950 underline-offset-4 hover:underline">
           Create an account
         </Link>
@@ -496,7 +496,7 @@ export function SignupForm({ initialPlan = "standard", initialBilling = "monthly
         title="Confirm your email"
         body={
           <>
-            We sent a link to <b className="text-zinc-950">{email}</b>. Open it to finish setting up your Terminal account.
+            We sent a link to <b className="text-zinc-950">{email}</b>. Open it to finish setting up your Baseline account.
           </>
         }
       />

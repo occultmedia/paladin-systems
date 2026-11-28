@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Landing-page hero: a live-looking preview of the Terminal that cycles
+ * Landing-page hero: a live-looking preview of Baseline that cycles
  * through its real features (daily Index, price history, watchlist,
  * interested clients). All data comes from the same mock
  * layer as the dashboard, prepared on the server and passed in as props.
@@ -506,7 +506,7 @@ export function TerminalPreview({ data }: { data: PreviewData }) {
       </div>
 
       {/* feature tabs */}
-      <div className="no-scrollbar -mx-4 mt-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:grid sm:grid-cols-4 sm:px-0" role="tablist" aria-label="Terminal features">
+      <div className="no-scrollbar -mx-4 mt-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:grid sm:grid-cols-4 sm:px-0" role="tablist" aria-label="Baseline features">
         {FEATURES.map((f) => {
           const on = f.key === active;
           return (
@@ -535,7 +535,7 @@ export function TerminalPreview({ data }: { data: PreviewData }) {
         })}
       </div>
       <p className="mt-3 text-[12px] text-zinc-500">
-        Live preview of the Terminal.{" "}
+        Live preview of Baseline.{" "}
         <Link href={HREF_FOR[active]} className="font-medium text-zinc-950 underline-offset-4 hover:underline">
           Open {FEATURES.find((f) => f.key === active)?.label} →
         </Link>

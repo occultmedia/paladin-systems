@@ -82,7 +82,7 @@ const digits = (s: string) => s.replace(/[^\d]/g, "");
 
 function ContactRow({ post }: { post: Pick<FeedPost, "title" | "author"> }) {
   const a = post.author;
-  const msg = `Hi ${a.name.split(" ")[0]}, about "${post.title}" on the Terminal Market feed.`;
+  const msg = `Hi ${a.name.split(" ")[0]}, about "${post.title}" on the Baseline Market feed.`;
   const links = [
     a.whatsapp && { href: `https://wa.me/${digits(a.whatsapp)}?text=${encodeURIComponent(msg)}`, label: "WhatsApp", icon: MessageCircle, primary: true },
     a.phone && { href: `tel:${a.phone.replace(/[^\d+]/g, "")}`, label: "Call", icon: Phone },
@@ -503,7 +503,7 @@ function Composer({ open, onClose, onPost, author }: { open: boolean; onClose: (
 
         <div className="flex flex-col-reverse gap-3 border-t border-zinc-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-[11.5px] text-zinc-500">
-            <b className="font-semibold text-zinc-800">Every Terminal member can see this post.</b> It deletes itself after {DEAL_TTL_DAYS} days.
+            <b className="font-semibold text-zinc-800">Every Baseline member can see this post.</b> It deletes itself after {DEAL_TTL_DAYS} days.
           </p>
           <button
             type="submit"
@@ -529,7 +529,7 @@ export function SharedNotice({ light = false }: { light?: boolean }) {
     >
       <Globe2 size={16} strokeWidth={1.75} className={`mt-0.5 shrink-0 ${light ? "text-zinc-950" : "text-lime"}`} />
       <p>
-        <b className={light ? "font-semibold text-zinc-950" : "font-semibold text-white"}>This is the only page visible to all users.</b> Every Terminal member
+        <b className={light ? "font-semibold text-zinc-950" : "font-semibold text-white"}>This is the only page visible to all users.</b> Every Baseline member
         sees what is posted here. Your Watchlist, clients and Settings stay private{" "}
         <Lock size={11} strokeWidth={2} className="-mt-0.5 inline" aria-hidden /> to you.
       </p>

@@ -29,14 +29,14 @@ export type AgentListingInput = Omit<AgentListingFields, "photo_url"> & {
 /** The database refused the listing as a likely duplicate. */
 export class DuplicateListingError extends Error {
   constructor(public match: { kind: "market" | "member"; ref: string; name: string; score: number }) {
-    super(`This looks like ${match.name} (${match.ref}), already on the Terminal.`);
+    super(`This looks like ${match.name} (${match.ref}), already on Baseline.`);
     this.name = "DuplicateListingError";
   }
 }
 
 export const VISIBILITY_LABEL = { members: "Off-market", private: "Only me" } as const;
 export const VISIBILITY_HINT = {
-  members: "Every Terminal member sees it on the dashboard, marked Off-market. It is never shown publicly.",
+  members: "Every Baseline member sees it on the dashboard, marked Off-market. It is never shown publicly.",
   private: "Only you see it. Handy for pocket listings you are still preparing.",
 } as const;
 

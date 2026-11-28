@@ -4,9 +4,9 @@
  * NEXT_PUBLIC_SITE_URL in Vercel (no code change needed).
  */
 export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://sequence-labs-psi.vercel.app").replace(/\/$/, "");
-export const SITE_NAME = "Terminal";
+export const SITE_NAME = "Baseline";
 export const SITE_TITLE =
-  "Terminal · Aruba Real Estate Market Intelligence | Powered by Sequence Data";
+  "Baseline · Aruba Real Estate Market Intelligence | Powered by Sequence Data";
 export const SITE_DESCRIPTION =
   "Aruba real estate market intelligence: listings from local agencies checked daily, with price history, estimated market value, listing agents, a watchlist and interested clients. For real estate agents and investors.";
 export const CONTACT_EMAIL = "ops@sequencedata.aw";

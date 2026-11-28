@@ -203,7 +203,7 @@ export function useProfile() {
             clearLocal();
           } catch (err) {
             // Keep the local copy and try again on the next visit.
-            console.warn("Terminal: could not save the sign-up photo/logo yet.", err);
+            console.warn("Baseline: could not save the sign-up photo/logo yet.", err);
           }
         } else if (sameAccount && stored) {
           clearLocal();

@@ -1,4 +1,4 @@
-# Terminal spider fleet (Level 1 ingestion)
+# Baseline spider fleet (Level 1 ingestion)
 
 Reads agency websites and upserts what it finds into Supabase `raw_listings`
 (one row per listing URL). The normaliser (`normalise.py`) then turns `raw_listings` into

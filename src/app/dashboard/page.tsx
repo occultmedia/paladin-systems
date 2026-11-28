@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * SEQUENCE DATA — Aruba Luxury STR Terminal (MVP)
+ * SEQUENCE DATA — Aruba Luxury STR Baseline (MVP)
  * Single-file dashboard: types → data layer → formatters → UI.
  *
  * Deps: next, react, tailwindcss, lucide-react, recharts
@@ -179,7 +179,7 @@ function PriceMove({ pct, label = true, size = 12 }: { pct: number; label?: bool
 
 function Logo() {
   return (
-    <Link href="/" className="select-none" aria-label="Terminal home">
+    <Link href="/" className="select-none" aria-label="Baseline home">
       <Wordmark tone="white" />
     </Link>
   );
@@ -369,7 +369,7 @@ function Header({ tab, onTab, updates, onUpdates, watchCount, onProfile, updated
             <button
               type="button"
               onClick={onUpdates}
-              aria-label={`Terminal updates: ${updates} today`}
+              aria-label={`Baseline updates: ${updates} today`}
               className="relative flex size-9 items-center justify-center rounded-full border border-white/15 bg-white/[0.06] text-zinc-200 transition-colors hover:bg-white/[0.12] hover:text-white"
             >
               <Bell size={15} strokeWidth={1.75} />
@@ -399,7 +399,7 @@ function Header({ tab, onTab, updates, onUpdates, watchCount, onProfile, updated
           <button
             type="button"
             onClick={onUpdates}
-            aria-label={`Terminal updates: ${updates} today`}
+            aria-label={`Baseline updates: ${updates} today`}
             className="relative flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/[0.06] text-zinc-200 transition-colors hover:bg-white/[0.12] hover:text-white"
           >
             <Bell size={15} strokeWidth={1.75} />
@@ -786,7 +786,7 @@ function ConfidenceTip() {
     <>
       <span className="block font-semibold text-white">What is the Confidence Score?</span>
       <span className="mt-1 block">
-        How likely it is that this listing is really still for sale. Agency sites often leave sold or withdrawn homes online (&quot;ghost listings&quot;), so Terminal scores every listing from 0 to 100% instead of trusting the site.
+        How likely it is that this listing is really still for sale. Agency sites often leave sold or withdrawn homes online (&quot;ghost listings&quot;), so Baseline scores every listing from 0 to 100% instead of trusting the site.
       </span>
       <span className="mt-2 block text-white">It goes down when:</span>
       <span className="block">· the listing disappears from the agency&apos;s site (−{CONFIDENCE_RULES.missingPerWeek} per week)</span>
@@ -1001,7 +1001,7 @@ function FlagDialog({ l, open, onClose }: { l: Listing; open: boolean; onClose: 
           />
         </label>
         <p className="rounded-lg border border-[#F3C9C9] bg-[#FDF2F2] px-3 py-2.5 text-[12px] leading-relaxed text-[#9B2C2C]">
-          This removes the listing from Terminal for every member right away and sets its confidence to 0. Your account is recorded with the flag, and you can undo it for {UNDO_MINUTES} minutes.
+          This removes the listing from Baseline for every member right away and sets its confidence to 0. Your account is recorded with the flag, and you can undo it for {UNDO_MINUTES} minutes.
         </p>
         {!live && <p className="text-[11.5px] text-zinc-500">Preview: flags are saved on this device until live listing data is connected.</p>}
         {error && <p className="rounded-lg bg-[#FBE9E9] px-3 py-2 text-[12.5px] text-[#B23A3A]">{error}</p>}
@@ -1015,7 +1015,7 @@ function FlagDialog({ l, open, onClose }: { l: Listing; open: boolean; onClose: 
             </Link>
           ) : (
             <button type="submit" disabled={busy} className="inline-flex items-center gap-2 rounded-full bg-[#B42318] px-5 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-[#8F1C13] disabled:opacity-60">
-              <Flag size={13} /> {busy ? "Removing…" : "Remove from Terminal"}
+              <Flag size={13} /> {busy ? "Removing…" : "Remove from Baseline"}
             </button>
           )}
         </div>
@@ -2040,7 +2040,7 @@ function ActiveListings({
   const [openId, setOpenId] = useState<string | null>(initialOpenId ?? null);
   const [hoverId, setHoverId] = useState<string | null>(null);
   const [popupId, setPopupId] = useState<string | null>(null);
-  // The Terminal opens in Normal view; the switch on the map opens Dashboard view (full screen).
+  // Baseline opens in Normal view; the switch on the map opens Dashboard view (full screen).
   const [fullMap, setFullMap] = useState(false);
   const closeFullMap = useCallback((tab: FullPanel = "Listings") => {
     setFullMap(false);
@@ -3171,7 +3171,7 @@ function Watchlist({ listings, runs, onOpenListing, onBrowse }: { listings?: Lis
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
- * Terminal updates — message board fed by every daily Index
+ * Baseline updates — message board fed by every daily Index
  * ──────────────────────────────────────────────────────────────────────── */
 
 const fmtRunTime = (iso: string) =>
@@ -3370,7 +3370,7 @@ function TerminalUpdates({
                 </p>
                 <ul>
                   {!run.new_listings.length && !run.price_changes.length && !run.status_changes.length && (
-                    <li className="px-4 py-2 text-[12px] text-zinc-400">Terminal updated, no changes</li>
+                    <li className="px-4 py-2 text-[12px] text-zinc-400">Baseline updated, no changes</li>
                   )}
                   {runMessages(run).map((m) => {
                       if (m.kind === "run") return null;
@@ -3454,7 +3454,7 @@ function Dashboard() {
   const params = useSearchParams();
   const router = useRouter();
   const { user, ready } = useUser();
-  // The Terminal is for members: once accounts are live, signed-out visitors go to log in.
+  // Baseline is for members: once accounts are live, signed-out visitors go to log in.
   // (Until then the dashboard stays open as the demo.)
   const locked = authConfigured && ready && !user;
   useEffect(() => {

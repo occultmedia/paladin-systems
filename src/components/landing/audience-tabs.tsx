@@ -27,7 +27,7 @@ export function AudienceTabs({ items }: { items: Audience[] }) {
   const a = items.find((x) => x.id === active) ?? items[0];
   return (
     <div>
-      <div role="tablist" aria-label="Who Terminal is for" className="glass inline-flex rounded-full p-1">
+      <div role="tablist" aria-label="Who Baseline is for" className="glass inline-flex rounded-full p-1">
         {items.map((x) => {
           const on = x.id === active;
           return (

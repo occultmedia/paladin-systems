@@ -26,7 +26,7 @@ import {
 } from "@/lib/aruba-data";
 
 /* ─────────────────────────────────────────────────────────────────────────
- * Terminal (powered by Sequence Data) — landing page.
+ * Baseline (powered by Sequence Data) — landing page.
  * Every number is read from src/lib/aruba-data.ts, the same source as the
  * dashboard. Photos are Unsplash placeholders until real listing photos.
  * ──────────────────────────────────────────────────────────────────────── */
@@ -51,7 +51,7 @@ const AGENCIES = new Set(ALL_LISTINGS.map((l) => l.agency.id)).size;
 const NEW_THIS_WEEK = ALL_LISTINGS.filter((l) => l.days_on_market <= 7).length;
 
 
-/* ── Terminal preview (hero) ─────────────────────────────────────────── */
+/* ── Baseline preview (hero) ─────────────────────────────────────────── */
 
 const RUN = INDEX_RUNS[0];
 const usdShort = (n: number) => (n >= 1e6 ? `$${(n / 1e6).toFixed(n >= 1e7 ? 1 : 2)}M` : `$${Math.round(n / 1000)}k`);
@@ -323,7 +323,7 @@ const AUDIENCES: Audience[] = [
       "The Confidence Score flags stale and ghost listings, so your team chases what is real.",
       "Team seats, CSV export and raw data access for your brokerage.",
     ],
-    cta: { label: "Get team access", href: `mailto:${CONTACT_EMAIL}?subject=Terminal%20Team%20Access` },
+    cta: { label: "Get team access", href: `mailto:${CONTACT_EMAIL}?subject=Baseline%20Team%20Access` },
     visual: <BrokerBoardCard ex={BROKER} />,
   },
   {
@@ -423,8 +423,8 @@ function SectionHeading({ eyebrow, title, body, light }: { eyebrow: string; titl
 
 const FAQ: FaqItem[] = [
   {
-    q: "Where does Terminal get its listings?",
-    a: `Every morning Terminal reads the public listing pages of Aruba's real estate agencies, brokers and developers (${AGENCIES} websites today) and collects every home, condo, villa, plot of land and commercial property for sale. Each listing shows the agency's logo and links back to the original page on its website.`,
+    q: "Where does Baseline get its listings?",
+    a: `Every morning Baseline reads the public listing pages of Aruba's real estate agencies, brokers and developers (${AGENCIES} websites today) and collects every home, condo, villa, plot of land and commercial property for sale. Each listing shows the agency's logo and links back to the original page on its website.`,
   },
   {
     q: "How often is the data updated?",
@@ -436,15 +436,15 @@ const FAQ: FaqItem[] = [
   },
   {
     q: "What is the Confidence Score?",
-    a: "A score from 0 to 100 for how sure Terminal is that a listing is really still for sale. Agency sites often leave listings up long after a deal closes. The score starts at 100 and drops when a listing disappears from its source website, stays on the market for more than 6 months (more again after a year), or keeps the same price for more than 4 months.",
+    a: "A score from 0 to 100 for how sure Baseline is that a listing is really still for sale. Agency sites often leave listings up long after a deal closes. The score starts at 100 and drops when a listing disappears from its source website, stays on the market for more than 6 months (more again after a year), or keeps the same price for more than 4 months.",
   },
   {
     q: "What if a listing has already been sold?",
     a: "Flag it from the listing. A flagged listing is marked as gone, its Confidence Score drops to 0 and it is removed from the market view for every member, so nobody else wastes a call on it.",
   },
   {
-    q: "Does Terminal sell property or act as an agent?",
-    a: "No. Terminal is a market intelligence tool, not a broker or a listing portal. Every listing belongs to the agency that published it, and the call, WhatsApp and e-mail buttons go straight to that agency's listing agent.",
+    q: "Does Baseline sell property or act as an agent?",
+    a: "No. Baseline is a market intelligence tool, not a broker or a listing portal. Every listing belongs to the agency that published it, and the call, WhatsApp and e-mail buttons go straight to that agency's listing agent.",
   },
   {
     q: "Is the AI Signal financial advice?",
@@ -622,7 +622,7 @@ export default function Home() {
                   </p>
                 </div>
                 <a
-                  href={`mailto:${CONTACT_EMAIL}?subject=Terminal%20Team%20Access`}
+                  href={`mailto:${CONTACT_EMAIL}?subject=Baseline%20Team%20Access`}
                   className="mt-8 inline-flex items-center gap-2 self-start rounded-full border border-zinc-950/15 bg-white/60 px-5 py-3 font-display text-[14px] font-semibold text-zinc-950 transition-colors hover:bg-zinc-950 hover:text-white"
                 >
                   Contact us <ArrowUpRight size={15} strokeWidth={2} />
@@ -640,7 +640,7 @@ export default function Home() {
             <div className="lg:sticky lg:top-28 lg:self-start">
               <SectionHeading
                 eyebrow="FAQ"
-                title="How Terminal works."
+                title="How Baseline works."
                 body="Where the listings come from, how often they update and what the numbers mean."
               />
               <Reveal>
@@ -673,7 +673,7 @@ export default function Home() {
                 {NEW_THIS_WEEK} new listings this week
               </p>
               <h2 className="mt-5 max-w-[18ch] font-display text-[34px] font-bold leading-[1.05] tracking-tight text-white sm:text-[52px]">
-                The market moved this morning. Terminal already read it.
+                The market moved this morning. Baseline already read it.
               </h2>
             </Reveal>
             <div className="flex flex-wrap gap-3">
@@ -695,7 +695,7 @@ export default function Home() {
         <div className="mx-auto flex max-w-[1240px] flex-col gap-6 px-5 py-10 sm:px-6 md:flex-row md:items-center md:justify-between">
           <Wordmark tagline />
           <p className="max-w-[64ch] text-[12px] leading-relaxed text-zinc-500 md:text-right">
-            © 2026 Terminal by Sequence Data · Oranjestad, Aruba · {CONTACT_EMAIL}
+            © 2026 Baseline by Sequence Data · Oranjestad, Aruba · {CONTACT_EMAIL}
             <br />
             Data is for information only and is not investment advice. Photos: Unsplash.
           </p>

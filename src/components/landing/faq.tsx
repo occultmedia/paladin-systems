@@ -1,7 +1,7 @@
 "use client";
 
 /*
- * FAQ: how Terminal gets its data and what the numbers mean. Glass accordion,
+ * FAQ: how Baseline gets its data and what the numbers mean. Glass accordion,
  * one answer open at a time. The same Q&A feeds the FAQPage JSON-LD on the
  * landing page, so keep answers as plain text.
  */

@@ -1,5 +1,5 @@
 /*
- * Confidence Score: how sure Terminal is that a listing is really still for
+ * Confidence Score: how sure Baseline is that a listing is really still for
  * sale, from 0 to 100. Broker sites keep "ghost listings" up long after a
  * deal closes, so a listing is never simply true or false.
  *

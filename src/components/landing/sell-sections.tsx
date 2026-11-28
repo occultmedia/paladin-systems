@@ -1,5 +1,5 @@
 /*
- * Landing sections that sell Terminal to its two audiences, plus the AI
+ * Landing sections that sell Baseline to its two audiences, plus the AI
  * capability grid. White and clinical; black and lime are the only accents.
  * Every example is built from today's data by the page.
  */
@@ -99,12 +99,12 @@ export type AgentMorning = {
   pricing: { listing: string; district: string; pct: number } | null;
 };
 
-/** An agent's morning in Terminal, built from today's data. */
+/** An agent's morning in Baseline, built from today's data. */
 export function AgentMorningCard({ m }: { m: AgentMorning }) {
   return (
     <div className="relative rounded-3xl border border-zinc-200 bg-zinc-50 p-4 sm:p-6">
       <RunLine speed={9} delay={-4} />
-      <p className="px-1 text-[12px] font-medium text-zinc-500">Your morning in Terminal · {m.time}</p>
+      <p className="px-1 text-[12px] font-medium text-zinc-500">Your morning in Baseline · {m.time}</p>
       <div className="mt-3 space-y-3">
         <div className="rounded-2xl bg-zinc-950 p-5 text-white">
           <p className="text-[12px] font-medium text-lime">Market brief</p>

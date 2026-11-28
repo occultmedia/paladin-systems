@@ -1,7 +1,7 @@
 "use client";
 
 /*
- * Full-screen mode of the Terminal: the map fills the screen, with a panel
+ * Full-screen mode of Baseline: the map fills the screen, with a panel
  * for Listings (your current filters), your Watchlist and the Market feed. Members land
  * here after logging in. Hovering a listing highlights its pin; clicking a
  * listing or pin flies the map in (3D) and shows its card. "Exit" returns to
@@ -562,7 +562,7 @@ export function MapFullscreen({
         <motion.div
           role="dialog"
           aria-modal="true"
-          aria-label="Terminal, full-screen mode"
+          aria-label="Baseline, full-screen mode"
           initial={{ opacity: 0, scale: 0.985 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.985 }}
