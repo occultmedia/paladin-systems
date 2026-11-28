@@ -25,7 +25,7 @@ const sora = Sora({
 // The wordmark ("The rule", 28 November 2026)
 const interTight = Inter_Tight({
   subsets: ["latin"],
-  weight: ["700"],
+  weight: ["600", "700"],
   variable: "--font-wordmark",
 });
 

@@ -33,26 +33,28 @@ export function SequenceMonogram({ className = "h-6 w-auto", tone = "black" }: {
 }
 
 /**
- * The Baseline logo ("The rule", since 28 November 2026): the name set in
- * Inter Tight, standing on a straight rule, the baseline itself, with a
- * short lime mark where the line starts. No icon.
+ * The Baseline logo ("The rule", since 28 November 2026): BASELINE in
+ * letter-spaced Inter Tight capitals over a hairline rule, the baseline
+ * itself, with a short lime mark where the line starts. No icon.
  *
  * `size` is the type size in px; the rule and gap scale with it.
  */
 export function BaselineLogo({ tone = "black", size = 19, className = "" }: { tone?: Tone; size?: number; className?: string }) {
   const ink = tone === "black" ? "#0A0A0A" : "#FFFFFF";
-  const rule = Math.max(2, Math.round(size / 9));
+  // Letter-spaced capitals; the last letter's spacing is taken back so the rule ends with the E.
+  const tracking = 0.3;
+  const rule = Math.max(1, Math.round(size / 12));
   return (
     <span className={`inline-flex flex-col leading-none ${className}`} aria-label="Baseline">
       <span
         aria-hidden
-        className="font-[family-name:var(--font-wordmark)] font-bold"
-        style={{ fontSize: size, letterSpacing: "-0.035em", color: ink, lineHeight: 1 }}
+        className="font-[family-name:var(--font-wordmark)] font-semibold uppercase"
+        style={{ fontSize: size, letterSpacing: `${tracking}em`, marginRight: `-${tracking}em`, color: ink, lineHeight: 1 }}
       >
         Baseline
       </span>
-      <span aria-hidden className="relative block" style={{ height: rule, marginTop: Math.round(size * 0.2), background: ink }}>
-        <span className="absolute inset-y-0 left-0 bg-lime" style={{ width: Math.round(size * 0.7) }} />
+      <span aria-hidden className="relative block" style={{ height: rule, marginTop: Math.round(size * 0.32), background: ink, opacity: 0.9 }}>
+        <span className="absolute inset-y-0 left-0 bg-lime" style={{ width: Math.round(size * 1.1) }} />
       </span>
     </span>
   );
@@ -65,7 +67,7 @@ export function Wordmark({ tone = "black", tagline = false }: { tone?: Tone; tag
   const muted = tone === "black" ? "text-zinc-500" : "text-zinc-400";
   return (
     <span className="inline-block leading-none">
-      <BaselineLogo tone={tone} size={21} />
+      <BaselineLogo tone={tone} size={15} />
       {tagline && (
         <span className={`mt-2 flex items-center gap-1.5 whitespace-nowrap text-[8.5px] font-medium uppercase tracking-[0.14em] ${muted}`}>
           Powered by
