@@ -1,4 +1,7 @@
+"use client";
+
 import Image from "next/image";
+import { useLayoutEffect, useRef, useState } from "react";
 
 /*
  * Brand: the product is "Baseline" (named Terminal until 28 Nov 2026), powered by Sequence Data.
@@ -39,36 +42,70 @@ export function SequenceMonogram({ className = "h-6 w-auto", tone = "black" }: {
  *
  * `size` is the type size in px; the house, the line and the gaps scale with it.
  */
-export function BaselineLogo({ tone = "black", size = 19, className = "" }: { tone?: Tone; size?: number; className?: string }) {
+export function BaselineLogo({ tone = "black", size = 19, run = true, className = "" }: { tone?: Tone; size?: number; run?: boolean; className?: string }) {
   const ink = tone === "black" ? "#0A0A0A" : "#FFFFFF";
   const tracking = 0.3; // letter spacing; the last letter's is taken back so the line ends with the E
   const stroke = Math.max(1.5, Math.round((size / 9.5) * 2) / 2);
   const h = Math.round(size * 1.75); // house height, roof tip to the line
   const w = Math.round(size * 1.8); // house width, foot to foot
-  const s2 = stroke / 2;
-  // In px: starts on the line, up the left wall, over the roof, down the right wall, back to the line.
   const lead = Math.round(size * 0.32);
-  const house = `M0 ${h - s2} H${lead} V${Math.round(h * 0.38)} L${lead + w / 2} ${s2 + 0.5} L${lead + w} ${Math.round(h * 0.38)} V${h - s2}`;
+  const gap = Math.round(size * 0.62);
+  const s2 = stroke / 2;
+  const base = h - s2;
+
+  // The line runs under the whole name: measure it (a first guess before the font is laid out).
+  const textRef = useRef<HTMLSpanElement>(null);
+  const [textW, setTextW] = useState(() => Math.round(size * 8 * 0.95));
+  useLayoutEffect(() => {
+    const el = textRef.current;
+    if (!el) return;
+    const measure = () => setTextW(Math.round(el.getBoundingClientRect().width));
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    document.fonts?.ready.then(measure).catch(() => {});
+    return () => ro.disconnect();
+  }, [size]);
+  const total = lead + w + gap + textW;
+
+  // One path: along the line, up the left wall, over the roof, down the right wall, on under the name.
+  const d = `M0 ${base} H${lead} V${Math.round(h * 0.38)} L${lead + w / 2} ${s2 + 0.5} L${lead + w} ${Math.round(h * 0.38)} V${base} H${total}`;
   return (
-    <span className={`inline-flex items-end leading-none ${className}`} aria-label="Baseline" role="img">
-      <svg width={lead + w} height={h} viewBox={`0 0 ${lead + w} ${h}`} fill="none" aria-hidden className="shrink-0 overflow-visible">
-        <path d={house} stroke={ink} strokeWidth={stroke} strokeLinejoin="miter" strokeLinecap="butt" />
+    <span className={`relative inline-flex items-end leading-none ${className}`} style={{ height: h }} aria-label="Baseline" role="img">
+      <svg
+        width={total}
+        height={h}
+        viewBox={`0 0 ${total} ${h}`}
+        fill="none"
+        aria-hidden
+        className="baseline-logo-line absolute bottom-0 left-0 overflow-visible"
+      >
+        <path d={d} stroke={ink} strokeWidth={stroke} strokeLinejoin="miter" pathLength={1000} />
+        {run && (
+          // the brand's running light: a lime comet along the line (still when motion is reduced)
+          <g className="baseline-logo-run" strokeLinejoin="miter" strokeLinecap="round" fill="none">
+            <path d={d} pathLength={1000} stroke="#ACFA68" strokeWidth={stroke * 3} className="blur l140" />
+            <path d={d} pathLength={1000} stroke="rgb(150 232 84 / 0.55)" strokeWidth={stroke} className="l220" />
+            <path d={d} pathLength={1000} stroke="#ACFA68" strokeWidth={stroke} className="l110" />
+            <path d={d} pathLength={1000} stroke="#E9FFD2" strokeWidth={stroke * 1.15} className="l22" />
+          </g>
+        )}
       </svg>
-      <span aria-hidden className="flex flex-col">
-        <span
-          className="font-[family-name:var(--font-wordmark)] font-semibold uppercase"
-          style={{
-            fontSize: size,
-            letterSpacing: `${tracking}em`,
-            marginRight: `-${tracking}em`,
-            paddingLeft: Math.round(size * 0.62),
-            color: ink,
-            lineHeight: 1,
-          }}
-        >
-          Baseline
-        </span>
-        <span className="block" style={{ height: stroke, marginTop: Math.round(size * 0.5), background: ink }} />
+      <span
+        ref={textRef}
+        aria-hidden
+        className="relative font-[family-name:var(--font-wordmark)] font-semibold uppercase"
+        style={{
+          fontSize: size,
+          letterSpacing: `${tracking}em`,
+          marginRight: `-${tracking}em`,
+          marginLeft: lead + w + gap,
+          marginBottom: Math.round(size * 0.5) + stroke,
+          color: ink,
+          lineHeight: 1,
+        }}
+      >
+        Baseline
       </span>
     </span>
   );

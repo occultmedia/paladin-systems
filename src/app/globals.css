@@ -601,6 +601,60 @@ body {
   }
 }
 
+/* ── The logo's running light (components/logo.tsx) ─────────────────────── */
+/* A comet travels the logo line: each path is one dash (lengths in units of
+   pathLength 1000) whose front moves from the start of the line to past its
+   end; the long pause keeps it calm. Fixed values: dash offsets written with
+   var() do not animate smoothly. */
+.baseline-logo-run path {
+  animation-duration: 6s;
+  animation-timing-function: cubic-bezier(0.45, 0, 0.25, 1);
+  animation-iteration-count: infinite;
+}
+.baseline-logo-run path.blur {
+  filter: blur(3px);
+  opacity: 0.55;
+}
+@keyframes baseline-logo-run-22 {
+  0% { stroke-dashoffset: 22px; }
+  60%, 100% { stroke-dashoffset: -1228px; }
+}
+.baseline-logo-run .l22 {
+  stroke-dasharray: 22px 2000px;
+  stroke-dashoffset: 22px;
+  animation-name: baseline-logo-run-22;
+}
+@keyframes baseline-logo-run-110 {
+  0% { stroke-dashoffset: 110px; }
+  60%, 100% { stroke-dashoffset: -1140px; }
+}
+.baseline-logo-run .l110 {
+  stroke-dasharray: 110px 2000px;
+  stroke-dashoffset: 110px;
+  animation-name: baseline-logo-run-110;
+}
+@keyframes baseline-logo-run-140 {
+  0% { stroke-dashoffset: 140px; }
+  60%, 100% { stroke-dashoffset: -1110px; }
+}
+.baseline-logo-run .l140 {
+  stroke-dasharray: 140px 2000px;
+  stroke-dashoffset: 140px;
+  animation-name: baseline-logo-run-140;
+}
+@keyframes baseline-logo-run-220 {
+  0% { stroke-dashoffset: 220px; }
+  60%, 100% { stroke-dashoffset: -1030px; }
+}
+.baseline-logo-run .l220 {
+  stroke-dasharray: 220px 2000px;
+  stroke-dashoffset: 220px;
+  animation-name: baseline-logo-run-220;
+}
+@media (prefers-reduced-motion: reduce) {
+  .baseline-logo-run { display: none; }
+}
+
 /* ── Glass: frosted panels that float over maps, images and gradients ─── */
 @utility glass {
   background-color: rgb(255 255 255 / 0.62);
