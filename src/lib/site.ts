@@ -25,9 +25,17 @@ export const BILLING_LABEL: Record<Billing, string> = { monthly: "Monthly", year
 export const PER: Record<Billing, "month" | "year"> = { monthly: "month", yearly: "year" };
 export const PLANS: Record<Plan, { name: string; price: Record<Billing, number>; blurb: string }> = {
   standard: { name: "Standard", price: { monthly: 50, yearly: 550 }, blurb: "Every agency listing, value signals, watchlist and Market feed." },
-  pro: { name: "Pro", price: { monthly: 99, yearly: 1000 }, blurb: "Everything in Standard, plus property auctions, social media listings and Airbnb rental income." },
+  pro: { name: "Pro", price: { monthly: 99, yearly: 1000 }, blurb: "Everything in Standard, plus Aruba's notary property auctions, on the map and in your calendar." },
 };
-export const PRO_FEATURES = ["Property auctions in Aruba", "Listings posted on social media", "Airbnb rental income by area, with a yield calculator"];
+/** Agency websites the daily Index reads (scraper/terminal_spider SPIDERS), for the landing page. */
+export const INDEXED_AGENCIES = 8;
+
+export const PRO_FEATURES = [
+  "Notary property auctions in Aruba, on the map with date, time and status",
+  "Track Auction Date: a calendar file and alerts before the day",
+  "Coming soon: listings posted on social media",
+  "Coming soon: Airbnb rental income by area, with a yield calculator",
+];
 export const fmtPlanPrice = (p: Plan, b: Billing) => `$${PLANS[p].price[b].toLocaleString("en-US")}/${PER[b]}`;
 /** What paying yearly saves against 12 monthly payments ($50 Standard, $188 Pro). */
 export const yearlySavings = (p: Plan) => PLANS[p].price.monthly * 12 - PLANS[p].price.yearly;

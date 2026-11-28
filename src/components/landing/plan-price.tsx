@@ -6,10 +6,12 @@ import { useSyncExternalStore } from "react";
 import { BILLING_LABEL, BILLING_ORDER, PER, PLANS, PRO_FEATURES, yearlySavings, type Billing, type Plan } from "@/lib/site";
 
 const STANDARD_FEATURES = [
-  "Listings from Aruba agencies, updated daily",
+  "Listings from Aruba's agencies, indexed every morning",
+  "One pin per home: every agency's asking price side by side",
+  "Available, Under contract and Sold, with the land title",
   "Value signal, price history and Confidence Score",
   "AI morning briefing and a note on every listing",
-  "Watchlist and interested clients",
+  "Watchlist, interested clients and your own listings",
   "Members-only Market feed",
   "3D map, agent contact and CSV export",
 ];
@@ -81,7 +83,7 @@ export function PlanPrice({ plan }: { plan: Plan }) {
         {!pro && (
           <li className="flex items-center gap-3 text-[14px] text-zinc-400">
             <Lock size={12} strokeWidth={2} className="shrink-0" />
-            Auctions, social media and Airbnb income (Pro)
+            Notary auctions and auction alerts (Pro)
           </li>
         )}
       </ul>

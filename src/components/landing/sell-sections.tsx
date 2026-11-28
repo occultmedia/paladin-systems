@@ -156,7 +156,7 @@ export function AgentMorningCard({ m }: { m: AgentMorning }) {
 /* ── for investors ───────────────────────────────────────────────────── */
 
 export type InvestorExample = {
-  post: { name: string; company: string; title: string; body: string; amount: string; district: string };
+  post: { name: string; role: string; title: string; body: string; amount: string; district: string };
   belowMarket: number;
   offMarket: number;
 };
@@ -180,7 +180,7 @@ export function InvestorPostCard({ ex }: { ex: InvestorExample }) {
           </span>
           <div>
             <p className="text-[14px] font-semibold text-zinc-950">{ex.post.name}</p>
-            <p className="text-[12px] text-zinc-500">Investor · {ex.post.company}</p>
+            <p className="text-[12px] text-zinc-500">{ex.post.role}</p>
           </div>
         </div>
         <div className="mt-4 overflow-hidden rounded-xl border border-zinc-200">
@@ -206,7 +206,7 @@ export function InvestorPostCard({ ex }: { ex: InvestorExample }) {
 /* ── for brokers ─────────────────────────────────────────────────────── */
 
 export type BrokerExample = {
-  rows: Array<{ name: string; district: string; price: string; agency: string; color: string; change: string }>;
+  rows: Array<{ name: string; district: string; price: string; type: string; agencies: number; change: string }>;
   agencies: number;
 };
 
@@ -225,17 +225,14 @@ export function BrokerBoardCard({ ex }: { ex: BrokerExample }) {
       <ul className="divide-y divide-zinc-100">
         {ex.rows.map((r) => (
           <li key={r.name} className="flex items-center gap-3 px-5 py-3">
-            <span className="grid size-8 shrink-0 place-items-center rounded-md text-[10px] font-bold text-white" style={{ background: r.color }}>
-              {r.agency
-                .split(" ")
-                .map((w) => w[0])
-                .join("")
-                .slice(0, 2)}
+            <span className="grid size-8 shrink-0 place-items-center rounded-md bg-zinc-950 text-[10px] font-bold uppercase text-lime">
+              {r.type.slice(0, 3)}
             </span>
             <span className="min-w-0 flex-1">
               <span className="block truncate text-[13.5px] font-semibold text-zinc-950">{r.name}</span>
               <span className="block truncate text-[11.5px] text-zinc-500">
-                {r.agency} · {r.district}
+                {r.type} · {r.district}
+                {r.agencies > 1 && <> · {r.agencies} agencies</>}
               </span>
             </span>
             <span className="shrink-0 text-right">

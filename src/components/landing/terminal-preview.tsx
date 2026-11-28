@@ -26,8 +26,8 @@ export interface PreviewRow {
   priceToday: "down" | "up" | null;
   tenure: string;
   status: string;
-  agency: { name: string; color: string };
-  agent: string | null;
+  /** How many agencies list it: one pin, every agency's price. */
+  agencies: number;
 }
 
 export interface PreviewData {
@@ -41,8 +41,8 @@ export interface PreviewData {
     photo: string | null;
     price: string;
     tenure: string;
-    agency: { name: string; color: string };
-    agent: { name: string; title: string } | null;
+    /** Every agency's asking price for this home, lowest first (no names on the landing page). */
+    offers: string[];
     /** [x 0–1, y 0–1] points, y up */
     asking: Array<[number, number]>;
     /** today's estimate */
@@ -54,7 +54,7 @@ export interface PreviewData {
     events: Array<{ date: string; label: string; price: string; pct: number | null }>;
   };
   clients: {
-    listing: { name: string; district: string; price: string; photo: string | null; agent: string | null };
+    listing: { name: string; district: string; price: string; photo: string | null };
     people: Array<{ name: string; phone: string; comment: string; added: string }>;
   };
   watchlist: {
@@ -102,24 +102,6 @@ function Move({ pct }: { pct: number }) {
   );
 }
 
-function Monogram({ name, color, size = 18 }: { name: string; color: string; size?: number }) {
-  const initials = name
-    .split(/\s+/)
-    .filter((w) => /^[A-Z]/.test(w))
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join("");
-  return (
-    <span
-      aria-hidden
-      className="inline-flex shrink-0 items-center justify-center rounded-[4px] font-display font-bold text-white"
-      style={{ width: size, height: size, background: color, fontSize: size * 0.42 }}
-    >
-      {initials}
-    </span>
-  );
-}
-
 const STATUS_COLOR: Record<string, string> = { "For sale": UP, "Under contract": FLAT, Sold: DOWN, "De-listed": "#71717A" };
 
 /* ── panes ─────────────────────────────────────────────────────────────── */
@@ -163,9 +145,11 @@ function IndexPane({ data }: { data: PreviewData }) {
               ) : (
                 <span className="block h-9 w-12 rounded-md bg-zinc-100" />
               )}
-              <span className="absolute -bottom-1 -right-1 rounded-[5px] ring-2 ring-white">
-                <Monogram name={l.agency.name} color={l.agency.color} size={14} />
-              </span>
+              {l.agencies > 1 && (
+                <span className="absolute -bottom-1 -right-1 grid h-3.5 min-w-[14px] place-items-center rounded-[4px] bg-zinc-950 px-0.5 text-[8px] font-bold text-lime ring-2 ring-white" title={`Listed by ${l.agencies} agencies`}>
+                  {l.agencies}
+                </span>
+              )}
             </span>
             <span className="min-w-0 flex-1">
               <span className="flex items-center gap-1.5">
@@ -185,7 +169,7 @@ function IndexPane({ data }: { data: PreviewData }) {
                 <span className="rounded border px-1 text-[8px] font-semibold uppercase" style={{ color: l.tenure === "Erfpacht" ? "#8A6A2E" : "#0A0A0A", borderColor: l.tenure === "Erfpacht" ? "#8A6A2E55" : "#0A0A0A33" }}>
                   {l.tenure}
                 </span>
-                {l.agent && <span className="hidden truncate sm:inline">· {l.agent}</span>}
+                {l.agencies > 1 && <span className="hidden truncate sm:inline">· {l.agencies} agencies</span>}
               </span>
             </span>
             <span className="shrink-0 text-right">
@@ -286,16 +270,15 @@ export function HistoryPane({ data }: { data: PreviewData }) {
           </ul>
         </div>
         <div className="rounded-lg border border-zinc-200 bg-white p-3">
-          <p className="text-[9px] uppercase tracking-[0.14em] text-zinc-500">Listed by</p>
-          <p className="mt-1.5 flex items-center gap-1.5 text-[11px] font-semibold text-zinc-950">
-            <Monogram name={f.agency.name} color={f.agency.color} size={16} />
-            <span className="truncate">{f.agency.name}</span>
-          </p>
-          {f.agent && (
-            <p className="mt-1 truncate text-[10px] text-zinc-500">
-              Agent <span className="text-zinc-800">{f.agent.name}</span>
-            </p>
-          )}
+          <p className="text-[9px] uppercase tracking-[0.14em] text-zinc-500">Listed by {f.offers.length} {f.offers.length === 1 ? "agency" : "agencies"}</p>
+          <ul className="mt-1.5 space-y-1">
+            {f.offers.map((o, i) => (
+              <li key={i} className="flex items-center justify-between gap-2 text-[11px]">
+                <span className="text-zinc-500">{i === 0 ? "Lowest asking" : `Offer ${i + 1}`}</span>
+                <span className="font-semibold tabular-nums text-zinc-950">{o}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
     </div>
@@ -325,7 +308,6 @@ export function ClientsPane({ data }: { data: PreviewData }) {
           <span className="block truncate text-[12px] font-semibold text-zinc-950">{c.listing.name}</span>
           <span className="block truncate text-[10px] text-zinc-500">
             {c.listing.district} · {c.listing.price}
-            {c.listing.agent && <> · Agent {c.listing.agent}</>}
           </span>
         </span>
         <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-lime px-2 py-0.5 text-[10px] font-semibold text-zinc-950">

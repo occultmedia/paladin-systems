@@ -1,7 +1,7 @@
 import { perM2 } from "@/lib/units";
 import { RunLine } from "@/components/run-line";
 import Link from "next/link";
-import { ArrowRight, ArrowUpRight, FileSpreadsheet, Flag, Handshake, LineChart, Map as MapIcon, MessageCircle, Pin, Rss, Scale, ShieldCheck, Sparkles, Users } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Building2, CalendarClock, FileSpreadsheet, Gavel, Handshake, Landmark, Layers, LineChart, Map as MapIcon, Pin, PlusSquare, Rss, Scale, ShieldCheck, Sparkles, Users } from "lucide-react";
 import { SequenceLockup, Wordmark } from "@/components/logo";
 import { BillingToggle, PlanPrice } from "@/components/landing/plan-price";
 import { AIBadge } from "@/components/ai/ai-visuals";
@@ -16,7 +16,7 @@ import { scoreConfidence } from "@/lib/confidence";
 import { marketBrief } from "@/lib/scan-data";
 import { TerminalPreview, type PreviewData } from "@/components/landing/terminal-preview";
 import { MotionRoot, Reveal, Stagger, StaggerItem } from "@/components/motion/reveal";
-import { BILLING_LABEL, BILLING_ORDER, CONTACT_EMAIL, PLANS, PLAN_ORDER, SITE_DESCRIPTION, SITE_NAME, SITE_URL, yearlySavings } from "@/lib/site";
+import { BILLING_LABEL, BILLING_ORDER, CONTACT_EMAIL, INDEXED_AGENCIES, PLANS, PLAN_ORDER, SITE_DESCRIPTION, SITE_NAME, SITE_URL, yearlySavings } from "@/lib/site";
 import { Faq, type FaqItem } from "@/components/landing/faq";
 import {
   ALL_LISTINGS,
@@ -48,7 +48,8 @@ const usd = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
 const usdM = (n: number) => (n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(2)}M` : usd(n));
 const pct = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${Math.abs(n).toFixed(1)}%`;
 
-const AGENCIES = new Set(ALL_LISTINGS.map((l) => l.agency.id)).size;
+// The real number of agency websites indexed, not the sample data's (no agency is named on this page).
+const AGENCIES = INDEXED_AGENCIES;
 const NEW_THIS_WEEK = ALL_LISTINGS.filter((l) => l.days_on_market <= 7).length;
 
 
@@ -104,7 +105,7 @@ function previewData(): PreviewData {
     .map((id) => ALL_LISTINGS.find((l) => l.listing_id === id))
     .filter((l): l is Listing => Boolean(l))
     .slice(0, 6)
-    .map((l) => {
+    .map((l, i) => {
       const pt = priceToday.get(l.listing_id);
       return {
         id: l.listing_id,
@@ -118,8 +119,8 @@ function previewData(): PreviewData {
         priceToday: pt === undefined ? null : pt < 0 ? ("down" as const) : ("up" as const),
         tenure: l.tenure ?? "",
         status: l.status,
-        agency: { name: l.agency.name, color: l.agency.color },
-        agent: l.agent?.name ?? null,
+        // one sample home listed by two agencies: one row, both prices
+        agencies: i === 1 ? 2 : 1,
       };
     });
 
@@ -164,8 +165,7 @@ function previewData(): PreviewData {
       photo: f.photo_url,
       price: usdShort(f.asking_price_usd),
       tenure: f.tenure ?? "",
-      agency: { name: f.agency.name, color: f.agency.color },
-      agent: f.agent ? { name: f.agent.name, title: f.agent.title } : null,
+      offers: [usdShort(f.asking_price_usd), usdShort(f.asking_price_usd * 1.02)],
       asking,
       estimate: [1, ny(marketNow)] as [number, number],
       askingLabel: usdShort(f.asking_price_usd),
@@ -183,7 +183,6 @@ function previewData(): PreviewData {
         district: f.district,
         price: usdShort(f.asking_price_usd),
         photo: f.photo_url,
-        agent: f.agent?.name ?? null,
       },
       // Fictional sample leads for the preview.
       people: [
@@ -329,7 +328,7 @@ function agentMorning(): AgentMorning {
 const INVESTOR: InvestorExample = {
   post: {
     name: "Elena Vos",
-    company: "Coastline Ventures",
+    role: "Investor · verified member",
     title: "Investor wanted: 6-unit rental project in Noord",
     body: "Land secured and permits submitted for six 1-bed units. Looking for a capital partner for 40%. Projections and drawings on request.",
     amount: "$650,000",
@@ -341,10 +340,10 @@ const INVESTOR: InvestorExample = {
 
 const AI_EX = aiExamples();
 const STATS: Array<[string, string]> = [
-  [String(ALL_LISTINGS.length), "listings for sale, in one place"],
-  [String(AGENCIES), "agency websites checked every morning"],
-  [String(RUN.new_listings.length + RUN.price_changes.length + RUN.status_changes.length), "changes caught this morning"],
-  [String(ALL_LISTINGS.filter((l) => l.signal === "UNDERVALUED").length), "priced 20%+ below similar homes"],
+  [String(AGENCIES), "agency websites indexed every morning"],
+  ["1 pin", "per home, however many agencies list it"],
+  ["3", "statuses followed: available, under contract, sold"],
+  ["20%+", "below similar homes: flagged before you wake up"],
 ];
 const AGENT_AM = agentMorning();
 
@@ -352,7 +351,14 @@ function brokerExample(): BrokerExample {
   const rows = [
     ...RUN.new_listings.slice(0, 3).map((l) => ({ l, change: "New listing" })),
     ...RUN.price_changes.slice(0, 2).map((c) => ({ l: c.listing, change: `${pct(c.change.change_pct ?? 0)} price` })),
-  ].map(({ l, change }) => ({ name: l.asset_name, district: l.district, price: usdShort(l.asking_price_usd), agency: l.agency.name, color: l.agency.color, change }));
+  ].map(({ l, change }, i) => ({
+    name: l.asset_name,
+    district: l.district,
+    price: usdShort(l.asking_price_usd),
+    type: l.category === "Property" ? l.property_type : l.category,
+    agencies: i === 2 ? 3 : 1,
+    change,
+  }));
   return { rows, agencies: AGENCIES };
 }
 const BROKER = brokerExample();
@@ -363,7 +369,7 @@ const AUDIENCES: Audience[] = [
     label: "Agents",
     title: "Know the market before your first call.",
     points: [
-      "Every new listing, price cut and sale on the island, ready by 7 AM.",
+      "Every new listing, price cut, contract and sale on the island, ready by 7 AM.",
       "Price with proof: $/m² against comparable homes in the same district.",
       "Save interested clients on each listing. When the price drops, call them first.",
     ],
@@ -375,7 +381,7 @@ const AUDIENCES: Audience[] = [
     label: "Brokers",
     title: "Your whole office on one market picture.",
     points: [
-      "Every competing agency's new listings, price moves and sales in one daily feed.",
+      "Every competing agency's new listings, price moves and sales in one daily feed, one pin per home.",
       "The Confidence Score flags stale and ghost listings, so your team chases what is real.",
       "Team seats, CSV export and raw data access for your brokerage.",
     ],
@@ -389,7 +395,7 @@ const AUDIENCES: Audience[] = [
     points: [
       "AI flags homes priced 20% or more below similar homes every morning.",
       "Full price history and a Confidence Score on every listing for quick diligence.",
-      "Off-market deals and co-investment posts on the members-only Market feed.",
+      "Notary auctions on the map with Pro, plus off-market deals on the members-only Market feed.",
     ],
     cta: { label: "Join as an investor", href: "/signup" },
     visual: <InvestorPostCard ex={INVESTOR} />,
@@ -397,24 +403,28 @@ const AUDIENCES: Audience[] = [
 ];
 
 const HOW: Array<[string, string]> = [
-  ["We collect", "Listings from agency, broker and developer websites across Aruba, checked each morning and gathered in one place."],
-  ["AI analyzes", "Each price against comparable listings. Below market, above market and ghost listings flagged."],
-  ["You act first", "Read the morning brief, watch your pins and call the listing agent in one tap."],
+  ["We index", `Every morning Baseline reads ${INDEXED_AGENCIES} Aruba agency websites and the notaries' auction notices. A home listed by several agencies becomes one pin with every asking price.`],
+  ["AI analyzes", "Each price against similar homes in the same district. Below market, above market, price cuts and ghost listings flagged."],
+  ["You act first", "Read the morning briefing, follow your watchlist and auction dates, and call the listing agent in one tap."],
 ];
 
 const FEATURES: Array<[typeof Rss, string, string]> = [
-  [Rss, "Daily feed", "New listings, price changes and sales, every morning."],
+  [Rss, "Daily feed", "New listings, price cuts, contracts and sales, every morning."],
+  [Layers, "One pin per home", "Listed by several agencies? One pin, every agency's asking price side by side."],
+  [Building2, "Building projects", "Units of one development grouped together, with their price range."],
   [Scale, "Value signal", "Below market, At market or Above market against similar homes."],
-  [LineChart, "Price history", "Every price change since the day it was listed."],
+  [LineChart, "Status & history", "Available, Under contract or Sold, and every price change since it was listed."],
+  [Landmark, "Land title", "Eigendom or Erfpacht on every listing, with a filter for each."],
   [ShieldCheck, "Confidence Score", "Spots listings the agency forgot to take down."],
   [Sparkles, "AI Signal", "A morning briefing and a plain-English note per listing."],
   [Pin, "Watchlist", "Pin properties and see every move since you pinned."],
   [Users, "Interested clients", "Buyers on each listing with phone and notes."],
-  [MessageCircle, "Agent contact", "Call, WhatsApp or e-mail the listing agent in one tap."],
+  [PlusSquare, "Your own listings", "Add off-market or private listings; Baseline warns you about duplicates."],
   [Handshake, "Market feed", "The one page every member sees: off-market deals, buyer requests and rentals."],
-  [MapIcon, "3D map", "Tracked listings on a map of the island, with filters."],
+  [MapIcon, "3D map", "The island in 3D, with filters and a list that follows the map as you move."],
   [FileSpreadsheet, "CSV export", "Take any filtered list into your own spreadsheet."],
-  [Flag, "Flag sold listings", "Mark a listing as gone and it disappears for every member."],
+  [Gavel, "Notary auctions · Pro", "Aruba's property auctions on the map, with date, time and status."],
+  [CalendarClock, "Track Auction Date · Pro", "Add an auction to your calendar and get an alert before the day."],
 ];
 
 
@@ -480,11 +490,11 @@ function SectionHeading({ eyebrow, title, body, light }: { eyebrow: string; titl
 const FAQ: FaqItem[] = [
   {
     q: "Where does Baseline get its listings?",
-    a: `Every morning Baseline reads the public listing pages of Aruba's real estate agencies, brokers and developers (${AGENCIES} websites today) and collects every home, condo, villa, plot of land and commercial property for sale. Each listing shows the agency's logo and links back to the original page on its website.`,
+    a: `Every morning Baseline indexes the public listing pages of Aruba's real estate agencies (${AGENCIES} websites today): homes, condos, villas, land and commercial property for sale. When several agencies list the same home, it shows as one listing with every agency's asking price side by side. Each listing shows the agency's logo and links back to the original page on its website.`,
   },
   {
     q: "How often is the data updated?",
-    a: "Once a day, early in the morning, Aruba time. Each run picks up new listings, price changes and properties that went under contract, sold or came off the market, and adds them to the daily feed and to the price history of every listing.",
+    a: "Once a day, early in the morning, Aruba time. Each run picks up new listings, price changes and properties that went under contract, sold or came off the market, and adds them to the daily feed and to the price history of every listing. Filter the market by Available, Under contract or Sold.",
   },
   {
     q: "What do Below market, At market and Above market mean?",
@@ -493,6 +503,10 @@ const FAQ: FaqItem[] = [
   {
     q: "What is the Confidence Score?",
     a: "A score from 0 to 100 for how sure Baseline is that a listing is really still for sale. Agency sites often leave listings up long after a deal closes. The score starts at 100 and drops when a listing disappears from its source website, stays on the market for more than 6 months (more again after a year), or keeps the same price for more than 4 months.",
+  },
+  {
+    q: "What are the notary auctions in Pro?",
+    a: "Aruba's notaries publish the properties they will auction (executieveilingen). Baseline reads those public notices every morning and puts each auction on the map with its date, time, place and status, and follows it when it is postponed or cancelled. Tap Track Auction Date to add it to your calendar and get an alert before the day. The text of the notaries' documents is not stored.",
   },
   {
     q: "What if a listing has already been sold?",
@@ -512,7 +526,7 @@ const FAQ: FaqItem[] = [
   },
   {
     q: "How much does it cost?",
-    a: `Two plans, billed monthly or once a year. Standard is $${PLANS.standard.price.monthly} a month or $${PLANS.standard.price.yearly} a year (saves $${yearlySavings("standard")}) and has every agency listing, the value signals, watchlist and Market feed. Pro is $${PLANS.pro.price.monthly} a month or $${PLANS.pro.price.yearly.toLocaleString("en-US")} a year (saves $${yearlySavings("pro")}) and adds property auctions, listings from social media, and Airbnb rental income by area with a yield calculator for investors. You can move from Standard to Pro in Settings. Teams that need several seats can contact us for team access.`,
+    a: `Two plans, billed monthly or once a year. Standard is $${PLANS.standard.price.monthly} a month or $${PLANS.standard.price.yearly} a year (saves $${yearlySavings("standard")}) and has every agency listing, the value signals, watchlist and Market feed. Pro is $${PLANS.pro.price.monthly} a month or $${PLANS.pro.price.yearly.toLocaleString("en-US")} a year (saves $${yearlySavings("pro")}) and adds Aruba's notary property auctions with calendar tracking and alerts; listings from social media and Airbnb rental income by area are coming to Pro next. You can move from Standard to Pro in Settings. Teams that need several seats can contact us for team access.`,
   },
   {
     q: "My agency's listings are missing or wrong. What do I do?",
@@ -593,7 +607,7 @@ export default function Home() {
                 </h2>
               </div>
               <p className="max-w-[40ch] text-[15px] leading-relaxed text-zinc-600">
-                What changed overnight, what each listing is worth and who is selling it.
+                What changed overnight, what each listing is worth and every agency&rsquo;s asking price.
               </p>
             </Reveal>
             <Reveal delay={0.1} y={28} className="mt-10 min-w-0 sm:mt-12">
